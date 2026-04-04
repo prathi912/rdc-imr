@@ -4,6 +4,7 @@
 import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, EmrInterest, User, Author, ApprovalStage } from '@/types';
 import { parseISO, getYear } from 'date-fns';
+import { GovernanceLogger } from '@/lib/governance-logger';
 
 // --- Policy Constants ---
 const POLICY = {
@@ -637,7 +638,7 @@ export async function calculateArpsForUser(userId: string, year: number) {
         grade += ' (Minimum 10 publications required)';
     }
 
-    return {
+    const result = {
         success: true,
         data: {
             publications: { raw: round(rawPubScore), weighted: round(weightedPub), final: round(finalPubScore), contributingClaims: publicationContributingClaims },
@@ -656,6 +657,17 @@ export async function calculateArpsForUser(userId: string, year: number) {
             }
         }
     };
+
+    // Policy Traceability Logging
+    await GovernanceLogger.logPolicyTrace({
+        policyName: 'ARPS_V2',
+        entityId: userId,
+        inputs: { userId, year, startDate: startDate.toISOString(), endDate: endDate.toISOString() },
+        outputs: { totalArps: totalArps, grade },
+        logicVersion: '2.1.0'
+    });
+
+    return result;
 
   } catch (error: any) {
     console.error("Error calculating ARPS:", error);

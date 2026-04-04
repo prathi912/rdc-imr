@@ -27,6 +27,7 @@ import type * as z from "zod"
 import { awardInitialGrant, addGrantPhase, updatePhaseStatus } from "./grant-actions"
 import { generateSanctionOrder } from "./document-actions"
 import { logEvent, LogCategory } from "@/lib/logger"
+import { GovernanceLogger } from "@/lib/governance-logger"
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -580,7 +581,19 @@ export async function getSystemSettings(): Promise<SystemSettings> {
 export async function updateSystemSettings(settings: SystemSettings): Promise<{ success: boolean; error?: string }> {
   try {
     const settingsRef = adminDb.collection("system").doc("settings")
+    const oldSettings = await getSystemSettings();
+
     await settingsRef.set(settings, { merge: true })
+    
+    // Config Change Logging
+    await GovernanceLogger.logEntityChange(
+        'main',
+        'SYSTEM_SETTINGS',
+        'SYSTEM_ADMIN',
+        oldSettings,
+        settings
+    );
+
     await logActivity("INFO", "System settings updated", { newSettings: settings })
     return { success: true }
   } catch (error: any) {
@@ -833,11 +846,32 @@ export async function getLogs(filters: {
     }
 
     const snapshot = await query.get();
-    let logs = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      timestamp: doc.data().timestamp.toDate().toISOString(),
-    }));
+    let logs = snapshot.docs.map(doc => {
+      const data = doc.data();
+      let dateValue: Date;
+
+      // Robust date parsing for Firestore data
+      if (data.timestamp && typeof data.timestamp.toDate === 'function') {
+        dateValue = data.timestamp.toDate();
+      } else if (data.timestamp instanceof Date) {
+        dateValue = data.timestamp;
+      } else if (typeof data.timestamp === 'string' || typeof data.timestamp === 'number') {
+        dateValue = new Date(data.timestamp);
+      } else {
+        dateValue = new Date(); // Fallback to current date if missing
+      }
+
+      // Final validation to ensure date is valid before calling toISOString
+      const isoTimestamp = !isNaN(dateValue.getTime()) 
+        ? dateValue.toISOString() 
+        : new Date().toISOString();
+
+      return {
+        id: doc.id,
+        ...data,
+        timestamp: isoTimestamp,
+      };
+    });
 
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
@@ -851,6 +885,21 @@ export async function getLogs(filters: {
     return { success: true, logs };
   } catch (error: any) {
     console.error("Error fetching logs:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function exportLogs(filters: {
+  category?: LogCategory | 'ALL';
+  duration?: 'today' | '24h' | '7d' | '30d' | 'all';
+  search?: string;
+}) {
+  try {
+    // Re-use logic from getLogs but with a much higher limit (e.g., 2000)
+    // for a comprehensive report.
+    return await getLogs({ ...filters, limit: 2000 });
+  } catch (error: any) {
+    console.error("Error exporting logs:", error);
     return { success: false, error: error.message };
   }
 }
@@ -890,6 +939,16 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     }
 
     await projectRef.update(updateData)
+    
+    // Entity History Logging
+    await GovernanceLogger.logEntityChange(
+        projectId,
+        'PROJECT',
+        'SYSTEM_ADMIN',
+        project,
+        { ...project, ...updateData }
+    );
+
     await logActivity("INFO", "Project status updated", { projectId, newStatus, piUid: project.pi_uid })
     await logEvent('WORKFLOW', 'Project status updated', {
       metadata: { projectId, newStatus, title: project.title, comments },
@@ -974,6 +1033,16 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
     const claim = claimSnap.data() as IncentiveClaim
 
     await claimRef.update({ status: newStatus })
+    
+    // Entity History Logging
+    await GovernanceLogger.logEntityChange(
+        claimId,
+        'CLAIM',
+        'SYSTEM_ADMIN', // Ideally we pass the current user session here
+        claim,
+        { ...claim, status: newStatus }
+    );
+
     await logActivity("INFO", "Incentive claim status updated", { claimId, newStatus, userId: claim.uid })
     await logEvent('WORKFLOW', 'Incentive claim status updated', {
       metadata: { claimId, newStatus, userName: claim.userName, claimId_human: claim.claimId },
@@ -2590,6 +2659,16 @@ export async function bulkUploadProjects(
   }
 
   await logActivity('INFO', 'Bulk project upload completed', { successfulCount, failureCount: failures.length });
+  
+  // Data Quality Governance Logging
+  await GovernanceLogger.logPolicyTrace({
+      policyName: 'BULK_PROJECT_IMPORT',
+      entityId: `BATCH-${new Date().getTime()}`,
+      inputs: { rowCount: projectsData.length },
+      outputs: { successfulCount, failureCount: failures.length, failureSamples: failures.slice(0, 5) },
+      logicVersion: '1.0.1'
+  });
+
   if (failures.length > 0) {
     await logActivity('WARNING', 'Some projects failed during bulk upload', { failures });
   }
@@ -2670,3 +2749,16 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
   }
 }
 
+
+/**
+ * Audit-grade document access tracking. Call this when a user views/downloads a research PPT or Proposal.
+ */
+export async function trackDocumentAccess(userId: string, resourceId: string, action: 'READ' | 'DOWNLOAD', metadata?: any) {
+ try {
+ await GovernanceLogger.logAccessAudit(userId, resourceId, action, metadata);
+ return { success: true };
+ } catch (error) {
+  console.error('Failed to log document access:', error);
+ return { success: false };
+ }
+}

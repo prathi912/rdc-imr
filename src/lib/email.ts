@@ -120,7 +120,7 @@ export async function sendEmail({ to, cc, bcc, subject, html, attachments, from 
   try {
     await transporter.sendMail(mailOptions);
     console.log(`Email sent successfully to ${to} from ${selectedSender} account.`);
-    await logEvent('NOTIFICATION', 'Email sent successfully', {
+    await logEvent('NOTIFICATION', `Email sent successfully: ${subject}`, {
       metadata: { to, subject, from: selectedSender, attachments: attachments?.length || 0 },
       status: 'success'
     });
@@ -140,7 +140,7 @@ export async function sendEmail({ to, cc, bcc, subject, html, attachments, from 
           from: fallbackFromAddress,
         });
         console.warn(`RDC email failed for ${to}. Sent successfully using default account instead.`);
-        await logEvent('NOTIFICATION', 'Fallback email sent successfully', {
+        await logEvent('NOTIFICATION', `Fallback email sent successfully: ${subject}`, {
           metadata: { to, subject, from: 'default', originalError: error.message },
           status: 'warning'
         });
@@ -161,7 +161,7 @@ export async function sendEmail({ to, cc, bcc, subject, html, attachments, from 
     console.error(`Error Message: ${error.message}`);
     console.error(`Full Error Object:`, error);
     console.error(`---------------------------`);
-    await logEvent('NOTIFICATION', 'Email sending failed', {
+    await logEvent('NOTIFICATION', `Email sending failed: ${subject}`, {
       metadata: { to, subject, error: error.message, stack: error.stack },
       status: 'error'
     });

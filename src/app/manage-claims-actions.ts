@@ -10,6 +10,7 @@ import ExcelJS from 'exceljs';
 import { getSystemSettings } from './actions';
 import { format } from 'date-fns';
 import { FieldPath } from 'firebase-admin/firestore';
+import { GovernanceLogger } from '@/lib/governance-logger';
 
 // --- Centralized Logging Service ---
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
@@ -69,12 +70,29 @@ export async function markPaymentsCompleted(claimIds: string[]): Promise<{ succe
           continue;
       }
       
-      // Update status in the batch
-      batch.update(doc.ref, { status: 'Payment Completed' });
-      
       // Prepare notification and email
       const claimTitle = claim.paperTitle || claim.publicationTitle || claim.patentTitle || 'your recent incentive claim';
 
+      // Update status in the batch
+      batch.update(doc.ref, { status: 'Payment Completed' });
+
+      // Atomic Ledger Integration
+      const { ref: ledgerRef, data: ledgerData } = GovernanceLogger.prepareFinancialLedger({
+        source: 'INCENTIVE',
+        entityId: claim.id,
+        userId: claim.uid,
+        amount: claim.finalApprovedAmount || 0,
+        type: 'CREDIT',
+        status: 'PROCESSED',
+        metadata: {
+            claimId_human: claim.claimId,
+            paperTitle: claimTitle,
+            paymentSheetRef: claim.paymentSheetRef,
+            userEmail: claim.userEmail
+        }
+      });
+      batch.set(ledgerRef, ledgerData);
+      
       const notification = {
         uid: claim.uid,
         title: `Payment for your claim "${claimTitle}" has been processed.`,
@@ -233,7 +251,7 @@ export async function generateIncentivePaymentSheet(
     }
     
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(templateContent);
+    await workbook.xlsx.load(templateContent as any);
     const worksheet = workbook.worksheets[0]; // Get the first worksheet by index
 
     if (!worksheet) {
@@ -333,7 +351,7 @@ export async function downloadPaymentSheetByRef(
     }
     
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(templateContent);
+    await workbook.xlsx.load(templateContent as any);
     const worksheet = workbook.worksheets[0];
 
     if (!worksheet) {

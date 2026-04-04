@@ -8,7 +8,8 @@ import path from 'path';
 import { sendEmail as sendEmailUtility } from "@/lib/email";
 import { formatInTimeZone, toDate } from "date-fns-tz";
 import type * as z from 'zod';
-import { addDays, setHours, setMinutes, setSeconds, addHours, format, parseISO } from "date-fns";
+import { addDays, setHours, setMinutes, setSeconds, addHours, format, parseISO, differenceInHours } from "date-fns";
+import { GovernanceLogger } from "@/lib/governance-logger";
 
 
 // --- Centralized Logging Service ---
@@ -988,6 +989,22 @@ export async function addEmrEvaluation(
     const interestSnap = await adminDb.collection("emrInterests").doc(interestId).get()
     if (interestSnap.exists) {
       const interest = interestSnap.data() as EmrInterest
+      
+      // SLA Tracking
+      if (interest.meetingSlot?.date) {
+        const deadlineDate = new Date(`${interest.meetingSlot.date}T${interest.meetingSlot.time || '00:00'}:00`);
+        const now = new Date();
+        const delayHours = differenceInHours(now, deadlineDate);
+        
+        await GovernanceLogger.logPolicyTrace({
+            policyName: 'SLA_EMR_EVALUATION',
+            entityId: interestId,
+            inputs: { deadline: deadlineDate.toISOString(), completion: now.toISOString() },
+            outputs: { delayHours, isBreached: delayHours > 24 }, // Breach if > 24h after meeting
+            logicVersion: '1.0.0'
+        });
+      }
+
       const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get()
       if (!superAdminUsersSnapshot.empty) {
         const batch = adminDb.batch()

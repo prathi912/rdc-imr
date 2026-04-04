@@ -37,9 +37,10 @@ import {
   AlertCircle,
   CheckCircle2,
   Info,
-  ShieldAlert
+  ShieldAlert,
+  Download
 } from "lucide-react";
-import { getLogs } from "@/app/actions";
+import { getLogs, exportLogs } from "@/app/actions";
 import { LogCategory } from "@/lib/logger";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
@@ -77,6 +78,49 @@ export function LogViewer() {
   const [duration, setDuration] = useState<string>("today");
   const [search, setSearch] = useState("");
   const [selectedLog, setSelectedLog] = useState<any>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    try {
+      setDownloading(true);
+      const result = await exportLogs({ category, duration: duration as any, search });
+      if (result.success && result.logs) {
+        // Generate CSV
+        const headers = ["Timestamp", "Category", "Status", "User", "Role", "Message", "Path", "Request ID"];
+        const rows = result.logs.map((log: any) => [
+          log.timestamp,
+          log.category,
+          log.status,
+          log.userEmail || "System",
+          log.userRole || "N/A",
+          `"${log.message?.replace(/"/g, '""')}"`,
+          log.path || "N/A",
+          log.requestId
+        ]);
+
+        const csvContent = [
+          headers.join(","),
+          ...rows.map((row: any) => row.join(","))
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `rdc_system_logs_${format(new Date(), "yyyyMMdd_HHmmss")}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast({ title: "Success", description: "Report downloaded successfully." });
+      } else {
+        toast({ variant: "destructive", title: "Error", description: result.error || "Failed to export logs." });
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "An error occurred during export." });
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const fetchLogs = useCallback(async (isRefresh = false) => {
     try {
@@ -174,8 +218,20 @@ export function LogViewer() {
               size="icon" 
               onClick={() => fetchLogs(true)}
               disabled={refreshing}
+              title="Refresh Logs"
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={handleDownload}
+              disabled={downloading}
+              title="Download CSV Report"
+              className="text-primary border-primary/50 hover:bg-primary/10"
+            >
+              <Download className={`h-4 w-4 ${downloading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>

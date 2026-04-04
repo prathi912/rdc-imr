@@ -9,6 +9,7 @@ import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility'
 import { sendEmail } from '@/lib/email';
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import { getDefaultModulesForRole } from '@/lib/modules';
+import { GovernanceLogger } from '@/lib/governance-logger';
 
 const EMAIL_STYLES = {
   background: 'style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;"',
@@ -462,6 +463,21 @@ export async function processIncentiveClaimAction(
 
     await claimRef.update(updateData);
     
+    // AI/System Integrity Governance: Track manual overrides
+    const systemAmount = claim.calculatedIncentive || 0;
+    const humanAmount = effectiveApprovedAmount;
+    const deviation = systemAmount > 0 ? Math.abs(humanAmount - systemAmount) / systemAmount : 0;
+    
+    if (deviation > 0.2 && systemAmount > 0) { // >20% deviation
+        await GovernanceLogger.logPolicyTrace({
+            policyName: 'INCENTIVE_OVERRIDE_DETECTION',
+            entityId: claimId,
+            inputs: { systemCalculated: systemAmount, humanApproved: humanAmount, approverEmail: approver.email },
+            outputs: { deviationPercentage: (deviation * 100).toFixed(2), action: 'OVERRIDE_FLAGGED' },
+            logicVersion: '1.0.0'
+        });
+    }
+
     const claimTitle = getClaimTitle(claim);
 
     if (action === 'reject' && claim.userEmail) {
