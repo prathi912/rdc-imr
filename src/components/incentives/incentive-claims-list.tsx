@@ -14,8 +14,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { db } from '@/lib/config';
+import { db, db_rtdb } from '@/lib/config';
 import { collection, getDocs, doc, updateDoc, orderBy, query } from 'firebase/firestore';
+import { ref, update } from 'firebase/database';
 import type { IncentiveClaim } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -51,6 +52,18 @@ export function IncentiveClaimsList() {
     try {
       const claimDoc = doc(db, 'incentiveClaims', id);
       await updateDoc(claimDoc, { status: newStatus });
+
+      // Sync to Realtime Database
+      try {
+        const rtdbRef = ref(db_rtdb, `incentiveClaims/${id}`);
+        await update(rtdbRef, { 
+          status: newStatus,
+          lastSyncedAt: new Date().toISOString()
+        });
+      } catch (rtdbError) {
+        console.error("RTDB Sync Error (handleStatusChange):", rtdbError);
+      }
+
       toast({ title: 'Status Updated', description: "The claim's status has been changed." });
       fetchClaims(); 
     } catch (error) {
@@ -58,6 +71,7 @@ export function IncentiveClaimsList() {
        toast({ variant: 'destructive', title: "Error", description: "Could not update status." });
     }
   }, [fetchClaims, toast]);
+
   
   if (loading) {
     return (

@@ -2,7 +2,7 @@
 
 'use server';
 
-import { adminDb } from '@/lib/admin';
+import { adminDb, adminRtdb } from '@/lib/admin';
 import type { IncentiveClaim, User } from '@/types';
 import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
 import { sendEmail as sendEmailUtility } from "@/lib/email";
@@ -75,6 +75,17 @@ export async function markPaymentsCompleted(claimIds: string[]): Promise<{ succe
 
       // Update status in the batch
       batch.update(doc.ref, { status: 'Payment Completed' });
+
+      // Sync to Realtime Database
+      try {
+        await adminRtdb.ref(`incentiveClaims/${claim.id}`).update({
+          status: 'Payment Completed',
+          lastSyncedAt: new Date().toISOString()
+        });
+      } catch (rtdbError) {
+        console.error(`RTDB Sync Error (markPaymentsCompleted) for claim ${claim.id}:`, rtdbError);
+      }
+
 
       // Atomic Ledger Integration
       const { ref: ledgerRef, data: ledgerData } = GovernanceLogger.prepareFinancialLedger({
@@ -171,6 +182,17 @@ export async function submitToAccounts(claimIds: string[]): Promise<{ success: b
             continue;
         }
         batch.update(doc.ref, { status: 'Submitted to Accounts' });
+        
+        // Sync to Realtime Database
+        try {
+          await adminRtdb.ref(`incentiveClaims/${doc.id}`).update({
+            status: 'Submitted to Accounts',
+            lastSyncedAt: new Date().toISOString()
+          });
+        } catch (rtdbError) {
+          console.error(`RTDB Sync Error (submitToAccounts) for claim ${doc.id}:`, rtdbError);
+        }
+
       processedCount++;
     }
 
@@ -260,16 +282,29 @@ export async function generateIncentivePaymentSheet(
     
     const batch = adminDb.batch();
     let totalAmount = 0;
+    const paymentData: any[] = [];
 
-    const paymentData = payableClaims.map((claim, index) => {
-      const user = usersMap.get(claim.uid);
+    for (let index = 0; index < payableClaims.length; index++) {
+      const claim = payableClaims[index];
+      const user = usersMap.get(claim.uid) as any;
       const amount = claim.finalApprovedAmount || 0;
       totalAmount += amount;
       
       const claimRef = adminDb.collection('incentiveClaims').doc(claim.id);
       batch.update(claimRef, { paymentSheetRef: referenceNumber, paymentSheetRemarks: remarks[claim.id] || '' });
       
-      return {
+      // Sync to Realtime Database
+      try {
+        await adminRtdb.ref(`incentiveClaims/${claim.id}`).update({
+          paymentSheetRef: referenceNumber,
+          paymentSheetRemarks: remarks[claim.id] || '',
+          lastSyncedAt: new Date().toISOString()
+        });
+      } catch (rtdbError) {
+        console.error(`RTDB Sync Error (generateIncentivePaymentSheet) for claim ${claim.id}:`, rtdbError);
+      }
+
+      paymentData.push({
         [`beneficiary_${index + 1}`]: user?.bankDetails?.beneficiaryName || user?.name || '',
         [`account_${index + 1}`]: user?.bankDetails?.accountNumber || '',
         [`ifsc_${index + 1}`]: user?.bankDetails?.ifscCode || '',
@@ -278,10 +313,10 @@ export async function generateIncentivePaymentSheet(
         [`college_${index + 1}`]: getInstituteAcronym(user?.institute),
         [`mis_${index + 1}`]: user?.misId || '',
         [`remarks_${index + 1}`]: remarks[claim.id] || '',
-      };
-    });
+      });
+    }
 
-    const flatData: { [key: string]: any } = paymentData.reduce((acc, item) => ({ ...acc, ...item }), {});
+    const flatData: { [key: string]: any } = Object.assign({}, ...paymentData);
     
     flatData.date = format(new Date(), 'dd/MM/yyyy');
     flatData.reference_number = referenceNumber;

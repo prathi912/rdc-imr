@@ -42,6 +42,7 @@ function ensureAdminInitialized() {
         privateKey: privateKey,
       }),
       storageBucket,
+      databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
     });
   } catch (error: any) {
     console.error(
@@ -80,9 +81,17 @@ export const adminDb = new Proxy({} as admin.firestore.Firestore, {
   },
 });
 
+export const adminRtdb = new Proxy({} as admin.database.Database, {
+    get(target, prop) {
+      const service = getService(() => admin.database());
+      return Reflect.get(service, prop);
+    },
+});
+
 export const adminStorage = new Proxy({} as admin.storage.Storage, {
   get(target, prop) {
     const service = getService(() => admin.storage());
     return Reflect.get(service, prop);
   },
 });
+

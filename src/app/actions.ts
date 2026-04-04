@@ -1,7 +1,6 @@
-
 'use server';
 
-import { adminDb, adminStorage } from "@/lib/admin"
+import { adminDb, adminStorage, adminRtdb } from "@/lib/admin"
 import { FieldValue } from "firebase-admin/firestore"
 import admin from "firebase-admin"
 import type {
@@ -1033,6 +1032,16 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
     const claim = claimSnap.data() as IncentiveClaim
 
     await claimRef.update({ status: newStatus })
+
+    // Sync to Realtime Database
+    try {
+      await adminRtdb.ref(`incentiveClaims/${claimId}`).update({
+        status: newStatus,
+        lastSyncedAt: new Date().toISOString()
+      });
+    } catch (rtdbError) {
+      console.error(`RTDB Sync Error (updateIncentiveClaimStatus) for claim ${claimId}:`, rtdbError);
+    }
     
     // Entity History Logging
     await GovernanceLogger.logEntityChange(

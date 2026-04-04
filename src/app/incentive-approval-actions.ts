@@ -2,7 +2,7 @@
 
 'use server';
 
-import { adminDb } from '@/lib/admin';
+import { adminDb, adminRtdb } from '@/lib/admin';
 import type { IncentiveClaim, SystemSettings, ApprovalStage, User, ResearchPaper, Author } from '@/types';
 import { getSystemSettings } from './actions';
 import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
@@ -152,7 +152,20 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
 
         await newClaimRef.set(finalClaimData, { merge: true });
 
+        // Sync to Realtime Database
+        try {
+            await adminRtdb.ref(`incentiveClaims/${claimId}`).set({
+                id: claimId,
+                ...finalClaimData,
+                lastSyncedAt: new Date().toISOString()
+            });
+        } catch (rtdbError) {
+            console.error("RTDB Sync Error (submitIncentiveClaim):", rtdbError);
+            // We don't fail the whole action if RTDB sync fails, but we log it
+        }
+
         // Only send notifications to co-authors if this is the original author's claim.
+
         // If this is a co-author claim (has originalClaimId), skip notifications as the original author already added them.
         const isCoAuthorClaim = !!claimData.originalClaimId;
         
@@ -263,7 +276,16 @@ export async function deleteIncentiveClaim(claimId: string, userId: string): Pro
         }
 
         await claimRef.delete();
+        
+        // Sync to Realtime Database
+        try {
+            await adminRtdb.ref(`incentiveClaims/${claimId}`).remove();
+        } catch (rtdbError) {
+            console.error("RTDB Sync Error (deleteIncentiveClaim):", rtdbError);
+        }
+
         await logActivity('INFO', 'Incentive claim draft deleted', { claimId, userId });
+
         return { success: true };
         
     } catch (error: any) {
@@ -463,7 +485,18 @@ export async function processIncentiveClaimAction(
 
     await claimRef.update(updateData);
     
+    // Sync to Realtime Database
+    try {
+        await adminRtdb.ref(`incentiveClaims/${claimId}`).update({
+            ...updateData,
+            lastSyncedAt: new Date().toISOString()
+        });
+    } catch (rtdbError) {
+        console.error("RTDB Sync Error (processIncentiveClaimAction):", rtdbError);
+    }
+    
     // AI/System Integrity Governance: Track manual overrides
+
     const systemAmount = claim.calculatedIncentive || 0;
     const humanAmount = effectiveApprovedAmount;
     const deviation = systemAmount > 0 ? Math.abs(humanAmount - systemAmount) / systemAmount : 0;
