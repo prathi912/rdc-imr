@@ -28,3 +28,5 @@ patch.txt
 .env
 .env.*
 !.env.production
+
+deploy.ps1
