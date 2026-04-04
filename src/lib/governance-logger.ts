@@ -77,10 +77,10 @@ export const GovernanceLogger = {
    * Tracks state evolution and field-level changes for critical entities.
    */
   async logEntityChange(
-    entityId: string, 
-    entityType: EntityChange['entityType'], 
-    changedBy: string, 
-    before: Record<string, any>, 
+    entityId: string,
+    entityType: EntityChange['entityType'],
+    changedBy: string,
+    before: Record<string, any>,
     after: Record<string, any>
   ) {
     const diff: Record<string, any> = {};
