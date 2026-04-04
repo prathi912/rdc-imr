@@ -4,7 +4,7 @@ steps:
     args:
       - 'build'
       - '--tag'
-      - '$_AR_HOSTNAME/$PROJECT_ID/rdc-repo/rdc-imr'
+      - '$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$_SERVICE_NAME'
       - '--build-arg'
       - 'NEXT_PUBLIC_FIREBASE_API_KEY=$_NEXT_PUBLIC_FIREBASE_API_KEY'
       - '--build-arg'
@@ -27,16 +27,16 @@ steps:
 
   # Push the container image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '$_AR_HOSTNAME/$PROJECT_ID/rdc-repo/rdc-imr']
+    args: ['push', '$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$_SERVICE_NAME']
 
   # Deploy the container to Cloud Run with runtime environment variables
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - 'run'
       - 'deploy'
-      - 'rdc-imr'
+      - '$_SERVICE_NAME'
       - '--image'
-      - '$_AR_HOSTNAME/$PROJECT_ID/rdc-repo/rdc-imr'
+      - '$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$_SERVICE_NAME'
       - '--region'
       - '$_DEPLOY_REGION'
       - '--platform'
@@ -46,11 +46,14 @@ steps:
       - 'FIREBASE_PRIVATE_KEY=$_FIREBASE_PRIVATE_KEY,GEMINI_API_KEY=$_GEMINI_API_KEY,GENERATIVE_AI_API_KEY=$_GENERATIVE_AI_API_KEY,WOS_API_KEY=$_WOS_API_KEY,SPRINGER_API_KEY=$_SPRINGER_API_KEY,SCOPUS_API_KEY=$_SCOPUS_API_KEY'
 
 images:
-  - '$_AR_HOSTNAME/$PROJECT_ID/rdc-repo/rdc-imr'
+  - '$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$_SERVICE_NAME'
 
 substitutions:
   _AR_HOSTNAME: 'asia-south1-docker.pkg.dev'
   _DEPLOY_REGION: 'asia-south1'
+  _AR_REPOSITORY: 'rdc-repo'
+  _SERVICE_NAME: 'rdc-imr'
+  _AR_PROJECT_ID: 'rdc-imr-emr-portal-776a7'
   _NEXT_PUBLIC_FIREBASE_API_KEY: ''
   _NEXT_PUBLIC_FIREBASE_APP_ID: ''
   _NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ''
