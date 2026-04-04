@@ -179,17 +179,20 @@ export async function bulkUploadIncentiveClaims(
 
       // Sync to Realtime Database after successful Firestore commit
       try {
-          const syncPromises = rtdbSyncTasks.map(task => 
-              adminRtdb.ref(`incentiveClaims/${task.id}`).set({
+          const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
+          const syncPromises = rtdbSyncTasks.map(task => {
+              const sanitizedData = sanitizeForRtdb({
                   id: task.id,
                   ...task.data,
                   lastSyncedAt: new Date().toISOString()
-              })
-          );
+              });
+              return adminRtdb.ref(`incentiveClaims/${task.id}`).set(sanitizedData);
+          });
           await Promise.all(syncPromises);
       } catch (rtdbError) {
           console.error("RTDB Bulk Sync Error:", rtdbError);
       }
+
 
       await logActivity('INFO', 'Bulk incentive claims processed', { successfulClaimsCount: successfulClaims.length, errors });
       return { 

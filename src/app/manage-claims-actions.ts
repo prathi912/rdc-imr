@@ -78,13 +78,16 @@ export async function markPaymentsCompleted(claimIds: string[]): Promise<{ succe
 
       // Sync to Realtime Database
       try {
-        await adminRtdb.ref(`incentiveClaims/${claim.id}`).update({
+        const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
+        const sanitizedUpdate = sanitizeForRtdb({
           status: 'Payment Completed',
           lastSyncedAt: new Date().toISOString()
         });
+        await adminRtdb.ref(`incentiveClaims/${claim.id}`).update(sanitizedUpdate);
       } catch (rtdbError) {
         console.error(`RTDB Sync Error (markPaymentsCompleted) for claim ${claim.id}:`, rtdbError);
       }
+
 
 
       // Atomic Ledger Integration
@@ -185,13 +188,16 @@ export async function submitToAccounts(claimIds: string[]): Promise<{ success: b
         
         // Sync to Realtime Database
         try {
-          await adminRtdb.ref(`incentiveClaims/${doc.id}`).update({
+          const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
+          const sanitizedUpdate = sanitizeForRtdb({
             status: 'Submitted to Accounts',
             lastSyncedAt: new Date().toISOString()
           });
+          await adminRtdb.ref(`incentiveClaims/${doc.id}`).update(sanitizedUpdate);
         } catch (rtdbError) {
           console.error(`RTDB Sync Error (submitToAccounts) for claim ${doc.id}:`, rtdbError);
         }
+
 
       processedCount++;
     }
@@ -295,14 +301,17 @@ export async function generateIncentivePaymentSheet(
       
       // Sync to Realtime Database
       try {
-        await adminRtdb.ref(`incentiveClaims/${claim.id}`).update({
+        const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
+        const sanitizedUpdate = sanitizeForRtdb({
           paymentSheetRef: referenceNumber,
           paymentSheetRemarks: remarks[claim.id] || '',
           lastSyncedAt: new Date().toISOString()
         });
+        await adminRtdb.ref(`incentiveClaims/${claim.id}`).update(sanitizedUpdate);
       } catch (rtdbError) {
         console.error(`RTDB Sync Error (generateIncentivePaymentSheet) for claim ${claim.id}:`, rtdbError);
       }
+
 
       paymentData.push({
         [`beneficiary_${index + 1}`]: user?.bankDetails?.beneficiaryName || user?.name || '',

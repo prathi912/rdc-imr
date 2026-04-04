@@ -16,7 +16,9 @@ export async function GET(request: NextRequest) {
       hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
       hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
       hasStorageBucket: !!process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      hasDatabaseUrl: !!process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
     };
+
     
     // Test Service Account Variable
     if (results.debug.environment.hasProjectId && results.debug.environment.hasClientEmail && results.debug.environment.hasPrivateKey) {
@@ -90,6 +92,32 @@ export async function GET(request: NextRequest) {
         bucketExists: false,
       };
     }
+
+    // Test Firebase Realtime Database
+    try {
+      const { adminRtdb } = await import("@/lib/admin");
+      const testRef = adminRtdb.ref("_health_check/write_test");
+      await testRef.set({ timestamp: Date.now() });
+      const snapshot = await testRef.get();
+      const canRead = snapshot.exists();
+      await testRef.remove();
+
+      results.tests.rtdb = {
+        status: "success",
+        message: "Realtime Database connection successful - can read and write.",
+        canRead,
+        canWrite: true,
+      };
+    } catch (error: any) {
+      results.tests.rtdb = {
+        status: "error",
+        message: `Realtime Database error: ${error.message}`,
+        details: error.stack,
+        canRead: false,
+        canWrite: false,
+      };
+    }
+
 
     // Overall status
     const hasErrors = Object.values(results.tests).some((test) => test.status === "error");

@@ -154,15 +154,19 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
 
         // Sync to Realtime Database
         try {
-            await adminRtdb.ref(`incentiveClaims/${claimId}`).set({
+            const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
+            const sanitizedData = sanitizeForRtdb({
                 id: claimId,
                 ...finalClaimData,
                 lastSyncedAt: new Date().toISOString()
             });
+
+            await adminRtdb.ref(`incentiveClaims/${claimId}`).set(sanitizedData);
         } catch (rtdbError) {
             console.error("RTDB Sync Error (submitIncentiveClaim):", rtdbError);
             // We don't fail the whole action if RTDB sync fails, but we log it
         }
+
 
         // Only send notifications to co-authors if this is the original author's claim.
 
@@ -487,13 +491,16 @@ export async function processIncentiveClaimAction(
     
     // Sync to Realtime Database
     try {
-        await adminRtdb.ref(`incentiveClaims/${claimId}`).update({
+        const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
+        const sanitizedUpdate = sanitizeForRtdb({
             ...updateData,
             lastSyncedAt: new Date().toISOString()
         });
+        await adminRtdb.ref(`incentiveClaims/${claimId}`).update(sanitizedUpdate);
     } catch (rtdbError) {
         console.error("RTDB Sync Error (processIncentiveClaimAction):", rtdbError);
     }
+
     
     // AI/System Integrity Governance: Track manual overrides
 

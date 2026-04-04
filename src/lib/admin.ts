@@ -35,16 +35,25 @@ function ensureAdminInitialized() {
   }
 
   try {
+    const formattedPrivateKey = privateKey
+      .replace(/\\n/g, "\n")
+      .split("\n")
+      .map((line) => line.trim())
+      .join("\n")
+      .replace(/^"|"$/g, "");
+
     app = admin.initializeApp({
       credential: admin.credential.cert({
         projectId: projectId,
         clientEmail: clientEmail,
-        privateKey: privateKey,
+        privateKey: formattedPrivateKey,
       }),
       storageBucket,
       databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
     });
   } catch (error: any) {
+
+
     console.error(
       "Firebase Admin SDK initialization error. Check service account credentials.",
       error.message

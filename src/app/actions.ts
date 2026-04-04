@@ -1035,10 +1035,12 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
 
     // Sync to Realtime Database
     try {
-      await adminRtdb.ref(`incentiveClaims/${claimId}`).update({
+      const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
+      const sanitizedUpdate = sanitizeForRtdb({
         status: newStatus,
         lastSyncedAt: new Date().toISOString()
       });
+      await adminRtdb.ref(`incentiveClaims/${claimId}`).update(sanitizedUpdate);
     } catch (rtdbError) {
       console.error(`RTDB Sync Error (updateIncentiveClaimStatus) for claim ${claimId}:`, rtdbError);
     }

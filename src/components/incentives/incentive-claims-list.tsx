@@ -55,14 +55,17 @@ export function IncentiveClaimsList() {
 
       // Sync to Realtime Database
       try {
-        const rtdbRef = ref(db_rtdb, `incentiveClaims/${id}`);
-        await update(rtdbRef, { 
+        const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
+        const sanitizedUpdate = sanitizeForRtdb({ 
           status: newStatus,
           lastSyncedAt: new Date().toISOString()
         });
+        const rtdbRef = ref(db_rtdb, `incentiveClaims/${id}`);
+        await update(rtdbRef, sanitizedUpdate);
       } catch (rtdbError) {
         console.error("RTDB Sync Error (handleStatusChange):", rtdbError);
       }
+
 
       toast({ title: 'Status Updated', description: "The claim's status has been changed." });
       fetchClaims(); 
