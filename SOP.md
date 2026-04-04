@@ -4,7 +4,7 @@ This document provides detailed instructions for all user roles within the Resea
 
 ## Table of Contents
 1.  [Faculty (Standard User)](#1-faculty-standard-user)
-    -   [Profile & Settings](#profile--settings)
+    -   [Profile & Setting](#profile--settings)
     -   [IMR Workflow (Intramural Research)](#imr-workflow-intramural-research)
     -   [EMR Workflow (Extramural Research)](#emr-workflow-extramural-research)
     -   [Incentive Claim Workflow](#incentive-claim-workflow)
