@@ -39,7 +39,8 @@ import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Calendar as CalendarIcon, Edit, Plus, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Upload, NotebookText, Send, Trash2, Download, UserPlus, Search } from 'lucide-react';
+import { Calendar as CalendarIcon, Edit, Plus, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Upload, NotebookText, Send, Trash2, Download, UserPlus, Search, Check } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import type { FundingCall, User, EmrInterest, EmrEvaluation } from '@/types';
 import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, setHours, setMinutes, setSeconds, isBefore } from 'date-fns';
 import { uploadFileToServer } from '@/app/actions';
@@ -193,6 +194,8 @@ export function AddEditCallDialog({
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [agencies, setAgencies] = useState<string[]>([]);
+  const [openAgencies, setOpenAgencies] = useState(false);
   const isMobile = useIsMobile();
 
   const form = useForm<z.infer<typeof callSchema>>({
@@ -223,6 +226,26 @@ export function AddEditCallDialog({
       });
     }
   }, [existingCall, form]);
+
+  useEffect(() => {
+    const fetchAgencies = async () => {
+      try {
+        const q = query(collection(db, 'fundingCalls'));
+        const querySnapshot = await getDocs(q);
+        const uniqueAgencies = new Set<string>();
+        querySnapshot.forEach((doc) => {
+          const data = doc.data() as FundingCall;
+          if (data.agency) {
+            uniqueAgencies.add(data.agency);
+          }
+        });
+        setAgencies(Array.from(uniqueAgencies).sort());
+      } catch (error) {
+        console.error("Error fetching agencies:", error);
+      }
+    };
+    fetchAgencies();
+  }, [isOpen]);
 
   const handleSaveCall = async (values: z.infer<typeof callSchema>) => {
     setIsSubmitting(true);
@@ -285,7 +308,60 @@ export function AddEditCallDialog({
         <Form {...form}>
           <form id="add-edit-call-form" onSubmit={form.handleSubmit(handleSaveCall)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
              <FormField name="title" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Call Title</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-             <FormField name="agency" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Funding Agency</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+             <FormField 
+               name="agency" 
+               control={form.control} 
+               render={({ field }) => ( 
+                <FormItem className="flex flex-col">
+                  <FormLabel>Funding Agency</FormLabel>
+                   <Popover open={openAgencies} onOpenChange={setOpenAgencies}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <div className="relative">
+                          <Input 
+                            {...field} 
+                            placeholder="Type or select an agency..."
+                            autoComplete="off"
+                          />
+                          <Button 
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setOpenAgencies(!openAgencies)}
+                          >
+                            <Search className="h-4 w-4 opacity-50" />
+                          </Button>
+                        </div>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-0 pointer-events-auto" align="start" style={{ width: 'var(--radix-popover-trigger-width)' }} onKeyDown={(e) => e.stopPropagation()}>
+                       <Command>
+                        <CommandInput placeholder="Search existing agencies..." />
+                        <CommandList>
+                          <CommandEmpty>No results found.</CommandEmpty>
+                          <CommandGroup>
+                            {agencies.map((agency) => (
+                              <CommandItem
+                                key={agency}
+                                value={agency}
+                                onSelect={() => {
+                                  field.onChange(agency);
+                                  setOpenAgencies(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", agency === field.value ? "opacity-100" : "opacity-0")} />
+                                {agency}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem> 
+              )} />
              <FormField name="description" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Description</FormLabel><FormControl><RichTextEditor {...field} /></FormControl><FormMessage /></FormItem> )} />
              <FormField name="callType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Call Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Fellowship">Fellowship</SelectItem><SelectItem value="Grant">Grant</SelectItem><SelectItem value="Collaboration">Collaboration</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

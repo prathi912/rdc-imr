@@ -24,6 +24,115 @@ import { Input } from '@/components/ui/input';
 import { AddEditCallDialog } from '@/components/emr/emr-calendar';
 import { announceEmrCall } from '@/app/emr-actions';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
+import { Check, PlusCircle, Filter, Plus } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
+
+interface FacetedFilterProps {
+    title: string;
+    options: string[];
+    selectedValues: string[];
+    onSelect: (values: string[]) => void;
+}
+
+function AgencyFacetedFilter({ title, options, selectedValues, onSelect }: FacetedFilterProps) {
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-10 border-dashed">
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    {title}
+                    {selectedValues?.length > 0 && (
+                        <>
+                            <Separator orientation="vertical" className="mx-2 h-4" />
+                            <Badge
+                                variant="secondary"
+                                className="rounded-sm px-1 font-normal lg:hidden"
+                            >
+                                {selectedValues.length}
+                            </Badge>
+                            <div className="hidden space-x-1 lg:flex">
+                                {selectedValues.length > 2 ? (
+                                    <Badge
+                                        variant="secondary"
+                                        className="rounded-sm px-1 font-normal"
+                                    >
+                                        {selectedValues.length} selected
+                                    </Badge>
+                                ) : (
+                                    options
+                                        .filter((option) => selectedValues.includes(option))
+                                        .map((option) => (
+                                            <Badge
+                                                variant="secondary"
+                                                key={option}
+                                                className="rounded-sm px-1 font-normal"
+                                            >
+                                                {option}
+                                            </Badge>
+                                        ))
+                                )}
+                            </div>
+                        </>
+                    )}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[200px] p-0" align="start">
+                <Command>
+                    <CommandInput placeholder={title} />
+                    <CommandList>
+                        <CommandEmpty>No results found.</CommandEmpty>
+                        <CommandGroup>
+                            {options.map((option) => {
+                                const isSelected = selectedValues.includes(option);
+                                return (
+                                    <CommandItem
+                                        key={option}
+                                        onSelect={() => {
+                                            if (isSelected) {
+                                                onSelect(selectedValues.filter((v) => v !== option));
+                                            } else {
+                                                onSelect([...selectedValues, option]);
+                                            }
+                                        }}
+                                    >
+                                        <div
+                                            className={cn(
+                                                "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                                isSelected
+                                                    ? "bg-primary text-primary-foreground"
+                                                    : "opacity-50 [&_svg]:invisible"
+                                            )}
+                                        >
+                                            <Check className={cn("h-4 w-4")} />
+                                        </div>
+                                        <span>{option}</span>
+                                    </CommandItem>
+                                );
+                            })}
+                        </CommandGroup>
+                        {selectedValues.length > 0 && (
+                            <>
+                                <CommandSeparator />
+                                <CommandGroup>
+                                    <CommandItem
+                                        onSelect={() => onSelect([])}
+                                        className="justify-center text-center"
+                                    >
+                                        Clear filters
+                                    </CommandItem>
+                                </CommandGroup>
+                            </>
+                        )}
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    );
+}
 
 
 function EmrLogsTab({ user }: { user: User | null }) {
@@ -32,6 +141,7 @@ function EmrLogsTab({ user }: { user: User | null }) {
     const [users, setUsers] = useState<Map<string, User>>(new Map());
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 15;
     const { toast } = useToast();
@@ -96,11 +206,32 @@ function EmrLogsTab({ user }: { user: User | null }) {
         fetchData();
     }, [fetchData]);
 
+    const availableAgencies = useMemo(() => {
+        const uniqueAgencies = new Set<string>();
+        logs.forEach(log => {
+            const call = calls.get(log.callId);
+            if (call?.agency) {
+                uniqueAgencies.add(call.agency);
+            }
+        });
+        return Array.from(uniqueAgencies).sort();
+    }, [logs, calls]);
+
     const filteredLogs = useMemo(() => {
-        if (!searchTerm) return logs;
+        let result = logs;
+
+        // Apply Agency Filter
+        if (selectedAgencies.length > 0) {
+            result = result.filter(log => {
+                const call = calls.get(log.callId);
+                return call?.agency && selectedAgencies.includes(call.agency);
+            });
+        }
+
+        // Apply Search Filter
+        if (!searchTerm) return result;
         const lowercasedFilter = searchTerm.toLowerCase();
-        return logs.filter(log => {
-            const user = users.get(log.userId);
+        return result.filter(log => {
             const call = calls.get(log.callId);
             return (
                 log.userName.toLowerCase().includes(lowercasedFilter) ||
@@ -108,7 +239,7 @@ function EmrLogsTab({ user }: { user: User | null }) {
                 (log.agencyReferenceNumber && log.agencyReferenceNumber.toLowerCase().includes(lowercasedFilter))
             );
         });
-    }, [logs, searchTerm, users, calls]);
+    }, [logs, searchTerm, users, calls, selectedAgencies]);
 
     const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
 
@@ -162,8 +293,18 @@ function EmrLogsTab({ user }: { user: User | null }) {
 
     return (
         <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <Input placeholder="Search logs..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-sm" />
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+                <div className="flex flex-1 items-center space-x-2 w-full max-w-xl">
+                    <Input placeholder="Search logs..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="max-w-[250px]" />
+                    {availableAgencies.length > 0 && (
+                        <AgencyFacetedFilter
+                            title="Agencies"
+                            options={availableAgencies}
+                            selectedValues={selectedAgencies}
+                            onSelect={setSelectedAgencies}
+                        />
+                    )}
+                </div>
                 <Button onClick={handleExport} disabled={loading || filteredLogs.length === 0}><Download className="mr-2 h-4 w-4" /> Export Logs</Button>
             </div>
             <Card>
@@ -251,6 +392,7 @@ export default function EmrManagementOverviewPage() {
     const [isAnnounceDialogOpen, setIsAnnounceDialogOpen] = useState(false);
     const [isAnnouncing, setIsAnnouncing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 15;
     const router = useRouter();
@@ -350,8 +492,26 @@ export default function EmrManagementOverviewPage() {
         }, {} as Record<string, number>);
     }, [interests]);
 
+    const availableAgencies = useMemo(() => {
+        const uniqueAgencies = new Set<string>();
+        calls.forEach(call => {
+            if (call.agency) {
+                uniqueAgencies.add(call.agency);
+            }
+        });
+        return Array.from(uniqueAgencies).sort();
+    }, [calls]);
+
     const filteredCalls = useMemo(() => {
-        if (!searchTerm) return calls;
+        let result = calls;
+
+        // Apply Agency Filter
+        if (selectedAgencies.length > 0) {
+            result = result.filter(call => call.agency && selectedAgencies.includes(call.agency));
+        }
+
+        // Apply Search Filter
+        if (!searchTerm) return result;
         const lowercasedFilter = searchTerm.toLowerCase();
 
         const matchingCallIds = new Set(
@@ -360,12 +520,12 @@ export default function EmrManagementOverviewPage() {
                 .map(interest => interest.callId)
         );
 
-        return calls.filter(call =>
+        return result.filter(call =>
             call.title.toLowerCase().includes(lowercasedFilter) ||
             call.agency.toLowerCase().includes(lowercasedFilter) ||
             matchingCallIds.has(call.id)
         );
-    }, [calls, interests, searchTerm]);
+    }, [calls, interests, searchTerm, selectedAgencies]);
 
     const totalCallPages = Math.ceil(filteredCalls.length / itemsPerPage);
 
@@ -451,21 +611,38 @@ export default function EmrManagementOverviewPage() {
                             <TabsTrigger value="logs">Submission Logs</TabsTrigger>
                         </TabsList>
                         <TabsContent value="calls" className="mt-4">
-                            <div className="flex justify-between items-center mb-4">
-                                <Input
-                                    placeholder="Search by call, agency, or applicant..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="max-w-sm"
-                                />
-                                <Button
-                                    onClick={handleExportCalls}
-                                    disabled={loading || filteredCalls.length === 0}
-                                    variant="outline"
-                                >
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Export Calls List
-                                </Button>
+                            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-4">
+                                <div className="flex flex-1 items-center space-x-2 w-full max-w-xl">
+                                    <Input
+                                        placeholder="Search by call, agency, or applicant..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="max-w-[300px]"
+                                    />
+                                    {availableAgencies.length > 0 && (
+                                        <AgencyFacetedFilter
+                                            title="Agencies"
+                                            options={availableAgencies}
+                                            selectedValues={selectedAgencies}
+                                            onSelect={setSelectedAgencies}
+                                        />
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {isSuperAdmin && (
+                                        <Button onClick={() => { setSelectedCall(null); setIsAddEditDialogOpen(true); }}>
+                                            <Plus className="mr-2 h-4 w-4" /> Add New Call
+                                        </Button>
+                                    )}
+                                    <Button
+                                        onClick={handleExportCalls}
+                                        disabled={loading || filteredCalls.length === 0}
+                                        variant="outline"
+                                    >
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Export Calls List
+                                    </Button>
+                                </div>
                             </div>
                             <Card>
                                 <CardHeader>
