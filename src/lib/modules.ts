@@ -32,7 +32,7 @@ export const ALL_MODULES = [
   { id: 'recruitment-approvals', label: 'Recruitment Approvals' },
 ]
 
-const coreModules = ["dashboard", "notifications", "settings", "emr-calendar","incentive-claim"]
+const coreModules = ["dashboard", "notifications", "settings", "emr-calendar", "incentive-claim"]
 const facultyCoreModules = ["new-submission", "my-projects"]
 const hierarchyCoreModules = ["analytics"]
 
@@ -51,7 +51,7 @@ export function getDefaultModulesForRole(role: User["role"], designation?: User[
   if (designation === "Head of Goa Campus") {
     return goaHeadDefaults
   }
-  
+
   if (role === "faculty") {
     if (designation === "Principal") {
       return principalDefaults
@@ -65,9 +65,9 @@ export function getDefaultModulesForRole(role: User["role"], designation?: User[
   if (role === "Evaluator") {
     return [...coreModules, "evaluator-dashboard", "my-evaluations", "emr-evaluations"]
   }
-  
+
   if (role === 'IQAC') {
-      return iqacDefaults;
+    return iqacDefaults;
   }
 
   switch (role) {

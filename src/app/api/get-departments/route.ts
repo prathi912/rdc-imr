@@ -1,29 +1,27 @@
-
 import { NextResponse } from 'next/server';
-import { readExcelFromFile } from '@/lib/excel-utils';
-import fs from 'fs';
-import path from 'path';
+import { readExcelFromUrl } from '@/lib/excel-utils';
 import { logEvent } from '@/lib/logger';
 
 interface StaffData {
   Department?: string;
 }
 
+const VADODARA_STAFF_DATA_URL = 'https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/staffdatabrc.xlsx';
+
 export async function GET() {
   const start = performance.now();
-  const filePath = path.join(process.cwd(), 'staffdata.xlsx');
 
   try {
-    if (!fs.existsSync(filePath)) {
-      console.warn(`Staff data file not found at: ${filePath}. Cannot fetch departments.`);
-      await logEvent('APPLICATION', 'API Request failed: File not found', {
+    const jsonData = await readExcelFromUrl<StaffData>(VADODARA_STAFF_DATA_URL);
+
+    if (!jsonData || jsonData.length === 0) {
+      console.warn(`No staff data found at: ${VADODARA_STAFF_DATA_URL}. Cannot fetch departments.`);
+      await logEvent('APPLICATION', 'API Request failed: Data empty', {
         metadata: { endpoint: '/api/get-departments', method: 'GET', statusCode: 404, latency_ms: performance.now() - start },
         status: 'warning'
       });
-      return NextResponse.json({ success: false, error: 'Department data source not found on the server.' }, { status: 404 });
+      return NextResponse.json({ success: false, error: 'Department data source is empty or unavailable.' }, { status: 404 });
     }
-
-    const jsonData = await readExcelFromFile<StaffData>(filePath);
 
     const departments = jsonData
       .map((row: StaffData) => row.Department)
@@ -38,7 +36,7 @@ export async function GET() {
     return NextResponse.json({ success: true, data: uniqueDepartments });
 
   } catch (error: any) {
-    console.error('Error fetching or processing staff data file for departments:', error);
+    console.error('Error fetching or processing staff data URL for departments:', error);
     await logEvent('APPLICATION', 'API Request failed: Internal error', {
       metadata: { endpoint: '/api/get-departments', method: 'GET', statusCode: 500, error: error.message, latency_ms: performance.now() - start },
       status: 'error'
