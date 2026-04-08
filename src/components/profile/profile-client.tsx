@@ -32,7 +32,7 @@ import Link from 'next/link';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 
 
-function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: string; icon: React.ElementType }) {
+function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: string | null; icon: React.ElementType }) {
     if (!value) return null;
     return (
         <div className="flex items-start gap-3">
@@ -578,7 +578,8 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
     const researchPaperTitleSet = new Set(researchPapers.map((paper) => normalizePublicationValue(paper.title)));
     const researchPaperUrlSet = new Set(researchPapers.map((paper) => normalizePublicationValue(paper.url)));
 
-    const paperClaims = claims.filter(c => c.claimType === 'Research Papers').filter((claim) => {
+    const safeClaims = claims || [];
+    const paperClaims = safeClaims.filter(c => c.claimType === 'Research Papers').filter((claim) => {
         // Do not list the same publication twice when a claim is already linked to
         // a research paper entry for this profile.
         if (claim.paperId && researchPaperIdSet.has(claim.paperId)) {
@@ -598,9 +599,9 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
         return true;
     });
 
-    const otherClaims = claims.filter(c => c.claimType !== 'Research Papers');
+    const otherClaims = safeClaims.filter(c => c.claimType !== 'Research Papers');
     const totalPublicationAndClaimCount = researchPapers.length + paperClaims.length + otherClaims.length;
-    const totalApprovedAmount = claims.reduce((sum, claim) => sum + (claim.finalApprovedAmount || 0), 0);
+    const totalApprovedAmount = safeClaims.reduce((sum, claim) => sum + (claim.finalApprovedAmount || 0), 0);
 
     return (
         <div className="flex flex-col items-center">

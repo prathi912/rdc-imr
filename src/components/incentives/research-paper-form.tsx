@@ -56,7 +56,7 @@ const researchPaperSchema = z
     relevantLink: z.string().optional().or(z.literal('')),
     scopusLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
     wosLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
-    journalClassification: z.enum(["Q1", "Q2", "Q3", "Q4", "Nature/Science/Lancet", "Top 1% Journals"], { required_error: 'Journal Classification (Q-rating) is required for Scopus/WoS indexed papers.' }),
+    journalClassification: z.enum(["Q1", "Q2", "Q3", "Q4", "Nature/Science/Lancet", "Top 1% Journals"]).optional(),
     wosType: z.enum(["SCIE", "SSCI", "A&HCI"]).optional(),
     journalName: z.string().min(3, "Journal name is required."),
     journalWebsite: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
@@ -922,61 +922,6 @@ export function ResearchPaperForm() {
                   />
                 )}
 
-                {(indexType === 'scopus' || indexType === 'both') && (
-                  <FormField
-                    control={form.control}
-                    name="scopusLink"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Scopus URL</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://www.scopus.com/pages/publications/" {...field} disabled={isSubmitting} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                {(indexType === 'wos' || indexType === 'both') && (
-                  <FormField
-                    control={form.control}
-                    name="wosLink"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>WoS URL</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://www.webofscience.com/wos/woscc/full-record/WOS:" {...field} disabled={isSubmitting} />
-                        </FormControl>
-                        <FormDescription>
-                          WOS URL can be found using this:{" "}
-                          <a href="https://www.webofscience.com/wos/woscc/smart-search?embedded=0" target="_blank" rel="noopener noreferrer" className="underline">
-                            https://www.webofscience.com/wos/woscc/smart-search?embedded=0
-                          </a>
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                {(indexType === 'scopus' || indexType === 'wos' || indexType === 'both' || indexType === 'sci') && (
-                  <FormField
-                    control={form.control}
-                    name="journalClassification"
-                    render={({ field }) => (
-                      <FormItem className="space-y-3">
-                        <FormLabel>Journal Classification (Q-rating)</FormLabel>
-                        <FormControl>
-                          <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap items-center gap-x-6 gap-y-2" disabled={isSubmitting}>
-                            {availableClassifications.map((option) => (<FormItem key={option.value} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={option.value} /></FormControl><FormLabel className="font-normal">{option.label}</FormLabel></FormItem>))}
-                          </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
 
 
                 {(indexType === "wos" || indexType === "both") && (
@@ -1018,60 +963,6 @@ export function ResearchPaperForm() {
                   />
                 )}
 
-                <FormField
-                  control={form.control}
-                  name="publicationType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Type of Publication</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select publication type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {publicationTypes.map((o) => (
-                            <SelectItem key={o} value={o}>
-                              {o}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="journalName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name of Journal/Proceedings</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter the full name of the journal or proceedings"
-                          {...field}
-                          disabled={isSubmitting}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="journalWebsite"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Journal Website Link</FormLabel>
-                      <FormControl>
-                        <Input placeholder="https://www.examplejournal.com" {...field} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 <FormField
                   control={form.control}
                   name="locale"
@@ -1181,8 +1072,126 @@ export function ResearchPaperForm() {
                   />
                 </div>
 
+                <FormField
+                  control={form.control}
+                  name="publicationType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Type of Publication</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select publication type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {publicationTypes.map((o) => (
+                            <SelectItem key={o} value={o}>
+                              {o}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="journalName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name of Journal/Proceedings</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Enter the full name of the journal or proceedings"
+                          {...field}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="journalWebsite"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Journal Website Link</FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://www.examplejournal.com" {...field} disabled={isSubmitting} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {(indexType === 'scopus' || indexType === 'both') && (
+                  <FormField
+                    control={form.control}
+                    name="scopusLink"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Scopus URL</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://www.scopus.com/pages/publications/" {...field} disabled={isSubmitting} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {(indexType === 'wos' || indexType === 'both') && (
+                  <FormField
+                    control={form.control}
+                    name="wosLink"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>WoS URL</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://www.webofscience.com/wos/woscc/full-record/WOS:" {...field} disabled={isSubmitting} />
+                        </FormControl>
+                        <FormDescription>
+                          WOS URL can be found using this:{" "}
+                          <a href="https://www.webofscience.com/wos/woscc/smart-search?embedded=0" target="_blank" rel="noopener noreferrer" className="underline">
+                            https://www.webofscience.com/wos/woscc/smart-search?embedded=0
+                          </a>
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {(indexType === 'scopus' || indexType === 'wos' || indexType === 'both' || indexType === 'sci') && (
+                  <FormField
+                    control={form.control}
+                    name="journalClassification"
+                    render={({ field }) => (
+                      <FormItem className="space-y-3">
+                        <FormLabel>Journal Classification (Q-rating)</FormLabel>
+                        <FormControl>
+                          <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap items-center gap-x-6 gap-y-2" disabled={isSubmitting}>
+                            {availableClassifications.map((option) => (<FormItem key={option.value} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={option.value} /></FormControl><FormLabel className="font-normal">{option.label}</FormLabel></FormItem>))}
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
                 <div className="space-y-4 pt-4">
                   <FormLabel>Author(s) & Roles</FormLabel>
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Mandatory Requirement</AlertTitle>
+                    <AlertDescription>
+                      Listing all authors is mandatory. If any author not listed here is found at the verification stage, the application will be directly rejected.
+                    </AlertDescription>
+                  </Alert>
                   {publicationType === 'Scopus Indexed Conference Proceedings' && (
                     <Alert variant="default">
                       <Info className="h-4 w-4" />
