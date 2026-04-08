@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
+import { Label } from '@/components/ui/label'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
@@ -25,7 +26,7 @@ import { uploadFileToApi } from '@/lib/upload-client'
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
 import { fetchScienceDirectData } from "@/app/sciencedirect-actions";
-import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus, Edit, Info } from 'lucide-react'
+import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus, Edit, Info, FileText, CheckCircle2 } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -253,89 +254,172 @@ const SPECIAL_POLICY_FACULTIES = [
   "Faculty of Engineering & Technology"
 ];
 
-function ReviewDetails({ data, onEdit }: { data: ResearchPaperFormValues; onEdit: () => void }) {
-  const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[]) => {
+function ReviewDetails({ data, onEdit, calculatedIncentive, user }: { data: ResearchPaperFormValues; onEdit: () => void; calculatedIncentive: number | null; user: User }) {
+  const renderItem = (label: string, value?: string | number | boolean | string[] | Author[], icon?: React.ReactNode) => {
     if (!value && value !== 0 && value !== false) return null;
 
     let displayValue: React.ReactNode = String(value);
     if (typeof value === 'boolean') {
-      displayValue = value ? 'Yes' : 'No';
+      displayValue = value ? (
+        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Yes</Badge>
+      ) : (
+        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">No</Badge>
+      );
     }
     if (Array.isArray(value)) {
       if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null && 'name' in value[0]) {
+        return null; // Handle authors separately
+      } else {
         displayValue = (
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Author Name</TableHead>
-                  <TableHead>Role</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(value as Author[]).map((author, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>{author.name}</TableCell>
-                    <TableCell><Badge variant="secondary">{author.role}</Badge></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {(value as string[]).map((v, i) => (
+              <Badge key={i} variant="secondary" className="text-[10px] py-0">{v}</Badge>
+            ))}
           </div>
         );
-      } else {
-        displayValue = (value as string[]).join(', ');
       }
     }
 
     return (
-      <div className="grid grid-cols-3 gap-2 py-1.5 items-start">
-        <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
-        <dd className="col-span-2">{displayValue}</dd>
+      <div className="space-y-1.5 p-3 rounded-xl hover:bg-muted/30 transition-colors">
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 flex items-center gap-1.5">
+          {icon}
+          {label}
+        </p>
+        <div className="text-sm font-semibold leading-tight text-foreground/90">{displayValue}</div>
       </div>
     );
   };
 
-  const fileList = data.publicationProof ? Array.from(data.publicationProof as FileList).map(f => f.name).join(', ') : 'No file selected';
+  const authors = data.authors as Author[];
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <div>
-            <CardTitle>Review Your Application</CardTitle>
-            <CardDescription>Please review the details below before final submission.</CardDescription>
-          </div>
-          <Button variant="outline" onClick={onEdit}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
+    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-primary/5 p-6 rounded-3xl border border-primary/10">
+        <div className="space-y-1">
+           <h2 className="text-2xl font-black tracking-tight text-primary flex items-center gap-2">
+             <CheckCircle2 className="h-7 w-7" />
+             Review Application
+           </h2>
+           <p className="text-sm text-muted-foreground font-medium">Verify your research publication details before final submission.</p>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {renderDetail("Publication Type", data.publicationType)}
-        {renderDetail("Indexing Status", data.indexType)}
-        {renderDetail("Paper Title", data.paperTitle)}
-        {renderDetail("Authors", data.authors)}
-        {renderDetail("Journal Name", data.journalName)}
-        {renderDetail("Journal Website", data.journalWebsite)}
-        {renderDetail("DOI", data.doi)}
-        {renderDetail("WoS Accession No.", data.wosAccessionNumber)}
-        {renderDetail("Article Link", data.relevantLink)}
-        {renderDetail("Scopus URL", data.scopusLink)}
-        {renderDetail("WoS URL", data.wosLink)}
-        {renderDetail("Journal Classification", data.journalClassification)}
-        {renderDetail("WoS Type", data.wosType)}
-        {renderDetail("Locale", data.locale)}
-        {renderDetail("Print ISSN", data.printIssn)}
-        {renderDetail("Electronic ISSN", data.electronicIssn)}
-        {renderDetail("Publication Month/Year", `${data.publicationMonth}, ${data.publicationYear}`)}
-        {renderDetail("Your Author Position", data.authorPosition)}
-        {renderDetail("PU Name in Publication", data.isPuNameInPublication)}
-        {renderDetail("APC Paid by University", data.wasApcPaidByUniversity)}
-        {renderDetail("Total PU Student Authors", data.totalPuStudentAuthors)}
-        {renderDetail("PU Student Names", data.puStudentNames)}
-        {renderDetail("SDGs", data.sdgGoals)}
-        {renderDetail("Publication Proof", fileList)}
-      </CardContent>
-    </Card>
+        <Button variant="outline" onClick={onEdit} className="h-11 px-6 rounded-xl border-primary/20 hover:bg-primary/5 gap-2 font-bold transition-all hover:scale-105 active:scale-95">
+          <Edit className="h-4 w-4" /> Edit Details
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2 shadow-sm rounded-3xl border-muted/40 overflow-hidden">
+          <CardHeader className="bg-muted/20 pb-4">
+             <CardTitle className="text-sm font-bold flex items-center gap-2 text-muted-foreground">
+               <FileText className="h-4 w-4" /> Publication Identity
+             </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div className="md:col-span-2">
+               {renderItem("Paper Title", data.paperTitle)}
+            </div>
+            {renderItem("Type", data.publicationType)}
+            {renderItem("Indexing", data.indexType?.toUpperCase())}
+            {renderItem("DOI", data.doi)}
+            {renderItem("Locale", data.locale)}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm rounded-3xl border-muted/40 overflow-hidden">
+           <CardHeader className="bg-primary/5 pb-4">
+             <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
+               <Info className="h-4 w-4" /> Journal & Impact
+             </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6 space-y-2">
+            {renderItem("Journal Name", data.journalName)}
+            {renderItem("Classification", data.journalClassification)}
+            {renderItem("Publication Date", `${data.publicationMonth} ${data.publicationYear}`)}
+            {renderItem("Print ISSN", data.printIssn)}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="shadow-sm rounded-3xl border-muted/40 overflow-hidden">
+        <CardHeader className="bg-muted/20 pb-4 flex flex-row items-center justify-between">
+           <CardTitle className="text-sm font-bold flex items-center gap-2 text-muted-foreground">
+             <UserPlus className="h-4 w-4" /> Author Details
+           </CardTitle>
+           <Badge variant="outline" className="text-[10px] font-bold">{authors.length} Authors Listed</Badge>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-muted/10">
+              <TableRow className="hover:bg-transparent border-none">
+                <TableHead className="text-[10px] font-black uppercase tracking-widest pl-6">Author Name</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest">Email Address</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest text-right pr-6">Contribution Role</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {authors.map((author, idx) => (
+                <TableRow key={idx} className="hover:bg-muted/5 transition-colors border-muted/20">
+                  <TableCell className="py-4 pl-6 font-bold text-sm">
+                    {author.name}
+                    {author.isExternal && <Badge variant="outline" className="ml-2 text-[8px] h-4 uppercase tracking-tighter bg-amber-50 text-amber-700 border-amber-200">External</Badge>}
+                    {author.email.toLowerCase() === (user?.email || '').toLowerCase() && <Badge variant="secondary" className="ml-2 text-[8px] h-4 uppercase tracking-tighter bg-primary/10 text-primary border-none font-black">You</Badge>}
+                  </TableCell>
+                  <TableCell className="text-xs font-medium text-muted-foreground">{author.email}</TableCell>
+                  <TableCell className="text-right pr-6">
+                    <Badge variant="secondary" className="font-bold text-[10px] px-3 py-0.5 rounded-full">{author.role}</Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="shadow-sm rounded-3xl border-muted/40 overflow-hidden">
+          <CardHeader className="bg-muted/20 pb-4">
+             <CardTitle className="text-sm font-bold flex items-center gap-2 text-muted-foreground">
+               <FileText className="h-4 w-4" /> Submission Metadata
+             </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6 grid grid-cols-2 gap-2">
+            {renderItem("Author Position", data.authorPosition)}
+            {renderItem("PU Affiliation", data.isPuNameInPublication)}
+            {renderItem("SDG Goals", data.sdgGoals)}
+            {renderItem("Student Authors", data.totalPuStudentAuthors)}
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-col gap-6">
+          {data.indexType !== 'other' && (
+            <div className="bg-primary p-6 rounded-[2rem] text-primary-foreground shadow-xl shadow-primary/20 relative overflow-hidden group">
+              <div className="absolute -right-4 -top-4 bg-white/10 w-24 h-24 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-500"></div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-2">Estimated Incentive</p>
+              <div className="flex items-baseline gap-2">
+                 <span className="text-4xl font-black tracking-tighter">₹{calculatedIncentive?.toLocaleString('en-IN') || '0'}</span>
+                 <span className="text-xs font-medium opacity-60">INR*</span>
+              </div>
+              <p className="text-[10px] mt-4 font-medium opacity-70 italic">*Subject to final verification by the technical committee.</p>
+            </div>
+          )}
+
+          <div className="bg-muted/30 p-5 rounded-[2rem] border border-dashed border-muted-foreground/30 flex items-center gap-4">
+            <div className="bg-background p-3 rounded-2xl border shadow-sm">
+              <FileText className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+               <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">Attachment</p>
+               <p className="text-sm font-bold truncate">
+                 {data.publicationProof && (data.publicationProof as FileList).length > 0 
+                   ? (data.publicationProof as FileList)[0].name
+                   : "Proof document uploaded"}
+               </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -768,240 +852,275 @@ export function ResearchPaperForm() {
 
   const onFinalSubmit = () => handleSave('Pending');
 
-  if (isLoadingDraft) {
-    return <Card className="p-8 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></Card>;
-  }
-
-  if (currentStep === 2) {
+  if (isLoadingDraft || !user) {
     return (
-      <Card>
-        <form onSubmit={form.handleSubmit(onFinalSubmit)}>
-          <CardContent className="pt-6">
-            <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
-          </CardContent>
-          <CardFooter>
-            <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSubmitting ? 'Submitting...' : 'Submit Claim'}
-            </Button>
-          </CardFooter>
-        </form>
+      <Card className="p-8 flex justify-center items-center h-64">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-sm font-medium text-muted-foreground">Loading session details...</p>
+        </div>
       </Card>
     );
   }
 
+  if (currentStep === 2) {
+    return (
+      <div className="w-full max-w-5xl mx-auto pb-20 animate-in fade-in duration-700">
+        <form onSubmit={form.handleSubmit(onFinalSubmit)}>
+           <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} calculatedIncentive={calculatedIncentive} user={user} />
+           <div className="max-w-4xl mx-auto mt-10 flex flex-col md:flex-row items-center justify-between gap-6 bg-card p-8 rounded-[2.5rem] border shadow-xl border-primary/10">
+              <div className="space-y-1 text-center md:text-left">
+                <p className="text-sm font-bold text-muted-foreground">Ready to submit?</p>
+                <p className="text-[10px] text-muted-foreground/60 max-w-[200px]">By submitting, you confirm all details are accurate.</p>
+              </div>
+              <Button type="submit" size="lg" disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing} className="w-full md:w-auto rounded-2xl h-16 px-12 font-black shadow-2xl shadow-primary/20 hover:shadow-primary/40 transition-all hover:scale-[1.02] active:scale-[0.98] text-xl group">
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-3 h-6 w-6 animate-spin" />
+                    Finalizing...
+                  </>
+                ) : (
+                  <>
+                    Submit Application <CheckCircle2 className="ml-3 h-6 w-6 group-hover:rotate-12 transition-transform" />
+                  </>
+                )}
+              </Button>
+           </div>
+        </form>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full">
-      <Card>
+    <div className="w-full max-w-5xl mx-auto pb-20">
+      <Card className="shadow-2xl border-t-4 border-t-primary overflow-hidden">
+        <CardHeader className="bg-primary/5 pb-8">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <CardTitle className="text-3xl font-bold tracking-tight text-primary">Research Paper Incentive Claim</CardTitle>
+              <CardDescription className="text-base text-muted-foreground/80">Submit your application for incentive claim on high-impact research publications.</CardDescription>
+            </div>
+            <div className="bg-primary/10 p-3 rounded-2xl hidden md:block">
+              <FileText className="h-10 w-10 text-primary" />
+            </div>
+          </div>
+        </CardHeader>
+
         <Form {...form}>
-          <form>
-            <CardContent className="space-y-6 pt-6">
+          <form className="space-y-0">
+            <CardContent className="space-y-10 pt-8 bg-card">
               {(bankDetailsMissing || orcidOrMisIdMissing) && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Profile Incomplete</AlertTitle>
-                  <AlertDescription>
-                    An ORCID iD, MIS ID, and bank details are mandatory for submitting incentive claims. Please add them
-                    to your profile.
-                    <Button asChild variant="link" className="p-1 h-auto">
-                      <Link href="/dashboard/settings">Go to Settings</Link>
-                    </Button>
+                <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive rounded-xl ring-1 ring-destructive/10">
+                  <AlertCircle className="h-5 w-5" />
+                  <AlertTitle className="font-bold">Action Required: Profile Incomplete</AlertTitle>
+                  <AlertDescription className="mt-1">
+                    Please add your {bankDetailsMissing && "bank details"}{bankDetailsMissing && orcidOrMisIdMissing && " and "}{orcidOrMisIdMissing && "ORCID iD / MIS ID"} in <Link href="/dashboard/settings" className="font-extrabold underline hover:text-destructive/80 transition-colors">Settings</Link> before submitting.
                   </AlertDescription>
                 </Alert>
               )}
+
               {isPhdScholar && (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Ph.D. Scholar Policy</AlertTitle>
+                <Alert className="bg-primary/5 border-primary/20 text-primary rounded-xl">
+                  <Info className="h-5 w-5" />
+                  <AlertTitle className="font-bold">Ph.D. Scholar Policy</AlertTitle>
                   <AlertDescription>
                     As a Ph.D. Scholar, you are eligible for incentives only for publications in Q1 or Q2 journals.
                   </AlertDescription>
                 </Alert>
               )}
-              <div className="space-y-6 animate-in fade-in-0">
-                <h3 className="font-semibold text-sm">RESEARCH PAPER DETAILS</h3>
 
+              <section className="space-y-6">
+                <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
+                  <div className="h-8 w-1.5 bg-primary rounded-full"></div>
+                  Publication Type
+                </div>
+                
                 <FormField
                   control={form.control}
-                  name="indexType"
+                  name="publicationType"
                   render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel>Indexing/Listing status of the Journal</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          className="flex flex-wrap items-center gap-x-6 gap-y-2"
-                          disabled={isSubmitting}
-                        >
-                          {availableIndexTypes.map((option) => (
-                            <FormItem key={option.value} className="flex items-center space-x-2 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value={option.value} />
-                              </FormControl>
-                              <FormLabel className="font-normal">{option.label}</FormLabel>
-                            </FormItem>
+                    <FormItem>
+                      <FormLabel className="text-base font-semibold">Type of Publication</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                        <FormControl>
+                          <SelectTrigger className="h-12 text-lg shadow-sm focus:ring-primary rounded-xl">
+                            <SelectValue placeholder="Select publication type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="rounded-xl">
+                          {publicationTypes.map((o) => (
+                            <SelectItem key={o} value={o}>
+                              {o}
+                            </SelectItem>
                           ))}
-                        </RadioGroup>
-                      </FormControl>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                {indexType !== 'other' && (
-                  <FormField
-                    control={form.control}
-                    name="doi"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>DOI (Digital Object Identifier)</FormLabel>
-                        <div className="flex items-center gap-2">
-                          <FormControl>
-                            <Input placeholder="Enter DOI (e.g., 10.1038/nature12345)" {...field} disabled={isSubmitting} />
-                          </FormControl>
-                          <Button type="button" variant="outline" onClick={() => handleFetchData('scopus')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch from Scopus"><Bot className="h-4 w-4" /> Scopus</Button>
-                          <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch from WoS"><Bot className="h-4 w-4" /> WoS</Button>
-                        </div>
-                        <FormDescription>This is the primary way we fetch and verify your publication details.</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-                <FormField
+              </section>
+
+              <Separator />
+
+              <section className="space-y-6">
+                 <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-primary font-bold text-lg">
+                      <div className="h-8 w-1.5 bg-primary rounded-full"></div>
+                      Article Identification
+                    </div>
+                    <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20">Step 1 of 2</Badge>
+                 </div>
+
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <div className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="indexType"
+                        render={({ field }) => (
+                          <FormItem className="space-y-3">
+                            <FormLabel className="text-base font-semibold">Indexing / Listing Status</FormLabel>
+                            <FormControl>
+                              <RadioGroup
+                                onValueChange={field.onChange}
+                                value={field.value}
+                                className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2"
+                              >
+                                {availableIndexTypes.map((option) => (
+                                  <Label 
+                                    key={option.value}
+                                    htmlFor={option.value} 
+                                    className="flex items-center space-x-3 bg-muted/30 px-3 py-3 rounded-xl border hover:bg-muted transition-all cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 shadow-sm"
+                                  >
+                                    <RadioGroupItem value={option.value} id={option.value} />
+                                    <span className="font-medium text-sm flex-1">{option.label}</span>
+                                  </Label>
+                                ))}
+                              </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                   </div>
+
+                   <div className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="doi"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base font-semibold">DOI (Digital Object Identifier)</FormLabel>
+                            <FormControl>
+                              <div className="flex gap-2">
+                                <Input 
+                                  placeholder="e.g. 10.1145/334252.334253" 
+                                  {...field} 
+                                  disabled={isSubmitting || isFetching} 
+                                  className="h-12 shadow-sm focus-visible:ring-primary rounded-xl"
+                                />
+                                <div className="flex gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-12 px-3 hover:bg-primary/10 transition-colors rounded-xl"
+                                    onClick={() => handleFetchData('scopus')}
+                                    disabled={isSubmitting || isFetching || !form.getValues('doi')}
+                                  >
+                                    Scopus
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-12 px-3 hover:bg-primary/10 transition-colors rounded-xl"
+                                    onClick={() => handleFetchData('wos')}
+                                    disabled={isSubmitting || isFetching || !form.getValues('doi')}
+                                  >
+                                    WoS
+                                  </Button>
+                                </div>
+                              </div>
+                            </FormControl>
+                            <FormDescription className="text-xs">Primary way we verify publication details.</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                   </div>
+                 </div>
+
+                 <FormField
                   control={form.control}
                   name="paperTitle"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Title of the Paper published</FormLabel>
+                      <FormLabel className="text-base font-semibold">Title of the Research Paper</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting} />
+                        <Textarea
+                          placeholder="Full title as published"
+                          {...field}
+                          disabled={isSubmitting}
+                          className="min-h-[80px] text-lg shadow-sm rounded-xl focus-visible:ring-primary"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                {(indexType === 'wos' || indexType === 'both') && showWosAccession && (
+              </section>
+
+              <Separator />
+
+              <section className="space-y-6">
+                <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
+                  <div className="h-8 w-1.5 bg-primary rounded-full"></div>
+                  Journal & Publication Information
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
-                    name="wosAccessionNumber"
+                    name="journalName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Web of Science Accession Number</FormLabel>
-                        <div className="flex items-center gap-2">
-                          <FormControl>
-                            <Input placeholder="e.g., WOS:000581634500008" {...field} disabled={isSubmitting} />
-                          </FormControl>
-                          <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('wosAccessionNumber')} title="Fetch data from Web of Science"><Bot className="h-4 w-4" /> WoS</Button>
-                        </div>
-                        <FormDescription>
-                          WOS URl can be found using this:{" "}
-                          <a href="https://www.webofscience.com/wos/woscc/smart-search" target="_blank" rel="noopener noreferrer" className="underline">
-                            https://www.webofscience.com/wos/woscc/smart-search
-                          </a>
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-                {indexType === 'other' && (
-                  <FormField
-                    control={form.control}
-                    name="relevantLink"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Link for Article</FormLabel>
+                        <FormLabel className="text-base font-semibold">Journal/Proceedings Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="https://www.journal.com/article/123" {...field} disabled={isSubmitting} />
-                        </FormControl>
-                        <FormDescription>Please provide a direct link to the published article.</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-
-
-                {(indexType === "wos" || indexType === "both") && (
-                  <FormField
-                    control={form.control}
-                    name="wosType"
-                    render={({ field }) => (
-                      <FormItem className="space-y-3">
-                        <FormLabel>Type of WoS</FormLabel>
-                        <FormControl>
-                          <RadioGroup
-                            onValueChange={field.onChange}
-                            value={field.value}
-                            className="flex items-center space-x-6"
-                          >
-                            <FormItem key="SCIE" className="flex items-center space-x-2 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value="SCIE" />
-                              </FormControl>
-                              <FormLabel className="font-normal">SCIE</FormLabel>
-                            </FormItem>
-                            <FormItem key="SSCI" className="flex items-center space-x-2 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value="SSCI" />
-                              </FormControl>
-                              <FormLabel className="font-normal">SSCI</FormLabel>
-                            </FormItem>
-                            <FormItem key="A&HCI" className="flex items-center space-x-2 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value="A&HCI" />
-                              </FormControl>
-                              <FormLabel className="font-normal">A&HCI</FormLabel>
-                            </FormItem>
-                          </RadioGroup>
+                          <Textarea
+                            placeholder="Full name of journal"
+                            {...field}
+                            disabled={isSubmitting}
+                            className="h-12 shadow-sm rounded-xl"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                )}
 
-                <FormField
-                  control={form.control}
-                  name="locale"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel>Locale</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          className="flex items-center space-x-6"
-                        >
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="National" />
-                            </FormControl>
-                            <FormLabel className="font-normal">National</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="International" />
-                            </FormControl>
-                            <FormLabel className="font-normal">International</FormLabel>
-                          </FormItem>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="journalWebsite"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold">Official Website</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://..." {...field} disabled={isSubmitting} className="h-12 shadow-sm rounded-xl" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
                     name="printIssn"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Print ISSN</FormLabel>
+                        <FormLabel className="text-sm font-semibold">Print ISSN</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g., 1234-5678" {...field} />
+                          <Input placeholder="e.g., 1234-5678" {...field} className="h-10 shadow-sm rounded-lg" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1012,33 +1131,32 @@ export function ResearchPaperForm() {
                     name="electronicIssn"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Electronic ISSN</FormLabel>
+                        <FormLabel className="text-sm font-semibold">e-ISSN</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g., 8765-4321" {...field} />
+                          <Input placeholder="e.g., 8765-4321" {...field} className="h-10 shadow-sm rounded-lg" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
                     name="publicationMonth"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Publication Month</FormLabel>
+                        <FormLabel className="text-sm font-semibold">Month</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="h-10 shadow-sm rounded-lg">
                               <SelectValue placeholder="Select month" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="rounded-xl">
                             {months.map((m) => (
-                              <SelectItem key={m} value={m}>
-                                {m}
-                              </SelectItem>
+                              <SelectItem key={m} value={m}>{m}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -1051,18 +1169,16 @@ export function ResearchPaperForm() {
                     name="publicationYear"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Publication Year</FormLabel>
+                        <FormLabel className="text-sm font-semibold">Year</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="h-10 shadow-sm rounded-lg">
                               <SelectValue placeholder="Select year" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="rounded-xl">
                             {years.map((y) => (
-                              <SelectItem key={y} value={y}>
-                                {y}
-                              </SelectItem>
+                              <SelectItem key={y} value={y}>{y}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -1072,98 +1188,84 @@ export function ResearchPaperForm() {
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="publicationType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Type of Publication</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select publication type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {publicationTypes.map((o) => (
-                            <SelectItem key={o} value={o}>
-                              {o}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="journalName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name of Journal/Proceedings</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter the full name of the journal or proceedings"
-                          {...field}
-                          disabled={isSubmitting}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="journalWebsite"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Journal Website Link</FormLabel>
-                      <FormControl>
-                        <Input placeholder="https://www.examplejournal.com" {...field} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {(indexType === 'scopus' || indexType === 'both') && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
-                    name="scopusLink"
+                    name="locale"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Scopus URL</FormLabel>
+                      <FormItem className="space-y-3">
+                        <FormLabel className="text-sm font-semibold">Publication Locale</FormLabel>
                         <FormControl>
-                          <Input placeholder="https://www.scopus.com/pages/publications/" {...field} disabled={isSubmitting} />
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            className="flex items-center space-x-6 h-10"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="National" id="locale-national" />
+                              <Label htmlFor="locale-national" className="font-normal">National</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="International" id="locale-international" />
+                              <Label htmlFor="locale-international" className="font-normal">International</Label>
+                            </div>
+                          </RadioGroup>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                )}
+                </div>
 
-                {(indexType === 'wos' || indexType === 'both') && (
-                  <FormField
-                    control={form.control}
-                    name="wosLink"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>WoS URL</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://www.webofscience.com/wos/woscc/full-record/WOS:" {...field} disabled={isSubmitting} />
-                        </FormControl>
-                        <FormDescription>
-                          WOS URL can be found using this:{" "}
-                          <a href="https://www.webofscience.com/wos/woscc/smart-search?embedded=0" target="_blank" rel="noopener noreferrer" className="underline">
-                            https://www.webofscience.com/wos/woscc/smart-search?embedded=0
-                          </a>
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
+                <div className="space-y-4 pt-2">
+                   {indexType === 'other' && (
+                    <FormField
+                      control={form.control}
+                      name="relevantLink"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-semibold text-primary">Article Link (Mandatory for 'Other')</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://www.journal.com/article/123" {...field} disabled={isSubmitting} className="h-10 border-primary/30 shadow-sm transition-all focus-visible:ring-primary rounded-lg" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {(indexType === 'scopus' || indexType === 'both') && (
+                    <FormField
+                      control={form.control}
+                      name="scopusLink"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-semibold">Scopus URL</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://www.scopus.com/..." {...field} disabled={isSubmitting} className="h-10 shadow-sm rounded-lg" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {(indexType === 'wos' || indexType === 'both') && (
+                    <FormField
+                      control={form.control}
+                      name="wosLink"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-semibold">Web of Science URL</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://www.webofscience.com/..." {...field} disabled={isSubmitting} className="h-10 shadow-sm rounded-lg" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
 
                 {(indexType === 'scopus' || indexType === 'wos' || indexType === 'both' || indexType === 'sci') && (
                   <FormField
@@ -1171,10 +1273,23 @@ export function ResearchPaperForm() {
                     name="journalClassification"
                     render={({ field }) => (
                       <FormItem className="space-y-3">
-                        <FormLabel>Journal Classification (Q-rating)</FormLabel>
-                        <FormControl>
-                          <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap items-center gap-x-6 gap-y-2" disabled={isSubmitting}>
-                            {availableClassifications.map((option) => (<FormItem key={option.value} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={option.value} /></FormControl><FormLabel className="font-normal">{option.label}</FormLabel></FormItem>))}
+                        <FormLabel className="text-base font-semibold">Classification (Q-rating)</FormLabel>
+                        <FormControl>                          <RadioGroup 
+                            onValueChange={field.onChange} 
+                            value={field.value} 
+                            className="flex flex-wrap gap-3 mt-2" 
+                            disabled={isSubmitting}
+                          >
+                            {availableClassifications.map((option) => (
+                              <Label 
+                                key={option.value}
+                                htmlFor={`q-${option.value}`} 
+                                className="flex items-center space-x-2 bg-muted/30 px-4 py-2.5 rounded-xl border hover:bg-muted cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 shadow-sm transition-all whitespace-nowrap"
+                              >
+                                <RadioGroupItem value={option.value} id={`q-${option.value}`} />
+                                <span className="font-medium text-xs">{option.label}</span>
+                              </Label>
+                            ))}
                           </RadioGroup>
                         </FormControl>
                         <FormMessage />
@@ -1182,90 +1297,140 @@ export function ResearchPaperForm() {
                     )}
                   />
                 )}
+              </section>
 
-                <div className="space-y-4 pt-4">
-                  <FormLabel>Author(s) & Roles</FormLabel>
-                  <Alert variant="destructive" className="mb-4">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Mandatory Requirement</AlertTitle>
-                    <AlertDescription>
-                      Listing all authors is mandatory. If any author not listed here is found at the verification stage, the application will be directly rejected.
-                    </AlertDescription>
-                  </Alert>
-                  {publicationType === 'Scopus Indexed Conference Proceedings' && (
-                    <Alert variant="default">
-                      <Info className="h-4 w-4" />
-                      <AlertTitle>Conference Proceedings Policy</AlertTitle>
-                      <AlertDescription>
-                        Only authors with the role of 'Presenting Author' or 'First & Presenting Author' are eligible for an incentive for this publication type. Other co-authors can be added for record-keeping.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  {fields.map((field, index) => (
-                    <div
-                      key={field.id}
-                      className="flex flex-col md:flex-row items-start md:items-center gap-4 p-3 bg-muted/50 rounded-md"
-                    >
-                      <div className="flex-grow">
-                        <p className="font-medium text-sm">
-                          {field.name} {field.isExternal && <span className="text-xs text-muted-foreground">(External)</span>}
-                        </p>
+              <Separator />
+
+              <section className="space-y-6">
+                <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
+                  <div className="h-8 w-1.5 bg-primary rounded-full"></div>
+                  Authorship & Disclosure
+                </div>
+
+                <Alert className="bg-destructive/5 border-destructive/20 py-4 rounded-2xl ring-1 ring-destructive/10">
+                  <AlertCircle className="h-5 w-5 text-destructive" />
+                  <AlertTitle className="text-destructive font-black uppercase text-xs tracking-widest">Mandatory Authors Disclosure</AlertTitle>
+                  <AlertDescription className="mt-2 text-sm font-medium">
+                    All authors must be listed. Missing authors discovered during verification will result in <span className="underline font-bold text-destructive">rejection</span>.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="bg-muted/20 p-6 rounded-2xl border border-dashed border-primary/30 space-y-4">
+                  <div className="space-y-2">
+                    {fields.map((field, index) => (
+                      <div key={field.id} className="flex flex-col md:flex-row items-start md:items-center gap-4 bg-background p-4 rounded-xl border shadow-sm animate-in slide-in-from-left-2">
+                        <div className="flex-1 space-y-0.5">
+                           <div className="flex items-center gap-2">
+                              <p className="font-bold text-sm">{field.name}</p>
+                              {field.isExternal && <Badge variant="outline" className="text-[9px] h-4">External</Badge>}
+                              {field.email.toLowerCase() === user?.email.toLowerCase() && <Badge variant="secondary" className="text-[9px] h-4 bg-primary/10 text-primary border-none">You</Badge>}
+                           </div>
+                           <p className="text-xs text-muted-foreground">{field.email}</p>
+                        </div>
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                          <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={field.role}>
+                            <SelectTrigger className="h-10 w-full md:w-[220px] rounded-lg text-xs font-semibold shadow-sm">
+                               <SelectValue placeholder="Role" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                               {getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (
+                                 <SelectItem key={role} value={role} className="text-xs">{role}</SelectItem>
+                               ))}
+                            </SelectContent>
+                          </Select>
+                          {field.email.toLowerCase() !== user?.email.toLowerCase() && (
+                            <Button variant="ghost" size="icon" onClick={() => removeAuthor(index)} className="text-destructive hover:bg-destructive/10 h-10 w-10">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 w-full md:w-auto">
-                        <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={field.role}>
-                          <SelectTrigger className="w-full md:w-[180px] h-9 text-xs"><SelectValue placeholder="Select role" /></SelectTrigger>
-                          <SelectContent>{getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
-                        </Select>
-                        {field.email.toLowerCase() !== user?.email.toLowerCase() && (
-                          <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => removeAuthor(index)}><Trash2 className="h-4 w-4" /></Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                   <AuthorSearch
                     authors={fields}
                     onAdd={(author) => append(author)}
                     availableRoles={getAvailableRoles()}
                     currentUserEmail={user?.email}
                   />
-                  <FormMessage>
-                    {form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}
-                  </FormMessage>
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="authorPosition"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Your Author Position</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                  <FormField
+                    control={form.control}
+                    name="authorPosition"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-semibold">Your Author Position</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-10 shadow-sm rounded-lg">
+                              <SelectValue placeholder="Position" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="rounded-xl">
+                            {authorPositions.map((pos) => (
+                              <SelectItem key={pos} value={pos}>{pos}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="isPuNameInPublication"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-4 shadow-sm hover:bg-primary/10 transition-all">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm font-bold">PU Affiliation Present?</FormLabel>
+                          <FormDescription className="text-[10px]">Is "Parul University" mentioned?</FormDescription>
+                        </div>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your position" />
-                          </SelectTrigger>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                         </FormControl>
-                        <SelectContent>
-                          {authorPositions.map((pos) => (
-                            <SelectItem key={pos} value={pos}>
-                              {pos}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </section>
+
+              {indexType !== 'other' && (
+                <div className="bg-primary/5 p-6 rounded-2xl border border-primary/20 space-y-4 shadow-inner">
+                  <div className="flex items-center gap-2 text-primary font-bold">
+                    <Info className="h-5 w-5" />
+                    Estimated Incentive Amount
+                  </div>
+                  {calculatedIncentive !== null ? (
+                    <div className="space-y-1">
+                      <p className="text-4xl font-black text-primary tracking-tighter">₹{calculatedIncentive.toLocaleString('en-IN')}</p>
+                      <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
+                    </div>
+                  ) : (
+                    <p className="text-sm italic text-muted-foreground">Estimate will appear once form is complete.</p>
                   )}
-                />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                </div>
+              )}
+
+              <Separator />
+
+              <section className="space-y-6">
+                <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
+                  <div className="h-8 w-1.5 bg-primary rounded-full"></div>
+                  Student Details & SDG Goals
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
                     name="totalPuStudentAuthors"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Total No. of Student Authors from PU</FormLabel>
+                        <FormLabel className="text-sm font-semibold">No. of Student Authors (PU)</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} min="0" />
+                          <Input type="number" {...field} min="0" className="h-10 shadow-sm rounded-lg" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1276,9 +1441,9 @@ export function ResearchPaperForm() {
                     name="puStudentNames"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Name(s) of Student Author(s)</FormLabel>
+                        <FormLabel className="text-sm font-semibold">Student Name(s)</FormLabel>
                         <FormControl>
-                          <Textarea {...field} />
+                          <Textarea placeholder="Comma separated..." {...field} className="min-h-[40px] shadow-sm rounded-lg" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1288,75 +1453,21 @@ export function ResearchPaperForm() {
 
                 <FormField
                   control={form.control}
-                  name="isPuNameInPublication"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Is "Parul University" name present in the publication?
-                        </FormLabel>
-                        <FormDescription>If not, the final incentive amount will be reduced by 50%.</FormDescription>
-                      </div>
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="wasApcPaidByUniversity"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Was the Article Processing Charge (APC) paid by the University?
-                        </FormLabel>
-                        <FormDescription>If yes, the final incentive amount will be reduced by 50%.</FormDescription>
-                      </div>
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {calculatedIncentive !== null && (
-                  <div className={`p-4 rounded-md ${calculatedIncentive === 0 ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-secondary'}`}>
-                    <p className="text-sm font-medium">Tentative Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
-                    {calculatedIncentive === 0 && formValues.authorPosition && ['6th', '7th', '8th', '9th', '10th'].includes(formValues.authorPosition) && (
-                      (() => {
-                        const userRole = formValues.authors.find(a => a.email.toLowerCase() === user?.email.toLowerCase())?.role;
-                        if (userRole === 'Co-Author') {
-                          return <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-2">As a co-author beyond the 5th position, this claim is not eligible for monetary incentive.</p>;
-                        }
-                        return null;
-                      })()
-                    )}
-                    {!(calculatedIncentive === 0 && formValues.authorPosition && ['6th', '7th', '8th', '9th', '10th'].includes(formValues.authorPosition) && formValues.authors.find(a => a.email.toLowerCase() === user?.email.toLowerCase())?.role === 'Co-Author') && (
-                      <p className="text-xs text-muted-foreground">This is your individual share based on the policy, publication type, and author roles.</p>
-                    )}
-                  </div>
-                )}
-
-                <FormField
-                  control={form.control}
                   name="sdgGoals"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>UN Sustainable Development Goals (SDGs)</FormLabel>
+                      <FormLabel className="text-sm font-semibold">Select SDG Goals</FormLabel>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" className="w-full justify-between font-normal">
-                            {field.value?.length > 0 ? `${field.value.length} selected` : "Select relevant goals"}
+                          <Button variant="outline" className="w-full justify-between h-10 font-medium shadow-sm rounded-lg">
+                            {field.value?.length > 0 ? (
+                               <Badge variant="secondary" className="px-2 py-0 text-xs">{field.value.length} selected</Badge>
+                            ) : "Select goals"}
                             <ChevronDown className="h-4 w-4 opacity-50" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] max-h-60 overflow-y-auto">
-                          <DropdownMenuLabel>Select all that apply</DropdownMenuLabel>
+                        <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] max-h-64 overflow-y-auto rounded-xl">
+                          <DropdownMenuLabel className="text-[10px] uppercase font-bold text-muted-foreground p-3">Sustainable Development Goals</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           {sdgGoalsList.map((goal) => (
                             <DropdownMenuCheckboxItem
@@ -1367,6 +1478,7 @@ export function ResearchPaperForm() {
                                   ? field.onChange([...(field.value || []), goal])
                                   : field.onChange(field.value?.filter((value) => value !== goal))
                               }}
+                              className="text-xs py-2"
                               onSelect={(e) => e.preventDefault()}
                             >
                               {goal}
@@ -1378,41 +1490,56 @@ export function ResearchPaperForm() {
                     </FormItem>
                   )}
                 />
+              </section>
+
+              <Separator />
+
+              <section className="space-y-6">
+                 <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
+                  <div className="h-8 w-1.5 bg-primary rounded-full"></div>
+                  Documentation & Proof
+                </div>
+
                 <FormField
                   control={form.control}
                   name="publicationProof"
-                  render={({ field: { value, onChange, ...fieldProps } }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Attach Proof of Publication: Copy of paper, title of the paper details with PU Name. [Max 10 MB]*
-                      </FormLabel>
+                  render={({ field: { onChange, value, ...rest } }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel className="text-base font-semibold text-primary">Upload Proof (PDF)</FormLabel>
                       <FormControl>
-                        <Input
-                          {...fieldProps}
-                          type="file"
-                          multiple
-                          onChange={(e) => onChange(e.target.files)}
-                          accept="application/pdf"
-                        />
+                        <div className="relative flex flex-col items-center justify-center p-8 border-2 border-dashed border-primary/20 rounded-2xl bg-muted/20 hover:bg-muted/30 transition-all cursor-pointer group">
+                           <FileText className="h-12 w-12 text-primary/40 group-hover:text-primary transition-colors mb-2" />
+                           <p className="text-sm font-bold text-primary mb-1">Click or drag to upload PDF</p>
+                           <p className="text-[10px] text-muted-foreground">Select the published paper (Max 10MB)</p>
+                           <input
+                            type="file"
+                            accept=".pdf"
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            onChange={(e) => onChange(e.target.files)}
+                            {...rest}
+                          />
+                        </div>
                       </FormControl>
+                      {value && (value as FileList).length > 0 && (
+                        <div className="flex items-center gap-2 text-xs font-bold text-green-700 bg-green-50 p-2 rounded-lg border border-green-200">
+                           <CheckCircle2 className="h-3 w-3" />
+                           {(value as FileList)[0].name} successfully selected
+                        </div>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
+              </section>
             </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleSave("Draft")}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Save as Draft
-              </Button>
-              <Button type="button" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
-                Proceed to Review
+
+            <CardFooter className="flex flex-col md:flex-row justify-between items-center p-8 bg-muted/10 border-t gap-4">
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                 <Button variant="ghost" type="button" onClick={() => router.back()} className="flex-1 md:flex-none rounded-xl h-12 font-semibold hover:bg-muted">Cancel</Button>
+                 <Button variant="outline" type="button" onClick={() => handleSave('Draft')} disabled={isSubmitting} className="flex-1 md:flex-none rounded-xl h-12 border-primary/30 text-primary hover:bg-primary/5">Save for later</Button>
+              </div>
+              <Button type="button" size="lg" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing} className="w-full md:w-auto rounded-xl h-12 px-12 font-black shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all">
+                Review Application
               </Button>
             </CardFooter>
           </form>

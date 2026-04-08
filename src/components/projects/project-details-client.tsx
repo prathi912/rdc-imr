@@ -525,12 +525,23 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   }
 
   const handleAddCoPi = () => {
-    if (foundCoPi && !coPiList.some((coPi) => coPi.uid === foundCoPi.uid)) {
-      if (user && foundCoPi.uid === user.uid) {
-        toast({ variant: "destructive", title: "Cannot Add Self", description: "You cannot add yourself as a Co-PI." })
+    if (foundCoPi) {
+      if (!foundCoPi.uid) {
+        toast({
+          variant: "destructive",
+          title: "User Not Registered",
+          description: "This user has not registered on the portal yet. Please ask them to log in once to create their profile before adding them as a Co-PI."
+        })
         return
       }
-      setCoPiList([...coPiList, foundCoPi])
+      
+      if (!coPiList.some((coPi) => coPi.uid === foundCoPi.uid)) {
+        if (user && foundCoPi.uid === user.uid) {
+          toast({ variant: "destructive", title: "Cannot Add Self", description: "You cannot add yourself as a Co-PI." })
+          return
+        }
+        setCoPiList([...coPiList, foundCoPi])
+      }
     }
     setFoundCoPi(null)
     setCoPiSearchTerm("")

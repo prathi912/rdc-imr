@@ -2065,67 +2065,130 @@ export async function updateCoInvestigators(
     if (!projectId) {
       return { success: false, error: "Project ID is required." }
     }
+    await logActivity("INFO", "Starting Co-PI update", { projectId, coPiUids })
+    
     const projectRef = adminDb.collection("projects").doc(projectId)
     const projectSnap = await projectRef.get()
+    
     if (!projectSnap.exists) {
+      await logActivity("WARNING", "Project not found for Co-PI update", { projectId })
       return { success: false, error: "Project not found." }
     }
+    
     const project = projectSnap.data() as Project
     const existingCoPis = project.coPiUids || []
 
     const filteredCoPiUids = (coPiUids || []).filter((uid): uid is string => !!uid);
+    
+    // Fetch all co-PI user profiles to construct full details
+    let coPiDetails: CoPiDetails[] = [];
+    let coPiEmails: string[] = [];
+    let coPiNames: string[] = [];
+
+    if (filteredCoPiUids.length > 0) {
+      const usersRef = adminDb.collection("users");
+      const usersSnapshot = await usersRef.where(admin.firestore.FieldPath.documentId(), "in", filteredCoPiUids).get();
+      
+      const userMap = new Map<string, User>();
+      usersSnapshot.forEach(doc => userMap.set(doc.id, { uid: doc.id, ...doc.data() } as User));
+
+      await logActivity("INFO", "Constructing Co-PI metadata", { 
+        projectId, 
+        foundUsers: usersSnapshot.size, 
+        requestedUids: filteredCoPiUids.length 
+      })
+
+      // Reconstruct in the order provided
+      for (const uid of filteredCoPiUids) {
+        const u = userMap.get(uid);
+        if (u) {
+          coPiDetails.push({
+            uid: u.uid,
+            name: u.name,
+            email: u.email,
+            misId: u.misId,
+            organization: u.institute || 'Parul University',
+            isExternal: false
+          });
+          coPiEmails.push(u.email.toLowerCase());
+          coPiNames.push(u.name);
+        } else {
+          await logActivity("WARNING", "User profile not found for Co-PI UID", { projectId, uid })
+        }
+      }
+    }
+
+    // Update with all necessary fields to ensure consistency
     await projectRef.update({
       coPiUids: filteredCoPiUids,
+      coPiDetails: coPiDetails,
+      coPiEmails: coPiEmails,
+      coPiNames: coPiNames
+    })
+
+    await logActivity("INFO", "Project document updated with Co-PI fields", { 
+      projectId, 
+      coPiCount: filteredCoPiUids.length 
     })
 
     const newCoPis = filteredCoPiUids.filter((uid) => !existingCoPis.includes(uid))
 
     if (newCoPis.length > 0) {
-      const usersRef = adminDb.collection("users")
-      const usersQuery = usersRef.where(admin.firestore.FieldPath.documentId(), "in", newCoPis)
-      const newCoPiDocs = await usersQuery.get()
-
       const batch = adminDb.batch()
 
-      for (const userDoc of newCoPiDocs.docs) {
-        const coPi = userDoc.data() as User
+      for (const uid of newCoPis) {
+        const coPi = coPiDetails.find(d => d.uid === uid);
+        if (!coPi) continue;
 
         // In-app notification
         const notificationRef = adminDb.collection("notifications").doc()
         batch.set(notificationRef, {
-          uid: coPi.uid,
+          uid: uid,
           projectId: projectId,
           title: `You have been added as a Co-PI to the IMR project: "${project.title}"`,
           createdAt: new Date().toISOString(),
           isRead: false,
         })
 
-        // Email notification
-        if (coPi.email) {
-          const emailHtml = `
-            <div ${EMAIL_STYLES.background}>
-              ${EMAIL_STYLES.logo}
-              <p style="color:#ffffff;">Dear ${coPi.name},</p>
-              <p style="color:#e0e0e0;">You have been added as a Co-PI to the IMR project titled "<strong style="color:#ffffff;">${project.title}</strong>" by ${project.pi}.</p>
-              <p style="color:#e0e0e0;">You can view the project details on the PU Research Projects Portal</p>
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectId}" style="background-color: #64B5F6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
-                  View Project Details
-                </a>
-              </div>
-              ${EMAIL_STYLES.footer}
-            </div>`
-          await sendEmailUtility({
-            to: coPi.email,
-            subject: `You've been added to an IMR Project`,
-            html: emailHtml,
-            from: "default",
-          })
+        // Email notification - Wrap in try-catch to prevent blocking
+        try {
+          if (coPi.email) {
+            const emailHtml = `
+              <div ${EMAIL_STYLES.background}>
+                ${EMAIL_STYLES.logo}
+                <p style="color:#ffffff;">Dear ${coPi.name},</p>
+                <p style="color:#e0e0e0;">You have been added as a Co-PI to the IMR project titled "<strong style="color:#ffffff;">${project.title}</strong>" by ${project.pi}.</p>
+                <p style="color:#e0e0e0;">You can view the project details on the PU Research Projects Portal</p>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectId}" style="background-color: #64B5F6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                    View Project Details
+                  </a>
+                </div>
+                ${EMAIL_STYLES.footer}
+              </div>`
+            
+            await sendEmailUtility({
+              to: coPi.email,
+              subject: `You've been added to an IMR Project`,
+              html: emailHtml,
+              from: "default",
+            })
+            await logActivity("INFO", "Sent Co-PI addition email", { projectId, recipient: coPi.email })
+          }
+        } catch (emailErr) {
+          console.error(`Failed to send Co-PI email to ${coPi.email}:`, emailErr);
+          await logActivity("WARNING", "Co-PI email notification failed", { projectId, email: coPi.email, error: emailErr })
         }
       }
       await batch.commit()
     }
-    await logActivity("INFO", "Co-investigators updated", { projectId, coPiUids })
+    
+    await logActivity("INFO", "Co-investigators updated fully", { 
+      projectId, 
+      coPiCount: filteredCoPiUids.length, 
+      newCoPiCount: newCoPis.length 
+    })
+    
     return { success: true }
   } catch (error: any) {
     console.error("Error updating Co-PIs:", error)
@@ -2773,3 +2836,4 @@ export async function trackDocumentAccess(userId: string, resourceId: string, ac
  return { success: false };
  }
 }
+
