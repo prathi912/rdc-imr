@@ -377,6 +377,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
     const [isApplying, setIsApplying] = useState(false);
     const [calculatedAmount, setCalculatedAmount] = useState<number | undefined>(undefined);
     const [isCalculating, setIsCalculating] = useState(false);
+    const [statusFilter, setStatusFilter] = useState<string>('pending');
 
     const form = useForm<CoAuthorApplyValues>({
         resolver: zodResolver(coAuthorApplySchema),
@@ -541,11 +542,16 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
         );
     };
 
-    const claimsToShow = claims.filter(claim => {
-        if (!currentUser) return false;
-        const myDetails = getMyCoAuthorDetails(claim);
-        return !!myDetails;
-    });
+    const claimsToShow = useMemo(() => {
+        return claims.filter(claim => {
+            if (!currentUser) return false;
+            const myDetails = getMyCoAuthorDetails(claim);
+            if (!myDetails) return false;
+
+            if (statusFilter === 'all') return true;
+            return myDetails.status.toLowerCase() === statusFilter.toLowerCase();
+        });
+    }, [claims, currentUser, statusFilter]);
 
     const getClaimTitle = (claim: IncentiveClaim): string => {
         return claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.conferencePaperTitle || claim.professionalBodyName || claim.apcPaperTitle || 'Untitled Claim';
@@ -572,6 +578,23 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
 
     return (
         <>
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Your Co-Author Publications</h3>
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap px-1">Filter by:</span>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-[150px]">
+                            <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="Applied">Applied</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+
             <div className="space-y-4">
                 {claimsToShow.map(claim => {
                     const myDetails = getMyCoAuthorDetails(claim);
@@ -894,6 +917,7 @@ export default function IncentiveClaimPage() {
     const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
     const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'apply');
     const [searchQuery, setSearchQuery] = useState('');
+    const [myClaimsStatusFilter, setMyClaimsStatusFilter] = useState('all');
     const isMobile = useIsMobile();
 
     const fetchAllData = useCallback(async (uid: string, email: string) => {
@@ -958,16 +982,10 @@ export default function IncentiveClaimPage() {
 
             // Filter out claims where the current user is the primary author (uid)
             // and exclude co-author-derived claims to avoid duplicate listings and re-application.
-            // Also filter out claims where the user has already applied (status is not 'pending')
             const coAuthorClaimList = Array.from(allCoAuthorClaims.values())
                 .filter(claim => {
                     if (claim.uid === uid || claim.originalClaimId) return false;
-                    // Check if user has already applied for this claim
-                    const userAuthor = claim.authors?.find(a =>
-                        (a.uid === uid || a.email.toLowerCase() === email.toLowerCase())
-                    );
-                    // Only show if user's status is still 'pending' (hasn't applied yet)
-                    return userAuthor?.status === 'pending';
+                    return true;
                 });
 
             setCoAuthorClaims(coAuthorClaimList);
@@ -1040,13 +1058,29 @@ export default function IncentiveClaimPage() {
 
 
     const draftClaims = userClaims.filter(c => c.status === 'Draft');
-    const otherClaims = userClaims.filter(c => c.status !== 'Draft');
+    
+    // Filtered "My Claims" based on status selection
+    const filteredOtherClaims = useMemo(() => {
+        const other = userClaims.filter(c => c.status !== 'Draft');
+        if (myClaimsStatusFilter === 'all') return other;
+        
+        return other.filter(claim => {
+            if (myClaimsStatusFilter === 'pending') {
+                return claim.status === 'Pending' || claim.status.startsWith('Pending Stage');
+            }
+            if (myClaimsStatusFilter === 'approved') {
+                return claim.status === 'Accepted' || claim.status === 'Submitted to Accounts';
+            }
+            return claim.status === myClaimsStatusFilter;
+        });
+    }, [userClaims, myClaimsStatusFilter]);
 
     // Search function to filter across all claims
     const searchClaims = (query: string): IncentiveClaim[] => {
         if (!query.trim()) return [];
         const lowerQuery = query.toLowerCase();
-        const allClaims = [...otherClaims, ...coAuthorClaims, ...draftClaims];
+        const other = userClaims.filter(c => c.status !== 'Draft');
+        const allClaims = [...other, ...coAuthorClaims, ...draftClaims];
 
         return allClaims.filter(claim => {
             const titleText = (claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.conferencePaperTitle || claim.professionalBodyName || claim.apcPaperTitle || claim.awardTitle || claim.emrProjectName || '').toLowerCase();
@@ -1233,8 +1267,25 @@ export default function IncentiveClaimPage() {
                                 })}
                             </div>
                         </TabsContent>
-                        <TabsContent value="my-claims" className="mt-4">
-                            {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={otherClaims} claimType="other" onViewDetails={handleViewDetails} onDeleteClaim={() => { }} />}
+                        <TabsContent value="my-claims" className="mt-4 space-y-4">
+                            {!loading && (
+                                <div className="flex justify-end items-center gap-2">
+                                    <span className="text-sm text-muted-foreground whitespace-nowrap">Filter by Status:</span>
+                                    <Select value={myClaimsStatusFilter} onValueChange={setMyClaimsStatusFilter}>
+                                        <SelectTrigger className="w-[180px]">
+                                            <SelectValue placeholder="All Statuses" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Statuses</SelectItem>
+                                            <SelectItem value="pending">Pending Approval</SelectItem>
+                                            <SelectItem value="approved">Approved</SelectItem>
+                                            <SelectItem value="Payment Completed">Payment Completed</SelectItem>
+                                            <SelectItem value="Rejected">Rejected</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                            {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={filteredOtherClaims} claimType="other" onViewDetails={handleViewDetails} onDeleteClaim={() => { }} />}
                         </TabsContent>
                         <TabsContent value="co-author" className="mt-4">
                             {loading ? <Skeleton className="h-40 w-full" /> : <CoAuthorClaimsList claims={coAuthorClaims} currentUser={user} onClaimApplied={() => fetchAllData(user!.uid, user!.email)} />}
