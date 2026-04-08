@@ -28,6 +28,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -35,7 +39,7 @@ import { db } from '@/lib/config';
 import { doc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, Author } from '@/types';
 import { uploadFileToApi } from '@/lib/upload-client';
-import { Loader2, AlertCircle, Trash2, Plus } from 'lucide-react';
+import { Loader2, AlertCircle, Trash2, Plus, Calendar as CalendarIcon, Bot, CheckCircle2, FileText, X, Globe } from 'lucide-react';
 import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
 import { AuthorSearch } from './author-search';
 
@@ -55,6 +59,8 @@ const workshopSchema = z
   .object({
     eventType: z.string({ required_error: 'Please select an event type.' }),
     workshopName: z.string().min(3, 'Workshop/FDP name is required.'),
+    workshopStartDate: z.string().min(1, 'Start date is required.'),
+    workshopEndDate: z.string().min(1, 'End date is required.'),
     attendanceMode: z.enum(['Online', 'Offline'], { required_error: 'Attendance mode is required.' }),
     organizerName: z.string().min(2, 'Organizer name is required.'),
     eventTypeLevel: z.enum(['International', 'National', 'Regional/State', 'Other'], { required_error: 'Event level is required.' }),
@@ -100,6 +106,28 @@ const workshopSchema = z
   .refine((data) => data.attendanceMode === 'Online' || !!data.travelMode, {
     message: 'Travel mode is required for offline attendance.',
     path: ['travelMode'],
+  })
+  .refine((data) => {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    return new Date(data.workshopStartDate) <= today;
+  }, {
+    message: "Start date cannot be in the future.",
+    path: ["workshopStartDate"],
+  })
+  .refine((data) => {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    return new Date(data.workshopEndDate) <= today;
+  }, {
+    message: "End date cannot be in the future.",
+    path: ["workshopEndDate"],
+  })
+  .refine((data) => {
+    return new Date(data.workshopEndDate) >= new Date(data.workshopStartDate);
+  }, {
+    message: "End date must be on or after the start date.",
+    path: ["workshopEndDate"],
   });
 
 type WorkshopFormValues = z.infer<typeof workshopSchema>;
@@ -126,6 +154,8 @@ export function WorkshopForm({ initialEventType, onEventTypeChange }: WorkshopFo
     defaultValues: {
       eventType: initialEventType || '',
       workshopName: '',
+      workshopStartDate: '',
+      workshopEndDate: '',
       authors: [],
       attendanceMode: undefined,
       organizerName: '',
@@ -258,6 +288,8 @@ export function WorkshopForm({ initialEventType, onEventTypeChange }: WorkshopFo
 
       const claimData: Omit<IncentiveClaim, 'id' | 'claimId'> = {
         ...restOfData,
+        workshopStartDate: data.workshopStartDate,
+        workshopEndDate: data.workshopEndDate,
         registrationFeeProofUrl: registrationFeeProofUrl ?? undefined,
         workshopCertificateUrl: workshopCertificateUrl ?? undefined,
         travelReceiptsUrl: travelReceiptsUrl ?? undefined,

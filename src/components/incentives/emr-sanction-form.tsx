@@ -47,7 +47,14 @@ const emrSanctionSchema = z.object({
   sanctionDate: z.string().min(1, "Date of sanction is required."),
   sanctionProof: z.any()
     .refine((files) => !files || files.length === 0 || Array.from(files as FileList).every((file) => file.size <= MAX_FILE_SIZE), 'File must be less than 10 MB.')
-});
+})
+  .refine(
+    (data) => {
+      const today = new Date().toISOString().split("T")[0];
+      return !data.sanctionDate || data.sanctionDate <= today;
+    },
+    { message: "Date of sanction cannot be in the future.", path: ["sanctionDate"] }
+  );
 
 type EmrSanctionFormValues = z.infer<typeof emrSanctionSchema>
 
@@ -198,30 +205,51 @@ export function EmrSanctionForm({ user }: { user: User }) {
           <CardDescription>Please verify all details before final submission.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-muted-foreground">Project Name</p>
-              <p className="font-medium">{values.emrProjectName}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <div>
+                <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Project Information</p>
+                <div className="space-y-1">
+                  <p className="font-medium text-base leading-tight">{values.emrProjectName}</p>
+                  <p className="text-xs text-muted-foreground">Sanctioning Body: {values.sanctionFrom}</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-8">
+                <div>
+                  <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Sanction Date</p>
+                  <p className="font-medium">{values.sanctionDate}</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">RDC Processed</p>
+                  <Badge variant={values.wasRoutedThroughRdc === "yes" ? "default" : "secondary"} className="text-[9px] py-0 h-4">
+                    {values.wasRoutedThroughRdc === "yes" ? "Routed via RDC" : "Direct Submission"}
+                  </Badge>
+                </div>
+              </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-muted-foreground">Sanctioning Authority</p>
-              <p className="font-medium">{values.sanctionFrom}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-muted-foreground">Sanction Amount</p>
-              <p className="font-medium text-lg text-primary">₹{values.sanctionAmount.toLocaleString('en-IN')}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-muted-foreground">Sanction Date</p>
-              <p className="font-medium">{values.sanctionDate}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-muted-foreground">Routed through RDC</p>
-              <p className="font-medium uppercase">{values.wasRoutedThroughRdc}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-muted-foreground">Tentative Incentive (1%)</p>
-              <p className="font-bold text-xl text-green-600">₹{tentativeIncentive.toLocaleString('en-IN')}</p>
+
+            <div className="space-y-4">
+              <div>
+                <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Financial Summary</p>
+                <div className="space-y-4">
+                  <div className="bg-muted/30 p-4 rounded-xl border border-muted-foreground/10 flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground italic">Sanctioned Amount:</span>
+                    <span className="font-bold">₹{values.sanctionAmount.toLocaleString('en-IN')}</span>
+                  </div>
+
+                  <div className="bg-primary p-6 rounded-[2rem] text-primary-foreground shadow-xl shadow-primary/20 relative overflow-hidden group">
+                    <div className="absolute -right-4 -top-4 bg-white/10 w-24 h-24 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-500"></div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-2">Estimated Incentive</p>
+                    <p className="text-[11px] opacity-70 mb-4 leading-tight font-medium">Based on 1% of the sanction amount, your tentative incentive claim will be:</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-4xl font-black tracking-tighter">₹{tentativeIncentive.toLocaleString('en-IN')}</span>
+                      <span className="text-xs font-medium opacity-60">INR*</span>
+                    </div>
+                    <p className="text-[10px] mt-4 font-medium opacity-70 italic">*Subject to final verification by the technical committee.</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -395,12 +423,11 @@ export function EmrSanctionForm({ user }: { user: User }) {
                         </div>
                       </FormControl>
                       {field.value > 0 && (
-                        <div className="mt-2 p-3 bg-primary/5 border border-primary/20 rounded-xl animate-in fade-in slide-in-from-top-1">
-                          <p className="text-xs font-bold text-primary uppercase tracking-wider mb-1">Amount in Words</p>
-                          <p className="text-sm font-medium text-foreground italic">{numberToWords(Number(field.value))}</p>
+                        <div className="mt-2 p-3 bg-muted/30 border border-muted-foreground/10 rounded-xl space-y-1">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none">Amount in Words</p>
+                          <p className="text-xs font-medium italic lowercase first-letter:uppercase">{numberToWords(Number(field.value))}</p>
                         </div>
                       )}
-                      <FormDescription className="mt-2 italic">Calculated incentive will be 1% of this amount.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -413,7 +440,7 @@ export function EmrSanctionForm({ user }: { user: User }) {
                     <FormItem>
                       <FormLabel className="text-base font-semibold">Date of Sanction</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} className="h-12 shadow-sm" />
+                        <Input type="date" {...field} max={new Date().toISOString().split("T")[0]} className="h-12 shadow-sm" />
                       </FormControl>
                       <FormDescription>As mentioned in the sanction letter/email.</FormDescription>
                       <FormMessage />

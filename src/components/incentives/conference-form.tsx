@@ -1,281 +1,379 @@
-'use client';
+"use client"
 
-import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/config';
-import { collection, doc, getDoc, getDocs, query, where, orderBy } from 'firebase/firestore';
-import type { User, IncentiveClaim, Author } from '@/types';
-import { uploadFileToApi } from '@/lib/upload-client';
-import { Loader2, AlertCircle, Info, Edit, Trash2, Plus } from 'lucide-react';
-import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
-import { parseISO, addYears, format } from 'date-fns';
-import { calculateConferenceIncentive } from '@/app/incentive-calculation';
-import { WorkshopForm } from '@/components/incentives/workshop-form';
-import { AuthorSearch } from './author-search';
+import { useForm, useFieldArray } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import { Separator } from "@/components/ui/separator"
+import { useState, useEffect, useCallback } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
+import { db } from "@/lib/config"
+import { collection, doc, getDoc, getDocs, query, where, orderBy } from "firebase/firestore"
+import type { User, IncentiveClaim, Author } from "@/types"
+import { uploadFileToApi } from "@/lib/upload-client"
+import { Loader2, AlertCircle, Info, Edit, Trash2, CheckCircle2, FileText, X, Globe, MapPin, Calendar, Award, Bot } from "lucide-react"
+import { submitIncentiveClaimViaApi } from "@/lib/incentive-claim-client"
+import { parseISO, addYears, format } from "date-fns"
+import { calculateConferenceIncentive } from "@/app/incentive-calculation"
+import { WorkshopForm } from "@/components/incentives/workshop-form"
+import { AuthorSearch } from "./author-search"
+import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 
-const workshopEventTypes = ['STTP', 'Workshop', 'Training Program', 'FDP', 'Other'];
+const workshopEventTypes = ["STTP", "Workshop", "Training Program", "FDP", "Other"]
 
 const conferenceSchema = z
   .object({
-    eventType: z.string({ required_error: 'Please select an event type.' }),
-    conferencePaperTitle: z.string().min(5, 'Paper title is required.'),
-    conferenceName: z.string().min(3, 'Conference name is required.'),
-    conferenceMode: z.enum(['Online', 'Offline'], { required_error: 'Presentation mode is required.' }),
-    onlinePresentationOrder: z.enum(['First', 'Second', 'Third', 'Additional']).optional(),
-    conferenceType: z.enum(['International', 'National', 'Regional/State'], { required_error: 'Conference type is required.' }),
-    conferenceVenue: z.enum(['India', 'Indian Subcontinent', 'South Korea, Japan, Australia and Middle East', 'Europe', 'African/South American/North American', 'Other'], { required_error: 'Conference venue is required.' }),
-    presentationType: z.enum(['Oral', 'Poster', 'Other']).optional(),
-    govtFundingRequestProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
-    registrationFee: z.coerce.number().nonnegative('Fee cannot be negative.').optional(),
-    travelFare: z.coerce.number().nonnegative('Fare cannot be negative.').optional(),
+    eventType: z.string({ required_error: "Please select an event type." }),
+    conferencePaperTitle: z.string().min(5, "Paper title is required."),
+    conferenceName: z.string().min(3, "Conference name is required."),
+    conferenceMode: z.enum(["Online", "Offline"], { required_error: "Presentation mode is required." }),
+    onlinePresentationOrder: z.enum(["First", "Second", "Third", "Additional"]).optional(),
+    conferenceType: z.enum(["International", "National", "Regional/State"], { required_error: "Conference type is required." }),
+    conferenceVenue: z.enum(
+      ["India", "Indian Subcontinent", "South Korea, Japan, Australia and Middle East", "Europe", "African/South American/North American", "Other"],
+      { required_error: "Conference venue is required." }
+    ),
+    presentationType: z.enum(["Oral", "Poster", "Other"]).optional(),
+    govtFundingRequestProof: z
+      .any()
+      .optional()
+      .refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, "File must be less than 10 MB."),
+    registrationFee: z.coerce.number().nonnegative("Fee cannot be negative.").optional(),
+    travelFare: z.coerce.number().nonnegative("Fare cannot be negative.").optional(),
     wasPresentingAuthor: z.boolean().optional(),
     isPuNamePresent: z.boolean().optional(),
     abstractUpload: z
       .any()
-      .refine((files) => files?.length > 0, 'An abstract is required.')
-      .refine((files) => files?.[0]?.type === 'application/pdf', 'Abstract must be a PDF file.')
-      .refine((files) => files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 50 MB.'),
-    organizerName: z.string().min(2, 'Organizer name is required.'),
-    eventWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
-    conferenceDate: z.string().min(1, 'Conference date is required.'),
-    presentationDate: z.string().min(1, 'Presentation date is required.'),
-    registrationFeeProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+      .refine((files) => files?.length > 0, "An abstract is required.")
+      .refine((files) => !files?.[0] || files?.[0]?.type === "application/pdf", "Abstract must be a PDF file.")
+      .refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, "File must be less than 10 MB."),
+    organizerName: z.string().min(2, "Organizer name is required."),
+    eventWebsite: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
+    conferenceDate: z.string().min(1, "Conference date is required."),
+    presentationDate: z.string().min(1, "Presentation date is required."),
+    registrationFeeProof: z
+      .any()
+      .optional()
+      .refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, "File must be less than 10 MB."),
     participationCertificate: z
       .any()
-      .refine((files) => files?.length > 0, 'Participation certificate is required.')
-      .refine((files) => files?.[0]?.type === 'application/pdf', 'File must be a PDF.')
-      .refine((files) => files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 50 MB.'),
+      .refine((files) => files?.length > 0, "Participation certificate is required.")
+      .refine((files) => !files?.[0] || files?.[0]?.type === "application/pdf", "File must be a PDF.")
+      .refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, "File must be less than 10 MB."),
     wonPrize: z.boolean().optional(),
     prizeDetails: z.string().optional(),
-    prizeProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
-    conferenceProof: z.any().refine((files) => !files || Array.from(files as FileList).every((file) => file.size <= MAX_FILE_SIZE), 'File must be less than 10 MB.'),
+    prizeProof: z
+      .any()
+      .optional()
+      .refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, "File must be less than 10 MB."),
+    conferenceProof: z
+      .any()
+      .optional()
+      .refine((files) => !files || Array.from(files as FileList).every((file) => file.size <= MAX_FILE_SIZE), "File must be less than 10 MB."),
     attendedOtherConference: z.boolean().optional(),
     travelPlaceVisited: z.string().optional(),
-    travelMode: z.enum(['Bus', 'Train', 'Air', 'Other']).optional(),
-    travelReceipts: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
-    conferenceSelfDeclaration: z.boolean().refine((val) => val === true, { message: 'You must agree to the self-declaration.' }),
+    travelMode: z.enum(["Bus", "Train", "Air", "Other"]).optional(),
+    travelReceipts: z
+      .any()
+      .optional()
+      .refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, "File must be less than 10 MB."),
+    conferenceSelfDeclaration: z.boolean().refine((val) => val === true, { message: "You must agree to the self-declaration." }),
     authors: z
       .array(
         z
           .object({
-            name: z.string().min(2, 'Author name is required.'),
-            email: z.string().email('Invalid email format.').or(z.literal('')),
+            name: z.string().min(2, "Author name is required."),
+            email: z.string().email("Invalid email format.").or(z.literal("")),
             uid: z.string().optional().nullable(),
-            role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author', "Presenting Author", "First & Presenting Author"]),
+            role: z.enum([
+              "First Author",
+              "Corresponding Author",
+              "Co-Author",
+              "First & Corresponding Author",
+              "Presenting Author",
+              "First & Presenting Author",
+            ]),
             isExternal: z.boolean(),
-            status: z.enum(['approved', 'pending', 'Applied'])
+            status: z.enum(["approved", "pending", "Applied"]),
           })
           .refine((data) => data.isExternal || !!data.email, {
-            message: 'Email is required for internal authors.',
-            path: ['email'],
+            message: "Email is required for internal authors.",
+            path: ["email"],
           })
       )
-      .min(1, 'At least one author is required.')
-      .refine(data => {
-        const firstAuthors = data.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
-        return firstAuthors.length <= 1;
-      }, { message: 'Only one author can be designated as the First Author.', path: ['authors'] }),
+      .min(1, "At least one author is required.")
+      .refine(
+        (data) => {
+          const firstAuthors = data.filter((author) => author.role === "First Author" || author.role === "First & Corresponding Author")
+          return firstAuthors.length <= 1
+        },
+        { message: "Only one author can be designated as the First Author.", path: ["authors"] }
+      ),
     authorType: z.string().optional(),
     totalAuthors: z.string().optional(),
+    authorPosition: z.enum(['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th']).optional(),
   })
   .refine(
-    (data) => !(data.conferenceVenue && data.conferenceVenue !== 'India') || (!!data.govtFundingRequestProof && data.govtFundingRequestProof.length > 0),
-    { message: 'Proof of government funding request is required for conferences outside India.', path: ['govtFundingRequestProof'] }
+    (data) => !(data.conferenceVenue && data.conferenceVenue !== "India") || (!!data.govtFundingRequestProof && data.govtFundingRequestProof.length > 0),
+    { message: "Proof of government funding request is required for conferences outside India.", path: ["govtFundingRequestProof"] }
+  )
+  .refine((data) => !data.wonPrize || (!!data.prizeDetails && data.prizeDetails.length > 2), {
+    message: "Prize details are required if you won a prize.",
+    path: ["prizeDetails"],
+  })
+  .refine((data) => !data.wonPrize || (!!data.prizeProof && data.prizeProof.length > 0), {
+    message: "Proof of prize is required if you won a prize.",
+    path: ["prizeProof"],
+  })
+  .refine((data) => data.conferenceMode === "Online" || !!data.presentationType, {
+    message: "Presentation type is required for offline conferences.",
+    path: ["presentationType"],
+  })
+  .refine((data) => !data.conferenceDate || !data.presentationDate || new Date(data.presentationDate) >= new Date(data.conferenceDate), {
+    message: "Presentation date must be on or after the conference start date.",
+    path: ["presentationDate"],
+  })
+  .refine(
+    (data) => {
+      const today = new Date().toISOString().split("T")[0];
+      return !data.conferenceDate || data.conferenceDate <= today;
+    },
+    { message: "Conference start date cannot be in the future.", path: ["conferenceDate"] }
   )
   .refine(
-    (data) => !(data.wonPrize) || (!!data.prizeDetails && data.prizeDetails.length > 2),
-    { message: 'Prize details are required if you won a prize.', path: ['prizeDetails'] }
-  )
-  .refine(
-    (data) => !(data.wonPrize) || (!!data.prizeProof && data.prizeProof.length > 0),
-    { message: 'Proof of prize is required if you won a prize.', path: ['prizeProof'] }
-  )
-  .refine(
-    (data) => data.conferenceMode === 'Online' || !!data.presentationType,
-    { message: 'Presentation type is required for offline conferences.', path: ['presentationType'] }
-  )
-  .refine(
-    (data) => !data.conferenceDate || !data.presentationDate || new Date(data.presentationDate) >= new Date(data.conferenceDate),
-    { message: 'Presentation date must be on or after the conference start date.', path: ['presentationDate'] }
+    (data) => {
+      const today = new Date().toISOString().split("T")[0];
+      return !data.presentationDate || data.presentationDate <= today;
+    },
+    { message: "Presentation date cannot be in the future.", path: ["presentationDate"] }
   );
 
-type ConferenceFormValues = z.infer<typeof conferenceSchema>;
+type ConferenceFormValues = z.infer<typeof conferenceSchema>
 
-const eventTypes = [
-  'Conference',
-  'Seminar',
-  'Symposium',
-  'Invited Talk/Guest Speaker',
-  ...workshopEventTypes,
-];
+const eventTypes = ["Conference", "Seminar", "Symposium", "Invited Talk/Guest Speaker", ...workshopEventTypes]
 
 const conferenceVenueOptions = {
-  International: ['India', 'Indian Subcontinent', 'South Korea, Japan, Australia and Middle East', 'Europe', 'African/South American/North American', 'Other'],
-  National: ['India'],
-  'Regional/State': ['India'],
-};
+  International: ["India", "Indian Subcontinent", "South Korea, Japan, Australia and Middle East", "Europe", "African/South American/North American", "Other"],
+  National: ["India"],
+  "Regional/State": ["India"],
+}
 
-const authorCountOptions = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10+'];
-const authorTypeOptions = ['First Author', 'Corresponding Author', 'Co-Author', 'Presenting Author', 'First & Presenting Author'];
-const coAuthorRoles: Author['role'][] = ['First Author', 'Corresponding Author', 'Co-Author', 'Presenting Author', 'First & Presenting Author'];
+const authorCountOptions = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10+"]
+const authorTypeOptions = ["First Author", "Corresponding Author", "Co-Author", "Presenting Author", "First & Presenting Author"]
+const coAuthorRoles: Author["role"][] = ["First Author", "Corresponding Author", "Co-Author", "Presenting Author", "First & Presenting Author"]
 
-function ReviewDetails({ data, onEdit }: { data: ConferenceFormValues; onEdit: () => void }) {
-  const renderDetail = (label: string, value?: string | number | boolean) => {
-    if (!value && value !== 0 && value !== false) return null;
-    return (
-      <div className="grid grid-cols-3 gap-2 py-1.5 items-start">
-        <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
-        <dd className="col-span-2">{String(value)}</dd>
-      </div>
-    );
-  };
-
+function ReviewDetails({
+  data,
+  onEdit,
+  isSubmitting,
+  totalIncentive,
+  breakdown,
+}: {
+  data: ConferenceFormValues
+  onEdit: () => void
+  isSubmitting: boolean
+  totalIncentive: number | null
+  breakdown: { eligibleExpenses?: number; maxReimbursement?: number } | null
+}) {
   return (
-    <Card>
-      <CardHeader>
+    <Card className="max-w-4xl mx-auto shadow-xl border-t-4 border-t-primary">
+      <CardHeader className="bg-muted/30">
         <div className="flex justify-between items-center">
           <div>
-            <CardTitle>Review Your Application</CardTitle>
-            <CardDescription>Please review the details below before final submission.</CardDescription>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <CheckCircle2 className="h-6 w-6 text-primary" /> Review Your Application
+            </CardTitle>
+            <CardDescription>Please verify all details before final submission.</CardDescription>
           </div>
-          <Button variant="outline" onClick={onEdit}>
-            <Edit className="h-4 w-4 mr-2" /> Edit
+          <Button variant="outline" onClick={onEdit} disabled={isSubmitting}>
+            Edit Form
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {renderDetail('Event Type', data.eventType)}
-        {renderDetail('Paper Title', data.conferencePaperTitle)}
-        {renderDetail('Conference Name', data.conferenceName)}
-        {renderDetail('Organizer', data.organizerName)}
-        {renderDetail('Event Website', data.eventWebsite)}
-        {renderDetail('Conference Date', data.conferenceDate)}
-        {renderDetail('Presentation Date', data.presentationDate)}
-        {renderDetail('Conference Type', data.conferenceType)}
-        {renderDetail('Presentation Type', data.presentationType)}
-        {renderDetail('Presentation Mode', data.conferenceMode)}
-        {renderDetail('Online Presentation Order', data.onlinePresentationOrder)}
-        {renderDetail('Registration Fee', data.registrationFee ? `₹${data.registrationFee.toLocaleString('en-IN')}` : undefined)}
-        {renderDetail('Venue/Location', data.conferenceVenue)}
-        {renderDetail('Place Visited', data.travelPlaceVisited)}
-        {renderDetail('Travel Mode', data.travelMode)}
-        {renderDetail('Travel Fare', data.travelFare ? `₹${data.travelFare.toLocaleString('en-IN')}` : undefined)}
-        {renderDetail('Presenting Author?', data.wasPresentingAuthor ? 'Yes' : 'No')}
-        {renderDetail('PU Name in Paper?', data.isPuNamePresent ? 'Yes' : 'No')}
-        {renderDetail('Won a Prize?', data.wonPrize ? 'Yes' : 'No')}
-        {renderDetail('Prize Details', data.prizeDetails)}
+      <CardContent className="space-y-6 pt-6 text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-4">
+            <div>
+              <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Event Type & Info</p>
+              <div className="space-y-1">
+                <p className="font-medium text-base">
+                  {data.eventType} ({data.conferenceMode})
+                </p>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Globe className="h-3.5 w-3.5" />
+                  <span>
+                    {data.conferenceType} - {data.conferenceVenue}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Paper Title</p>
+              <p className="font-medium">{data.conferencePaperTitle}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Conference/Event</p>
+              <p className="font-medium">{data.conferenceName}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Organized by: {data.organizerName}</p>
+            </div>
+            <div className="flex gap-6">
+              <div>
+                <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Start Date</p>
+                <p className="font-medium">{data.conferenceDate}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Presentation Date</p>
+                <p className="font-medium">{data.presentationDate}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Financial Summary</p>
+              <div className="space-y-4">
+                <div className="bg-muted/30 p-4 rounded-xl border border-muted-foreground/10 space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Registration Fee:</span>
+                    <span className="font-bold font-mono">₹{data.registrationFee?.toLocaleString("en-IN") || 0}</span>
+                  </div>
+                  {data.conferenceMode === "Offline" && (
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground">Travel Fare:</span>
+                      <span className="font-bold font-mono">₹{data.travelFare?.toLocaleString("en-IN") || 0}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-primary p-6 rounded-[2rem] text-primary-foreground shadow-xl shadow-primary/20 relative overflow-hidden group">
+                  <div className="absolute -right-4 -top-4 bg-white/10 w-24 h-24 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-500"></div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-2">Estimated Incentive</p>
+                  <p className="text-[11px] opacity-70 mb-4 leading-tight font-medium">Based on the provided details, your tentative incentive claim will be:</p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-black tracking-tighter">₹{totalIncentive?.toLocaleString('en-IN') || '0'}</span>
+                    <span className="text-xs font-medium opacity-60">INR*</span>
+                  </div>
+                  {breakdown && (
+                    <p className="text-[10px] mt-2 font-bold opacity-60 italic">
+                      (Policy Limit: ₹{breakdown.maxReimbursement?.toLocaleString("en-IN")})
+                    </p>
+                  )}
+                  <p className="text-[10px] mt-4 font-medium opacity-70 italic">*Subject to final verification by the technical committee.</p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Author Details</p>
+              <div className="border rounded-xl overflow-hidden shadow-sm">
+                <Table>
+                  <TableBody>
+                    {data.authors.map((author, idx) => (
+                      <TableRow key={idx} className="hover:bg-transparent">
+                        <TableCell className="py-2.5 font-medium">{author.name}</TableCell>
+                        <TableCell className="py-2.5">
+                          <Badge variant="outline" className="text-[9px] py-0 h-4">
+                            {author.role}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            {data.wonPrize && (
+              <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded-xl border border-amber-200 dark:border-amber-800">
+                <p className="text-amber-800 dark:text-amber-400 font-bold flex items-center gap-1.5 text-xs mb-1">
+                  <Award className="h-3.5 w-3.5" /> Prize Secured
+                </p>
+                <p className="text-xs font-medium">{data.prizeDetails}</p>
+              </div>
+            )}
+          </div>
+        </div>
       </CardContent>
     </Card>
-  );
+  )
 }
 
-export function ConferenceForm() {
-  const searchParams = useSearchParams();
-  const [draftEventType, setDraftEventType] = useState<string | null>(null);
-  const [selectedEventType, setSelectedEventType] = useState<string | null>(null);
-  const [isLoadingDraft, setIsLoadingDraft] = useState(true);
+export function ConferenceForm({ user }: { user: User }) {
+  const searchParams = useSearchParams()
+  const [selectedEventType, setSelectedEventType] = useState<string | null>(null)
+  const [isLoadingDraft, setIsLoadingDraft] = useState(true)
 
   useEffect(() => {
-    const claimId = searchParams.get('claimId');
+    const claimId = searchParams.get("claimId")
     if (claimId) {
       const fetchDraft = async () => {
         try {
-          const claimRef = doc(db, 'incentiveClaims', claimId);
-          const claimSnap = await getDoc(claimRef);
+          const claimRef = doc(db, "incentiveClaims", claimId)
+          const claimSnap = await getDoc(claimRef)
           if (claimSnap.exists()) {
-            const draftData = claimSnap.data() as IncentiveClaim;
-            const eventType = draftData.eventType || null;
-            setDraftEventType(eventType);
-            setSelectedEventType(eventType);
+            const draftData = claimSnap.data() as IncentiveClaim
+            const eventType = draftData.eventType || null
+            setSelectedEventType(eventType)
           }
         } catch (error) {
-          console.error('Error fetching draft:', error);
+          console.error("Error fetching draft:", error)
         } finally {
-          setIsLoadingDraft(false);
+          setIsLoadingDraft(false)
         }
-      };
-      fetchDraft();
+      }
+      fetchDraft()
     } else {
-      setIsLoadingDraft(false);
+      setIsLoadingDraft(false)
     }
-  }, [searchParams]);
+  }, [searchParams])
 
   if (isLoadingDraft) {
     return (
-      <Card className="p-8 flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <Card className="max-w-4xl mx-auto p-12 flex justify-center items-center shadow-lg border-t-4 border-t-primary">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </Card>
-    );
+    )
   }
 
   if (selectedEventType && workshopEventTypes.includes(selectedEventType)) {
-    return <WorkshopForm initialEventType={selectedEventType} onEventTypeChange={setSelectedEventType} />;
+    return <WorkshopForm initialEventType={selectedEventType} onEventTypeChange={setSelectedEventType} />
   }
 
-  return <ConferenceFormContent onEventTypeChange={setSelectedEventType} />;
+  return <ConferenceFormContent user={user} onEventTypeChange={setSelectedEventType} />
 }
 
-interface ConferenceFormContentProps {
-  onEventTypeChange?: (eventType: string | null) => void;
-}
-
-function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps) {
-  const { toast } = useToast();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [user, setUser] = useState<User | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
-  const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
-  const [eligibility, setEligibility] = useState<{ eligible: boolean; nextAvailableDate?: string }>({ eligible: true });
-  const [isLoadingDraft, setIsLoadingDraft] = useState(true);
-  const [currentStep, setCurrentStep] = useState(1);
-  const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
-  const [calculationBreakdown, setCalculationBreakdown] = useState<{ eligibleExpenses?: number; maxReimbursement?: number } | null>(null);
+function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEventTypeChange?: (eventType: string | null) => void }) {
+  const { toast } = useToast()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [bankDetailsMissing, setBankDetailsMissing] = useState(false)
+  const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false)
+  const [eligibility, setEligibility] = useState<{ eligible: boolean; nextAvailableDate?: string }>({ eligible: true })
+  const [isLoadingDraft, setIsLoadingDraft] = useState(true)
+  const [step, setStep] = useState<"edit" | "review">("edit")
+  const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null)
+  const [calculationBreakdown, setCalculationBreakdown] = useState<{ eligibleExpenses?: number; maxReimbursement?: number } | null>(null)
 
   const form = useForm<ConferenceFormValues>({
     resolver: zodResolver(conferenceSchema),
     defaultValues: {
-      eventType: '',
-      conferenceName: '',
-      conferencePaperTitle: '',
+      eventType: "",
+      conferenceName: "",
+      conferencePaperTitle: "",
       authors: [],
       conferenceType: undefined,
       conferenceVenue: undefined,
@@ -288,151 +386,150 @@ function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps
       wasPresentingAuthor: false,
       isPuNamePresent: false,
       abstractUpload: undefined,
-      organizerName: '',
-      eventWebsite: '',
-      conferenceDate: '',
-      presentationDate: '',
+      organizerName: "",
+      eventWebsite: "",
+      conferenceDate: "",
+      presentationDate: "",
       registrationFeeProof: undefined,
       participationCertificate: undefined,
       wonPrize: false,
-      prizeDetails: '',
+      prizeDetails: "",
       prizeProof: undefined,
       conferenceProof: undefined,
       attendedOtherConference: false,
-      travelPlaceVisited: '',
+      travelPlaceVisited: "",
       travelMode: undefined,
       travelReceipts: undefined,
       conferenceSelfDeclaration: false,
-      authorType: '',
-      totalAuthors: '',
+      authorType: "",
+      totalAuthors: "",
+      authorPosition: "1st" as any,
     },
-  });
+  })
 
   const { fields, append, remove, update } = useFieldArray({
     control: form.control,
     name: "authors",
-  });
+  })
 
-  const selectedEventType = form.watch('eventType');
+  const selectedEventType = form.watch("eventType")
 
-  // Notify parent component when workshop event type is selected
   useEffect(() => {
     if (selectedEventType && workshopEventTypes.includes(selectedEventType)) {
-      onEventTypeChange?.(selectedEventType);
+      onEventTypeChange?.(selectedEventType)
     }
-  }, [selectedEventType, onEventTypeChange]);
+  }, [selectedEventType, onEventTypeChange])
 
   const calculate = useCallback(async () => {
-    const dataForCalc = form.getValues();
+    const dataForCalc = form.getValues()
     if (dataForCalc.conferenceMode) {
-      const result = await calculateConferenceIncentive(dataForCalc);
+      const result = await calculateConferenceIncentive(dataForCalc)
       if (result.success) {
-        setCalculatedIncentive(result.amount ?? null);
+        setCalculatedIncentive(result.amount ?? null)
         setCalculationBreakdown({
           eligibleExpenses: result.eligibleExpenses,
           maxReimbursement: result.maxReimbursement,
-        });
+        })
       } else {
-        setCalculatedIncentive(null);
-        setCalculationBreakdown(null);
+        setCalculatedIncentive(null)
+        setCalculationBreakdown(null)
       }
     } else {
-      setCalculatedIncentive(null);
-      setCalculationBreakdown(null);
+      setCalculatedIncentive(null)
+      setCalculationBreakdown(null)
     }
-  }, [form]);
+  }, [form])
 
   useEffect(() => {
-    const subscription = form.watch((value, { name, type }) => {
-      const fieldsForRecalculation = [
-        'registrationFee',
-        'travelFare',
-        'conferenceMode',
-        'onlinePresentationOrder',
-        'conferenceType',
-        'presentationType',
-        'conferenceVenue',
-        'organizerName',
-        'conferenceName',
-      ];
-      if (type === 'change' && fieldsForRecalculation.includes(name as string)) {
-        calculate();
+    const subscription = form.watch((value, { name }) => {
+      if (name === "conferenceType" && value.conferenceType === "National") {
+        form.setValue("conferenceVenue", "India", { shouldValidate: true })
       }
-    });
-    return () => subscription.unsubscribe();
-  }, [form, calculate]);
+
+      const fieldsForRecalculation = [
+        "registrationFee",
+        "travelFare",
+        "conferenceMode",
+        "onlinePresentationOrder",
+        "conferenceType",
+        "presentationType",
+        "conferenceVenue",
+        "organizerName",
+        "conferenceName",
+      ]
+      if (fieldsForRecalculation.includes(name as string)) {
+        calculate()
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [form, calculate])
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-      setBankDetailsMissing(!parsedUser.bankDetails);
-      setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
+    if (user) {
+      setBankDetailsMissing(!user.bankDetails)
+      setOrcidOrMisIdMissing(!user.orcidId || !user.misId)
 
-      const isUserAlreadyAdded = form.getValues('authors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
+      const isUserAlreadyAdded = form.getValues("authors").some((field) => field.email.toLowerCase() === user.email.toLowerCase())
       if (!isUserAlreadyAdded) {
         append({
-          name: parsedUser.name,
-          email: parsedUser.email,
-          uid: parsedUser.uid,
-          role: "First Author",
+          name: user.name,
+          email: user.email,
+          uid: user.uid,
+          role: "Presenting Author",
           isExternal: false,
-          status: 'approved'
+          status: "approved",
         })
       }
 
       const checkEligibility = async () => {
-        const claimsRef = collection(db, 'incentiveClaims');
+        const claimsRef = collection(db, "incentiveClaims")
         const q = query(
           claimsRef,
-          where('uid', '==', parsedUser.uid),
-          where('claimType', '==', 'Conference Presentations'),
-          where('status', 'in', ['Accepted', 'Submitted to Accounts', 'Payment Completed']),
-          orderBy('submissionDate', 'desc')
-        );
-        const snapshot = await getDocs(q);
+          where("uid", "==", user.uid),
+          where("claimType", "==", "Conference Presentations"),
+          where("status", "in", ["Accepted", "Submitted to Accounts", "Payment Completed"]),
+          orderBy("submissionDate", "desc")
+        )
+        const snapshot = await getDocs(q)
         if (!snapshot.empty) {
           const lastPuConferenceClaim = snapshot.docs
             .map((docItem) => docItem.data() as IncentiveClaim)
             .find(
-              (claim) =>
-                claim.organizerName?.toLowerCase().includes('parul university') ||
-                claim.conferenceName?.toLowerCase().includes('picet')
-            );
+              (claim) => claim.organizerName?.toLowerCase().includes("parul university") || claim.conferenceName?.toLowerCase().includes("picet")
+            )
 
           if (lastPuConferenceClaim) {
-            const lastClaimDate = parseISO(lastPuConferenceClaim.submissionDate);
-            const oneYearAgo = addYears(new Date(), -1);
+            const lastClaimDate = parseISO(lastPuConferenceClaim.submissionDate)
+            const oneYearAgo = addYears(new Date(), -1)
 
             if (lastClaimDate > oneYearAgo) {
-              const nextDate = addYears(lastClaimDate, 1);
+              const nextDate = addYears(lastClaimDate, 1)
               setEligibility({
                 eligible: false,
-                nextAvailableDate: format(nextDate, 'PPP'),
-              });
+                nextAvailableDate: format(nextDate, "PPP"),
+              })
             }
           }
         }
-      };
-      checkEligibility();
+      }
+      checkEligibility()
     }
-    const claimId = searchParams.get('claimId');
+    const claimId = searchParams.get("claimId")
     if (!claimId) {
-      setIsLoadingDraft(false);
+      setIsLoadingDraft(false)
     }
-  }, [append, form, searchParams]);
+  }, [append, form, searchParams, user])
 
   useEffect(() => {
-    const claimId = searchParams.get('claimId');
+    const claimId = searchParams.get("claimId")
     if (claimId && user) {
       const fetchDraft = async () => {
-        setIsLoadingDraft(true);
+        setIsLoadingDraft(true)
         try {
-          const claimRef = doc(db, 'incentiveClaims', claimId);
-          const claimSnap = await getDoc(claimRef);
+          const claimRef = doc(db, "incentiveClaims", claimId)
+          const claimSnap = await getDoc(claimRef)
           if (claimSnap.exists()) {
-            const draftData = claimSnap.data() as any;
+            const draftData = claimSnap.data() as any
             form.reset({
               ...draftData,
               authors: draftData.authors || [],
@@ -443,70 +540,56 @@ function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps
               prizeProof: undefined,
               conferenceProof: undefined,
               travelReceipts: undefined,
-            });
-          } else {
-            toast({ variant: 'destructive', title: 'Draft Not Found' });
+            })
           }
         } catch (error) {
-          toast({ variant: 'destructive', title: 'Error Loading Draft' });
+          toast({ variant: "destructive", title: "Error Loading Draft" })
         } finally {
-          setIsLoadingDraft(false);
+          setIsLoadingDraft(false)
         }
-      };
-      fetchDraft();
+      }
+      fetchDraft()
     }
-  }, [searchParams, user, form, toast]);
+  }, [searchParams, user, form, toast])
 
   const handleProceedToReview = async () => {
-    const isValid = await form.trigger();
+    const isValid = await form.trigger()
     if (isValid) {
-      setCurrentStep(2);
+      setStep("review")
     } else {
       toast({
-        variant: 'destructive',
-        title: 'Validation Error',
-        description: 'Please correct the errors before proceeding.',
-      });
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Please correct the errors before proceeding.",
+      })
     }
-  };
+  }
 
-  async function handleSave(status: 'Draft' | 'Pending') {
-    if (!user || !user.faculty) {
-      toast({ variant: 'destructive', title: 'Error', description: 'User information not found. Please log in again.' });
-      return;
-    }
-    if (status === 'Pending' && (!user.bankDetails || !user.orcidId || !user.misId)) {
+  async function handleSave(status: "Draft" | "Pending") {
+    if (status === "Pending" && (bankDetailsMissing || orcidOrMisIdMissing)) {
       toast({
-        variant: 'destructive',
-        title: 'Profile Incomplete',
-        description: 'Please add your bank details, ORCID iD, and MIS ID in Settings before submitting a claim.',
-      });
-      return;
+        variant: "destructive",
+        title: "Profile Incomplete",
+        description: "Please add your bank details, ORCID iD, and MIS ID in Settings before submitting a claim.",
+      })
+      return
     }
 
-    setIsSubmitting(true);
+    setIsSubmitting(true)
     try {
-      const data = form.getValues();
-
+      const data = form.getValues()
       const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
-        if (!file || !user) return undefined;
-        const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
-        const result = await uploadFileToApi(file, { path });
+        if (!file || !user) return undefined
+        const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`
+        const result = await uploadFileToApi(file, { path })
         if (!result.success || !result.url) {
-          throw new Error(result.error || `File upload failed for ${folderName}`);
+          throw new Error(result.error || `File upload failed for ${folderName}`)
         }
-        return result.url;
-      };
+        return result.url
+      }
 
-      const {
-        govtFundingRequestProof,
-        abstractUpload,
-        registrationFeeProof,
-        participationCertificate,
-        prizeProof,
-        travelReceipts,
-        ...restOfData
-      } = data;
+      const { govtFundingRequestProof, abstractUpload, registrationFeeProof, participationCertificate, prizeProof, travelReceipts, ...restOfData } =
+        data
 
       const [
         govtFundingRequestProofUrl,
@@ -516,15 +599,15 @@ function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps
         prizeProofUrl,
         travelReceiptsUrl,
       ] = await Promise.all([
-        uploadFileHelper(govtFundingRequestProof?.[0], 'conference-funding-proof'),
-        uploadFileHelper(abstractUpload?.[0], 'conference-abstract'),
-        uploadFileHelper(registrationFeeProof?.[0], 'conference-reg-proof'),
-        uploadFileHelper(participationCertificate?.[0], 'conference-cert'),
-        uploadFileHelper(prizeProof?.[0], 'conference-prize-proof'),
-        uploadFileHelper(travelReceipts?.[0], 'conference-travel-receipts'),
-      ]);
+        uploadFileHelper(govtFundingRequestProof?.[0], "conference-funding-proof"),
+        uploadFileHelper(abstractUpload?.[0], "conference-abstract"),
+        uploadFileHelper(registrationFeeProof?.[0], "conference-reg-proof"),
+        uploadFileHelper(participationCertificate?.[0], "conference-cert"),
+        uploadFileHelper(prizeProof?.[0], "conference-prize-proof"),
+        uploadFileHelper(travelReceipts?.[0], "conference-travel-receipts"),
+      ])
 
-      const claimData: Omit<IncentiveClaim, 'id' | 'claimId'> = {
+      const claimData: Omit<IncentiveClaim, "id" | "claimId"> = {
         ...restOfData,
         govtFundingRequestProofUrl: govtFundingRequestProofUrl ?? undefined,
         abstractUrl: abstractUrl ?? undefined,
@@ -536,781 +619,507 @@ function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps
         misId: user.misId ?? undefined,
         orcidId: user.orcidId ?? undefined,
         bankDetails: user.bankDetails ?? undefined,
-        claimType: 'Conference Presentations',
-        benefitMode: 'reimbursement',
+        claimType: "Conference Presentations",
+        benefitMode: "reimbursement",
         uid: user.uid,
         userName: user.name,
         userEmail: user.email,
-        faculty: user.faculty,
+        faculty: user.faculty || "N/A",
         status,
         submissionDate: new Date().toISOString(),
         authorType: data.authorType,
         totalAuthors: data.totalAuthors,
-      };
-
-      const result = await submitIncentiveClaimViaApi(claimData);
-
-      if (!result.success) {
-        throw new Error(result.error);
       }
 
-      const claimId = searchParams.get('claimId') || result.claimId;
+      const claimId = searchParams.get("claimId")
+      const result = await submitIncentiveClaimViaApi(claimData, claimId || undefined)
 
-      if (status === 'Draft') {
-        toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
-        if (!searchParams.get('claimId')) {
-          router.push(`/dashboard/incentive-claim/conference?claimId=${claimId}`);
-        }
-      } else {
-        toast({ title: 'Success', description: 'Your incentive claim has been submitted.' });
-        router.push('/dashboard/incentive-claim');
-      }
+      if (!result.success) throw new Error(result.error)
+
+      toast({
+        title: status === "Draft" ? "Draft Saved!" : "Success",
+        description: status === "Draft" ? "You can continue editing later." : "Your incentive claim has been submitted.",
+      })
+      router.push("/dashboard/incentive-claim" + (status === "Pending" ? "?tab=my-claims" : ""))
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to submit claim. Please try again.' });
+      toast({ variant: "destructive", title: "Error", description: error.message || "Failed to submit claim. Please try again." })
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
   }
 
-  const onFinalSubmit = () => handleSave('Pending');
-
-  const firstAuthorExists = fields.some(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
+  const firstAuthorExists = fields.some((author) => author.role === "First Author" || author.role === "First & Corresponding Author")
 
   const getAvailableRoles = (currentAuthor?: Author) => {
-    const isCurrentAuthorFirst = currentAuthor && (currentAuthor.role === 'First Author' || currentAuthor.role === 'First & Corresponding Author');
+    const isCurrentAuthorFirst =
+      currentAuthor && (currentAuthor.role === "First Author" || currentAuthor.role === "First & Corresponding Author")
     if (firstAuthorExists && !isCurrentAuthorFirst) {
-      return coAuthorRoles.filter(role => role !== 'First Author' && role !== 'First & Corresponding Author');
+      return coAuthorRoles.filter((role) => role !== "First Author" && role !== "First & Corresponding Author")
     }
-    return coAuthorRoles;
-  };
-
-  const removeAuthor = (index: number) => {
-    const authorToRemove = fields[index];
-    if (authorToRemove.email.toLowerCase() === user?.email.toLowerCase()) {
-      toast({ variant: 'destructive', title: 'Action not allowed', description: 'You cannot remove yourself as the primary author.' });
-      return;
-    }
-    remove(index);
-  };
-
-  const updateAuthorRole = (index: number, role: Author['role']) => {
-    const currentAuthors = form.getValues('authors');
-    const author = currentAuthors[index];
-    const isTryingToBeFirst = role === 'First Author' || role === 'First & Corresponding Author';
-    const isAnotherFirst = currentAuthors.some((a, i) => i !== index && (a.role === 'First Author' || a.role === 'First & Corresponding Author'));
-
-    if (isTryingToBeFirst && isAnotherFirst) {
-      toast({ title: 'Conflict', description: 'Another author is already the First Author.', variant: 'destructive' });
-      return;
-    }
-
-    update(index, { ...author, role });
-  };
-
-  const { conferenceMode, conferenceType, wonPrize, organizerName, conferenceName, conferenceVenue } = form.watch();
-  const isPuConference = organizerName?.toLowerCase().includes('parul university') || conferenceName?.toLowerCase().includes('picet');
-  const isFormDisabled = (!eligibility.eligible && isPuConference) || isSubmitting;
-
-  if (isLoadingDraft) {
-    return (
-      <Card className="p-8 flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </Card>
-    );
+    return coAuthorRoles
   }
 
-  if (currentStep === 2) {
+  const removeAuthor = (index: number) => {
+    if (fields[index].email.toLowerCase() === user.email.toLowerCase()) {
+      toast({ variant: "destructive", title: "Action blocked", description: "You cannot remove yourself from the list." })
+      return
+    }
+    remove(index)
+  }
+
+  const updateAuthorRole = (index: number, role: Author["role"]) => {
+    const authors = form.getValues("authors")
+    const isTryingToBeFirst = role === "First Author" || role === "First & Corresponding Author"
+    const isAnotherFirst = authors.some((a, i) => i !== index && (a.role === "First Author" || a.role === "First & Corresponding Author"))
+
+    if (isTryingToBeFirst && isAnotherFirst) {
+      toast({ title: "Conflict", description: "Another author is already the First Author.", variant: "destructive" })
+      return
+    }
+
+    update(index, { ...authors[index], role })
+  }
+
+  const { conferenceMode, conferenceType, wonPrize, organizerName, conferenceName, conferenceVenue } = form.watch()
+  const isPuConference = organizerName?.toLowerCase().includes("parul university") || conferenceName?.toLowerCase().includes("picet")
+  const isFormDisabled = (!eligibility.eligible && isPuConference) || isSubmitting
+
+  if (isLoadingDraft) return <div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
+
+  if (step === "review") {
     return (
-      <Card>
-        <form onSubmit={form.handleSubmit(onFinalSubmit)}>
-          <CardContent className="pt-6">
-            <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
-          </CardContent>
-          <CardFooter>
-            <Button type="submit" disabled={isFormDisabled || bankDetailsMissing || orcidOrMisIdMissing}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSubmitting ? 'Submitting...' : 'Submit Claim'}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
-    );
+      <div className="space-y-8 animate-in fade-in duration-500">
+        <ReviewDetails
+          data={form.getValues()}
+          onEdit={() => setStep("edit")}
+          isSubmitting={isSubmitting}
+          totalIncentive={calculatedIncentive}
+          breakdown={calculationBreakdown}
+        />
+        <div className="flex justify-end max-w-4xl mx-auto gap-4">
+          <Button variant="ghost" onClick={() => setStep("edit")} disabled={isSubmitting}>Modify Details</Button>
+          <Button size="lg" onClick={() => handleSave("Pending")} disabled={isFormDisabled} className="px-10 font-bold shadow-lg shadow-primary/25">
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+            Confirm Submission
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <Card>
-      <Form {...form}>
-        <form>
-          <CardContent className="space-y-6 pt-6">
+    <Card className="max-w-4xl mx-auto shadow-2xl border-t-4 border-t-primary overflow-hidden">
+      <CardHeader className="bg-primary/5 pb-8">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <CardTitle className="text-3xl font-bold tracking-tight text-primary uppercase">Event Assistance</CardTitle>
+          </div>
+          <div className="bg-primary/10 p-3 rounded-2xl shadow-inner">
+            <Calendar className="h-10 w-10 text-primary" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-8 bg-card">
+        <Form {...form}>
+          <form className="space-y-10">
             {(bankDetailsMissing || orcidOrMisIdMissing) && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Profile Incomplete</AlertTitle>
-                <AlertDescription>
-                  An ORCID iD, MIS ID, and bank details are mandatory for submitting incentive claims. Please add them to your profile.
-                  <Button asChild variant="link" className="p-1 h-auto">
-                    <Link href="/dashboard/settings">Go to Settings</Link>
-                  </Button>
+              <Alert variant="destructive" className="rounded-2xl border-2">
+                <AlertCircle className="h-5 w-5" />
+                <AlertTitle className="font-bold">Profile Update Required</AlertTitle>
+                <AlertDescription className="flex items-center justify-between">
+                  <span>Your financial IDs (Bank, ORCID, MIS) must be complete to apply.</span>
+                  <Button variant="link" onClick={() => router.push("/dashboard/settings")} className="text-destructive font-black underline p-0 h-auto">Settings</Button>
                 </AlertDescription>
               </Alert>
             )}
 
             {!eligibility.eligible && isPuConference && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Not Eligible for PU Conference Reimbursement</AlertTitle>
+              <Alert className="bg-destructive/5 border-destructive text-destructive rounded-2xl">
+                <AlertCircle className="h-5 w-5" />
+                <AlertTitle className="font-bold">Wait Period Active</AlertTitle>
                 <AlertDescription>
-                  As per policy, a faculty member is eligible for PU conference assistance ONCE per year. You will be eligible to apply again on{' '}
-                  <strong>{eligibility.nextAvailableDate}</strong>.
+                  PU conference assistance allows one claim per academic year. Next eligibility starts: <strong>{eligibility.nextAvailableDate}</strong>.
                 </AlertDescription>
               </Alert>
             )}
 
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertTitle>Conference Reimbursement Policy</AlertTitle>
-              <AlertDescription>
-                <ul className="list-disc list-inside space-y-1 mt-2 text-xs">
-                  <li>For conferences organized by Parul University, 75% of the registration fee is reimbursed. This can be claimed once a year.</li>
-                  <li>Only the presenting author is entitled for reimbursement for other conferences.</li>
-                  <li>For <strong>offline conferences outside India</strong>, proof of application for government travel grants is mandatory.</li>
-                  <li>A faculty member is eligible for assistance for <strong>offline</strong> conferences ONCE in TWO years. There is no limit for online presentations.</li>
-                  <li>Airfare for International travel and II-AC train fare (or actual, whichever is lesser) for travel within India shall be reimbursed within policy limits.</li>
-                  <li>Please refer to the full SOP for detailed limits and conditions.</li>
-                </ul>
+            <Alert className="bg-primary/5 border-primary/20 rounded-2xl ring-1 ring-primary/10">
+              <Info className="h-5 w-5 text-primary" />
+              <AlertTitle className="text-primary font-bold">Assistance Highlights</AlertTitle>
+              <AlertDescription className="text-[11px] leading-relaxed space-y-1 mt-1">
+                <p>• <strong>Offline</strong> travel assistance is eligible ONCE every TWO academic years.</p>
+                <p>• <strong>PU Conferences</strong>: 75% reimbursement of registration fee (One claim/year).</p>
+                <p>• <strong>International</strong>: Mandatory proof of Government travel grant application for offline travel.</p>
               </AlertDescription>
             </Alert>
 
-            <div className="rounded-lg border p-4 space-y-6 animate-in fade-in-0">
-              <div>
-                <h3 className="font-semibold text-sm -mb-2">EVENT &amp; PRESENTATION DETAILS</h3>
-                <Separator className="mt-4" />
-                <div className="space-y-4 mt-4">
-                  <FormField
-                    name="eventType"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Type of Event</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select event type..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {eventTypes.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="conferenceMode"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Presentation Mode</FormLabel>
-                        <FormControl>
-                          <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6">
-                            <FormItem className="flex items-center space-x-2 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value="Online" disabled={isSubmitting} />
-                              </FormControl>
-                              <FormLabel className="font-normal">Online</FormLabel>
-                            </FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value="Offline" disabled={isFormDisabled} />
-                              </FormControl>
-                              <FormLabel className="font-normal">Offline</FormLabel>
-                            </FormItem>
-                          </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  {conferenceMode === 'Online' && (
-                    <FormField
-                      name="onlinePresentationOrder"
-                      control={form.control}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Online Presentation Order</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select order" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="First">First</SelectItem>
-                              <SelectItem value="Second">Second</SelectItem>
-                              <SelectItem value="Third">Third</SelectItem>
-                              <SelectItem value="Additional">Additional</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                  <FormField
-                    name="conferencePaperTitle"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Paper Title</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Title of the paper presented" {...field} disabled={isFormDisabled} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="conferenceName"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Conference/Event Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Full name of the conference" {...field} disabled={isFormDisabled} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="organizerName"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Organizer Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Name of Institution/Organisation" {...field} disabled={isFormDisabled} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="eventWebsite"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Event Website</FormLabel>
-                        <FormControl>
-                          <Input type="url" placeholder="https://example.com" {...field} disabled={isFormDisabled} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      name="conferenceDate"
-                      control={form.control}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Conference Start Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} disabled={isFormDisabled} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      name="presentationDate"
-                      control={form.control}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Your Presentation Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} disabled={isFormDisabled} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      name="conferenceType"
-                      control={form.control}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Conference Type</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select type" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="International">International</SelectItem>
-                              <SelectItem value="National">National</SelectItem>
-                              <SelectItem value="Regional/State">Regional/State</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    {conferenceMode === 'Offline' && (
-                      <FormField
-                        name="presentationType"
-                        control={form.control}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Presentation Type</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select type" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="Oral">Oral</SelectItem>
-                                <SelectItem value="Poster">Poster</SelectItem>
-                                <SelectItem value="Other">Other</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-                  </div>
-                  <FormField
-                    control={form.control}
-                    name="conferenceVenue"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Conference Venue/Location</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={!conferenceType || isFormDisabled}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select venue" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {(conferenceVenueOptions[conferenceType as keyof typeof conferenceVenueOptions] || []).map((venue) => (
-                              <SelectItem key={venue} value={venue}>
-                                {venue}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="abstractUpload"
-                    control={form.control}
-                    render={({ field: { value, onChange, ...fieldProps } }) => (
-                      <FormItem>
-                        <FormLabel>Attach Full Abstract (PDF, Below 10MB)</FormLabel>
-                        <FormControl>
-                          <Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="participationCertificate"
-                    control={form.control}
-                    render={({ field: { value, onChange, ...fieldProps } }) => (
-                      <FormItem>
-                        <FormLabel>Attach Participation/Presentation Certificate (PDF, Below 10MB)</FormLabel>
-                        <FormControl>
-                          <Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="space-y-4">
-                    <FormLabel>Author(s) & Roles</FormLabel>
-                    <div className="grid gap-3">
-                      {fields.map((field, index) => (
-                        <div
-                          key={field.id}
-                          className="flex flex-col md:flex-row items-start md:items-center gap-4 p-3 bg-muted/50 rounded-md"
-                        >
-                          <div className="flex-grow">
-                            <p className="font-medium text-sm">
-                              {field.name} {field.isExternal && <span className="text-xs text-muted-foreground">(External)</span>}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 w-full md:w-auto">
-                            <FormField
-                              control={form.control}
-                              name={`authors.${index}.role`}
-                              render={({ field: roleField }) => (
-                                <FormItem className="w-full md:w-[180px]">
-                                  <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={roleField.value}>
-                                    <FormControl>
-                                      <SelectTrigger className="h-9 text-xs">
-                                        <SelectValue placeholder="Select role" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (
-                                        <SelectItem key={role} value={role}>{role}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </FormItem>
-                              )}
-                            />
-                            {field.email.toLowerCase() !== user?.email.toLowerCase() && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={() => removeAuthor(index)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+            <section className="space-y-6">
+              <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
+                <div className="h-8 w-1.5 bg-primary rounded-full"></div>
+                Event Specification
+              </div>
 
-                    <AuthorSearch
-                      authors={fields}
-                      onAdd={(author) => append(author)}
-                      availableRoles={getAvailableRoles()}
-                      currentUserEmail={user?.email}
-                    />
-                    <FormMessage>{form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}</FormMessage>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="totalAuthors"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Total No. of Authors</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="-- Please Select --" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {authorCountOptions.map((option) => (
-                                <SelectItem key={option} value={option}>
-                                  {option}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                          <FormDescription>Calculated from the list above.</FormDescription>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="authorType"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Author Type</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="-- Please Select --" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {authorTypeOptions.map((option) => (
-                                <SelectItem key={option} value={option}>
-                                  {option}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm -mb-2">EXPENSE &amp; TRAVEL DETAILS</h3>
-                <Separator className="mt-4" />
-                <div className="space-y-4 mt-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      name="registrationFee"
-                      control={form.control}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Registration Fee (INR)</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="e.g., 5000" {...field} min="0" disabled={isFormDisabled} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      name="registrationFeeProof"
-                      control={form.control}
-                      render={({ field: { value, onChange, ...fieldProps } }) => (
-                        <FormItem>
-                          <FormLabel>Proof of Registration Fee Payment (PDF, Below 10MB)</FormLabel>
-                          <FormControl>
-                            <Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  {conferenceMode === 'Offline' && (
-                    <div className="space-y-4">
-                      <FormField
-                        name="travelPlaceVisited"
-                        control={form.control}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Place Visited</FormLabel>
-                            <FormControl>
-                              <Input {...field} disabled={isFormDisabled} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        name="travelMode"
-                        control={form.control}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Travel Mode</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select travel mode" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="Bus">Bus</SelectItem>
-                                <SelectItem value="Train">Train</SelectItem>
-                                <SelectItem value="Air">Air</SelectItem>
-                                <SelectItem value="Other">Other</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        name="travelFare"
-                        control={form.control}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Travel Fare Incurred (INR)</FormLabel>
-                            <FormControl>
-                              <Input type="number" {...field} min="0" disabled={isFormDisabled} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        name="travelReceipts"
-                        control={form.control}
-                        render={({ field: { value, onChange, ...fieldProps } }) => (
-                          <FormItem>
-                            <FormLabel>Attach All Tickets/Travel Receipts</FormLabel>
-                            <FormControl>
-                              <Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  )}
-                  {conferenceVenue && conferenceVenue !== 'India' && (
-                    <FormField
-                      name="govtFundingRequestProof"
-                      control={form.control}
-                      render={({ field: { value, onChange, ...fieldProps } }) => (
-                        <FormItem>
-                          <FormLabel>Proof of Govt. Funding Request (PDF, Below 10MB)</FormLabel>
-                          <FormControl>
-                            <Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" />
-                          </FormControl>
-                          <FormDescription>Required for conferences outside India.</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                </div>
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm -mb-2">DECLARATIONS</h3>
-                <Separator className="mt-4" />
-                <div className="space-y-4 mt-4">
-                  <FormField
-                    name="wasPresentingAuthor"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex items-center justify-between">
-                          <FormLabel>Were you the presenting author?</FormLabel>
-                          <FormControl>
-                            <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} />
-                          </FormControl>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="isPuNamePresent"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex items-center justify-between">
-                          <FormLabel>Is "Parul University" name present in the paper?</FormLabel>
-                          <FormControl>
-                            <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} />
-                          </FormControl>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="wonPrize"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex items-center justify-between">
-                          <FormLabel>Did your paper win a prize?</FormLabel>
-                          <FormControl>
-                            <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} />
-                          </FormControl>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  {wonPrize && (
-                    <div className="space-y-4 pl-4 border-l-2">
-                      <FormField
-                        name="prizeDetails"
-                        control={form.control}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Prize Details</FormLabel>
-                            <FormControl>
-                              <Input placeholder="e.g., Best Paper Award" {...field} disabled={isFormDisabled} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        name="prizeProof"
-                        control={form.control}
-                        render={({ field: { value, onChange, ...fieldProps } }) => (
-                          <FormItem>
-                            <FormLabel>Attach Prize Certificate (PDF)</FormLabel>
-                            <FormControl>
-                              <Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" />
-                            </FormControl>
-                            <FormDescription>Below 10 MB</FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  )}
-                  <FormField
-                    name="attendedOtherConference"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex items-center justify-between">
-                          <FormLabel>Have you attended any other conference this year?</FormLabel>
-                          <FormControl>
-                            <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} />
-                          </FormControl>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="conferenceSelfDeclaration"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl>
-                          <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Self Declaration</FormLabel>
-                          <FormMessage />
-                          <p className="text-xs text-muted-foreground">
-                            I hereby confirm that I have not applied/claimed for any incentive for the same application/publication earlier &amp; certified that I have availed only this conference in the calendar year.
-                          </p>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
-            </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <FormField name="eventType" control={form.control} render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">Event Classification</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}>
+                      <FormControl><SelectTrigger className="h-12 shadow-sm"><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
+                      <SelectContent>{eventTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
 
-            <div className="p-4 bg-secondary rounded-md space-y-2 mt-6">
-              <p className="text-sm font-medium">Tentative Eligible Reimbursement Amount:</p>
-              {calculatedIncentive !== null ? (
-                <>
-                  <p className="font-bold text-2xl text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</p>
-                  {calculationBreakdown && (
-                    <div className="text-xs text-muted-foreground">
-                      <div>Eligible expenses: ₹{(calculationBreakdown.eligibleExpenses ?? 0).toLocaleString('en-IN')}</div>
-                      <div>Policy cap: ₹{(calculationBreakdown.maxReimbursement ?? 0).toLocaleString('en-IN')}</div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="text-muted-foreground">Fill out the form to see an estimate.</p>
+                <FormField name="conferenceMode" control={form.control} render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">Presentation Mode</FormLabel>
+                    <FormControl>
+                      <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6 pt-2">
+                        <Label htmlFor="mode-on" className="flex items-center space-x-3 bg-muted/40 px-5 py-2.5 rounded-xl border border-muted-foreground/10 hover:bg-muted transition-all cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5">
+                          <RadioGroupItem value="Online" id="mode-on" disabled={isSubmitting} />
+                          <span className="font-bold text-sm">Online</span>
+                        </Label>
+                        <Label htmlFor="mode-off" className="flex items-center space-x-3 bg-muted/40 px-5 py-2.5 rounded-xl border border-muted-foreground/10 hover:bg-muted transition-all cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5">
+                          <RadioGroupItem value="Offline" id="mode-off" disabled={isFormDisabled} />
+                          <span className="font-bold text-sm">Offline</span>
+                        </Label>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              {conferenceMode === "Online" && (
+                <FormField name="onlinePresentationOrder" control={form.control} render={({ field }) => (
+                  <FormItem className="animate-in slide-in-from-top-2 duration-300">
+                    <FormLabel className="text-base font-semibold">Order of Presentation (Online)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}>
+                      <FormControl><SelectTrigger className="h-12 shadow-sm"><SelectValue placeholder="Select rank" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {["First", "Second", "Third", "Additional"].map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               )}
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button type="button" variant="outline" onClick={() => handleSave('Draft')} disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Save as Draft
-            </Button>
-            <Button type="button" onClick={handleProceedToReview} disabled={isFormDisabled || bankDetailsMissing || orcidOrMisIdMissing}>
-              Proceed to Review
-            </Button>
-          </CardFooter>
-        </form>
-      </Form>
+
+              <FormField name="conferencePaperTitle" control={form.control} render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-base font-semibold">Title of the Research Paper</FormLabel>
+                  <FormControl><Input placeholder="Exact title as per certificate" {...field} disabled={isFormDisabled} className="h-12 text-lg shadow-sm" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <FormField name="conferenceName" control={form.control} render={({ field }) => (
+                  <FormItem><FormLabel className="text-base font-semibold">Conference Full Name</FormLabel><FormControl><Input placeholder="e.g. IEEE World Congress..." {...field} disabled={isFormDisabled} className="h-12 shadow-sm" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField name="organizerName" control={form.control} render={({ field }) => (
+                  <FormItem><FormLabel className="text-base font-semibold">Organizing Body</FormLabel><FormControl><Input placeholder="e.g. Parul Institute of Engineering..." {...field} disabled={isFormDisabled} className="h-12 shadow-sm" /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+            </section>
+
+            <Separator className="my-10" />
+
+            <section className="space-y-6">
+              <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
+                <div className="h-8 w-1.5 bg-primary rounded-full"></div>
+                Venue & Timeline
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <FormField name="conferenceType" control={form.control} render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">Global Scale</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}>
+                      <FormControl><SelectTrigger className="h-12 shadow-sm"><SelectValue placeholder="Select scope" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {Object.keys(conferenceVenueOptions).map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField name="conferenceVenue" control={form.control} render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">Physical Location</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={!conferenceType || isFormDisabled}>
+                      <FormControl><SelectTrigger className="h-12 shadow-sm"><SelectValue placeholder="Select region" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {(conferenceVenueOptions[conferenceType as keyof typeof conferenceVenueOptions] || []).map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <FormField name="conferenceDate" control={form.control} render={({ field }) => (
+                  <FormItem><FormLabel className="text-base font-semibold flex items-center gap-2"><Calendar className="h-4 w-4" /> Start Date</FormLabel><FormControl><Input type="date" {...field} max={new Date().toISOString().split("T")[0]} disabled={isFormDisabled} className="h-12 shadow-sm cursor-pointer" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField name="presentationDate" control={form.control} render={({ field }) => (
+                  <FormItem><FormLabel className="text-base font-semibold flex items-center gap-2"><Calendar className="h-4 w-4" /> Presentation Date</FormLabel><FormControl><Input type="date" {...field} max={new Date().toISOString().split("T")[0]} disabled={isFormDisabled} className="h-12 shadow-sm cursor-pointer" /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                <FormField name="abstractUpload" control={form.control} render={({ field: { value, onChange, ...rest } }) => (
+                  <FormItem className="space-y-3"><FormLabel className="font-bold flex items-center gap-2 underline decoration-primary decoration-2"><FileText className="h-4 w-4" /> Full Abstract</FormLabel><FormControl><Input type="file" accept=".pdf" className="h-12 border-dashed border-2 bg-muted/20" onChange={e => onChange(e.target.files)} disabled={isFormDisabled} {...rest} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField name="participationCertificate" control={form.control} render={({ field: { value, onChange, ...rest } }) => (
+                  <FormItem className="space-y-3"><FormLabel className="font-bold flex items-center gap-2 underline decoration-primary decoration-2"><Award className="h-4 w-4" /> Participation Certificate</FormLabel><FormControl><Input type="file" accept=".pdf" className="h-12 border-dashed border-2 bg-muted/20" onChange={e => onChange(e.target.files)} disabled={isFormDisabled} {...rest} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+            </section>
+
+            <Separator className="my-10" />
+
+            <section className="space-y-6">
+              <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
+                <div className="h-8 w-1.5 bg-primary rounded-full"></div> Authorship & Disclosure
+              </div>
+
+              <Alert className="bg-destructive/5 border-destructive/20 py-4 rounded-2xl ring-1 ring-destructive/10">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                <AlertTitle className="text-destructive font-black uppercase text-xs tracking-widest">Mandatory Authors Disclosure</AlertTitle>
+                <AlertDescription className="mt-2 text-sm font-medium">
+                  All authors must be listed. Missing authors discovered during verification will result in <span className="underline font-bold text-destructive">rejection</span>.
+                </AlertDescription>
+              </Alert>
+
+              <div className="bg-muted/20 p-6 rounded-2xl border border-dashed border-primary/30 space-y-4">
+                <div className="space-y-2">
+                  {fields.map((f, i) => (
+                    <div key={f.id} className="group flex items-center justify-between bg-background p-4 rounded-xl border shadow-sm animate-in slide-in-from-right-2 transition-all hover:border-primary/30">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm">{f.name}</span>
+                          {f.isExternal && <Badge variant="outline" className="text-[9px] h-4">External</Badge>}
+                          {f.email.toLowerCase() === user.email.toLowerCase() && <Badge variant="secondary" className="text-[9px] h-4 bg-primary/10 text-primary border-none">You</Badge>}
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-medium italic">{f.email}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Select value={f.role} onValueChange={(r) => updateAuthorRole(i, r as Author["role"])}>
+                          <SelectTrigger className="h-9 w-[180px] bg-background shadow-sm rounded-lg text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>{coAuthorRoles.map(r => <SelectItem key={r} value={r} className="text-xs">{r}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <Button variant="ghost" size="icon" onClick={() => removeAuthor(i)} className="h-9 w-9 text-destructive hover:bg-destructive/10"><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <AuthorSearch authors={fields} onAdd={append} availableRoles={coAuthorRoles} currentUserEmail={user.email} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                <FormField
+                  control={form.control}
+                  name="authorPosition"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold">Your Author Position</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-10 shadow-sm rounded-lg">
+                            <SelectValue placeholder="Position" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="rounded-xl">
+                          {['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'].map((pos) => (
+                            <SelectItem key={pos} value={pos}>{pos}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  name="wasPresentingAuthor"
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-4 shadow-sm hover:bg-primary/10 transition-all">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-sm font-bold">Presenting Author Role</FormLabel>
+                        <FormDescription className="text-[10px]">Did you present at the event?</FormDescription>
+                      </div>
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  name="isPuNamePresent"
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-4 shadow-sm hover:bg-primary/10 transition-all">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-sm font-bold">PU Affiliation Present?</FormLabel>
+                        <FormDescription className="text-[10px]">Is "Parul University" mentioned?</FormDescription>
+                      </div>
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </section>
+
+            <Separator className="my-10" />
+
+            <section className="space-y-8">
+              <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
+                <div className="h-8 w-1.5 bg-primary rounded-full"></div> Financial Data & Claims
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <FormField name="registrationFee" control={form.control} render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">Registration Fee (INR)</FormLabel>
+                    <FormControl><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span><Input type="number" {...field} min="0" disabled={isFormDisabled} className="h-12 pl-8 text-lg font-black shadow-sm" /></div></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField name="registrationFeeProof" control={form.control} render={({ field: { value, onChange, ...rest } }) => (
+                  <FormItem className="pt-2">
+                    <FormLabel className="font-bold flex items-center gap-2 text-xs"><FileText className="h-3 w-3" /> Proof of Payment</FormLabel>
+                    <FormControl><Input type="file" accept=".pdf" className="h-9 text-xs" onChange={e => onChange(e.target.files)} disabled={isFormDisabled} {...rest} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              {conferenceMode === "Offline" && (
+                <div className="p-6 bg-muted/40 rounded-3xl space-y-6 border border-muted-foreground/10 animate-in slide-in-from-left-2">
+                  <p className="text-xs font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                    <MapPin className="h-4 w-4" /> Travel Logistics
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <FormField name="travelPlaceVisited" control={form.control} render={({ field }) => (
+                      <FormItem><FormLabel className="text-xs font-bold uppercase tracking-tight">Destination</FormLabel><FormControl><Input placeholder="City, Country" {...field} disabled={isFormDisabled} className="h-10 bg-background" /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField name="travelMode" control={form.control} render={({ field }) => (
+                      <FormItem><FormLabel className="text-xs font-bold uppercase tracking-tight">Transport Mode</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}><FormControl><SelectTrigger className="h-10 bg-background"><SelectValue placeholder="Select" /></SelectTrigger></FormControl><SelectContent>{["Bus", "Train", "Air", "Other"].map(mode => <SelectItem key={mode} value={mode}>{mode}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                    )} />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <FormField name="travelFare" control={form.control} render={({ field }) => (
+                      <FormItem><FormLabel className="text-xs font-bold uppercase tracking-tight">Fare Incurred (INR)</FormLabel><FormControl><Input type="number" {...field} disabled={isFormDisabled} className="h-10 bg-background" /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField name="travelReceipts" control={form.control} render={({ field: { value, onChange, ...rest } }) => (
+                      <FormItem><FormLabel className="text-xs font-bold uppercase tracking-tight">Tickets / Receipts</FormLabel><FormControl><Input type="file" accept=".pdf" onChange={e => onChange(e.target.files)} disabled={isFormDisabled} className="h-10 bg-background" {...rest} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                  </div>
+                </div>
+              )}
+
+              {conferenceVenue && conferenceVenue !== "India" && (
+                <FormField name="govtFundingRequestProof" control={form.control} render={({ field: { value, onChange, ...rest } }) => (
+                  <FormItem className="bg-amber-50 dark:bg-amber-950/20 p-6 rounded-3xl border border-amber-200 dark:border-amber-900 shadow-inner">
+                    <FormLabel className="text-sm font-black text-amber-900 dark:text-amber-400">Government Travel Grant Inquiry (Mandatory for International)</FormLabel>
+                    <p className="text-[10px] text-amber-800 dark:text-amber-500 mb-4 italic">You must provide proof of application for external funding (e.g. DST, SERB, ICMR) for international journeys.</p>
+                    <FormControl><Input type="file" accept=".pdf" className="bg-background border-amber-300 dark:border-amber-800 h-12" onChange={e => onChange(e.target.files)} disabled={isFormDisabled} {...rest} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              )}
+
+              {calculatedIncentive !== null && (
+                <Alert className="bg-primary/5 border-primary/20 py-8 rounded-3xl shadow-sm ring-1 ring-primary/10">
+                  <div className="flex flex-col gap-1">
+                    <p className="text-xs font-black text-primary uppercase tracking-[0.2em] flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4" /> Policy Estimation Result
+                    </p>
+                    <h4 className="text-4xl font-black text-foreground mt-2">₹{calculatedIncentive.toLocaleString("en-IN")}</h4>
+                    {calculationBreakdown && (
+                      <div className="flex gap-4 mt-1">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Eligible: ₹{calculationBreakdown.eligibleExpenses?.toLocaleString("en-IN")}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">|</span>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Policy Cap: ₹{calculationBreakdown.maxReimbursement?.toLocaleString("en-IN")}</span>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-muted-foreground font-medium mt-4 italic max-w-md">This estimate represents your admissible share based on institutional policy limits for this event category.</p>
+                  </div>
+                </Alert>
+              )}
+            </section>
+
+            <Separator className="my-10" />
+
+            <section className="space-y-6">
+              <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
+                <div className="h-8 w-1.5 bg-primary rounded-full"></div> Achievements & Declarations
+              </div>
+
+              <div className="bg-muted/30 p-8 rounded-[2rem] border space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+                  <FormField name="wasPresentingAuthor" control={form.control} render={({ field }) => (
+                    <FormItem className="flex items-center justify-between p-2"><FormLabel className="font-bold text-sm">Presenting Author Role</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} className="scale-125" /></FormControl></FormItem>
+                  )} />
+                  <FormField name="isPuNamePresent" control={form.control} render={({ field }) => (
+                    <FormItem className="flex items-center justify-between p-2"><FormLabel className="font-bold text-sm">PU Institutional Name Presence</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} className="scale-125" /></FormControl></FormItem>
+                  )} />
+                </div>
+
+                <Separator className="bg-muted-foreground/10" />
+
+                <FormField name="wonPrize" control={form.control} render={({ field }) => (
+                  <div className="space-y-4">
+                    <FormItem className="flex items-center justify-between p-2"><FormLabel className="font-black text-amber-600 dark:text-amber-500 uppercase tracking-tight flex items-center gap-2">Won a prize / Best paper award? <Award className="h-5 w-5" /></FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} className="scale-125 border-amber-500 data-[state=checked]:bg-amber-500" /></FormControl></FormItem>
+                    {field.value && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 animate-in slide-in-from-top-4">
+                        <FormField name="prizeDetails" control={form.control} render={({ field }) => (
+                          <FormItem><FormLabel className="text-xs font-black uppercase text-amber-700">Prize Description</FormLabel><FormControl><Input placeholder="e.g. Best Researcher Award (PICET 2026)" {...field} disabled={isFormDisabled} className="bg-background border-amber-200" /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField name="prizeProof" control={form.control} render={({ field: { value, onChange, ...rest } }) => (
+                          <FormItem><FormLabel className="text-xs font-black uppercase text-amber-700">Upload Award Copy</FormLabel><FormControl><Input type="file" accept=".pdf" onChange={e => onChange(e.target.files)} disabled={isFormDisabled} className="bg-background border-amber-200" {...rest} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                      </div>
+                    )}
+                  </div>
+                )} />
+              </div>
+            </section>
+
+            <Separator className="my-10" />
+
+            <FormField control={form.control} name="conferenceSelfDeclaration" render={({ field }) => (
+              <FormItem className="flex flex-row items-center space-x-4 space-y-0 bg-primary/5 p-8 rounded-[2rem] border border-primary/20 shadow-sm ring-1 ring-inset ring-primary/5">
+                <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} className="h-6 w-6 rounded-lg" /></FormControl>
+                <div className="space-y-2 leading-none">
+                  <FormLabel className="text-base font-black tracking-tight">Final Declaration of Integrity</FormLabel>
+                  <FormMessage />
+                  <p className="text-xs text-muted-foreground italic leading-relaxed">
+                    I hereby certify that I have only availed of the conference incentive assistance policy as per the specified frequency limits. I further confirm that I am eligible for this claim under university regulations.
+                  </p>
+                </div>
+              </FormItem>
+            )} />
+          </form>
+        </Form>
+      </CardContent>
+      <CardFooter className="flex justify-between p-8 bg-muted/20 border-t border-muted/30 gap-4">
+        <Button variant="ghost" size="lg" onClick={() => handleSave("Draft")} disabled={isSubmitting} className="rounded-2xl px-8 h-12 font-bold hover:bg-primary/5 text-primary">Save as Draft</Button>
+        <div className="flex gap-4">
+          <Button variant="outline" size="lg" onClick={() => router.back()} disabled={isSubmitting} className="rounded-2xl px-6 h-12">Cancel</Button>
+          <Button size="lg" onClick={form.handleSubmit(handleProceedToReview)} disabled={isFormDisabled} className="rounded-2xl px-12 h-12 font-black shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-[1.02]">
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
+            Review Application
+          </Button>
+        </div>
+      </CardFooter>
     </Card>
-  );
+  )
 }

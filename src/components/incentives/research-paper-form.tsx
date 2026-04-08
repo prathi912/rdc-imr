@@ -26,7 +26,7 @@ import { uploadFileToApi } from '@/lib/upload-client'
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
 import { fetchScienceDirectData } from "@/app/sciencedirect-actions";
-import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus, Edit, Info, FileText, CheckCircle2 } from 'lucide-react'
+import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus, Edit, Info, FileText, CheckCircle2, X } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -167,6 +167,21 @@ const researchPaperSchema = z
       return true;
     },
     { message: "Only one author can be the Presenting Author for a conference proceeding.", path: ["authors"] }
+  )
+  .refine(
+    (data) => {
+      const currentYear = new Date().getFullYear().toString()
+      const currentMonthIndex = new Date().getMonth() // 0-indexed
+      const selectedYear = data.publicationYear
+      const selectedMonth = data.publicationMonth
+      const monthIndex = months.indexOf(selectedMonth)
+
+      if (selectedYear === currentYear) {
+        return monthIndex <= currentMonthIndex
+      }
+      return true
+    },
+    { message: "Publication date cannot be in the future.", path: ["publicationMonth"] }
   );
 
 type ResearchPaperFormValues = z.infer<typeof researchPaperSchema>
@@ -240,7 +255,7 @@ const months = [
   "November",
   "December",
 ]
-const years = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() - i).toString())
+const years = Array.from({ length: 15 }, (_, i) => (new Date().getFullYear() - i).toString())
 
 const SPECIAL_POLICY_FACULTIES = [
   "Faculty of Applied Sciences",
@@ -396,6 +411,7 @@ function ReviewDetails({ data, onEdit, calculatedIncentive, user }: { data: Rese
             <div className="bg-primary p-6 rounded-[2rem] text-primary-foreground shadow-xl shadow-primary/20 relative overflow-hidden group">
               <div className="absolute -right-4 -top-4 bg-white/10 w-24 h-24 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-500"></div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-2">Estimated Incentive</p>
+              <p className="text-[11px] opacity-70 mb-4 leading-tight font-medium">Based on the provided details, your tentative incentive claim will be:</p>
               <div className="flex items-baseline gap-2">
                  <span className="text-4xl font-black tracking-tighter">₹{calculatedIncentive?.toLocaleString('en-IN') || '0'}</span>
                  <span className="text-xs font-medium opacity-60">INR*</span>
@@ -981,22 +997,24 @@ export function ResearchPaperForm() {
                           <FormItem className="space-y-3">
                             <FormLabel className="text-base font-semibold">Indexing / Listing Status</FormLabel>
                             <FormControl>
-                              <RadioGroup
-                                onValueChange={field.onChange}
-                                value={field.value}
-                                className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2"
-                              >
-                                {availableIndexTypes.map((option) => (
-                                  <Label 
-                                    key={option.value}
-                                    htmlFor={option.value} 
-                                    className="flex items-center space-x-3 bg-muted/30 px-3 py-3 rounded-xl border hover:bg-muted transition-all cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 shadow-sm"
-                                  >
-                                    <RadioGroupItem value={option.value} id={option.value} />
-                                    <span className="font-medium text-sm flex-1">{option.label}</span>
-                                  </Label>
-                                ))}
-                              </RadioGroup>
+                              <div>
+                                <RadioGroup
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                  className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2"
+                                >
+                                  {availableIndexTypes.map((option) => (
+                                    <Label 
+                                      key={option.value}
+                                      htmlFor={option.value} 
+                                      className="flex items-center space-x-3 bg-muted/30 px-3 py-3 rounded-xl border hover:bg-muted transition-all cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 shadow-sm"
+                                    >
+                                      <RadioGroupItem value={option.value} id={option.value} />
+                                      <span className="font-medium text-sm flex-1">{option.label}</span>
+                                    </Label>
+                                  ))}
+                                </RadioGroup>
+                              </div>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -1196,20 +1214,22 @@ export function ResearchPaperForm() {
                       <FormItem className="space-y-3">
                         <FormLabel className="text-sm font-semibold">Publication Locale</FormLabel>
                         <FormControl>
-                          <RadioGroup
-                            onValueChange={field.onChange}
-                            value={field.value}
-                            className="flex items-center space-x-6 h-10"
-                          >
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="National" id="locale-national" />
-                              <Label htmlFor="locale-national" className="font-normal">National</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="International" id="locale-international" />
-                              <Label htmlFor="locale-international" className="font-normal">International</Label>
-                            </div>
-                          </RadioGroup>
+                          <div>
+                            <RadioGroup
+                              onValueChange={field.onChange}
+                              value={field.value}
+                              className="flex items-center space-x-6 h-10"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="National" id="locale-national" />
+                                <Label htmlFor="locale-national" className="font-normal">National</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="International" id="locale-international" />
+                                <Label htmlFor="locale-international" className="font-normal">International</Label>
+                              </div>
+                            </RadioGroup>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1274,23 +1294,26 @@ export function ResearchPaperForm() {
                     render={({ field }) => (
                       <FormItem className="space-y-3">
                         <FormLabel className="text-base font-semibold">Classification (Q-rating)</FormLabel>
-                        <FormControl>                          <RadioGroup 
-                            onValueChange={field.onChange} 
-                            value={field.value} 
-                            className="flex flex-wrap gap-3 mt-2" 
-                            disabled={isSubmitting}
-                          >
-                            {availableClassifications.map((option) => (
-                              <Label 
-                                key={option.value}
-                                htmlFor={`q-${option.value}`} 
-                                className="flex items-center space-x-2 bg-muted/30 px-4 py-2.5 rounded-xl border hover:bg-muted cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 shadow-sm transition-all whitespace-nowrap"
-                              >
-                                <RadioGroupItem value={option.value} id={`q-${option.value}`} />
-                                <span className="font-medium text-xs">{option.label}</span>
-                              </Label>
-                            ))}
-                          </RadioGroup>
+                        <FormControl>
+                          <div>
+                            <RadioGroup 
+                              onValueChange={field.onChange} 
+                              value={field.value} 
+                              className="flex flex-wrap gap-3 mt-2" 
+                              disabled={isSubmitting}
+                            >
+                              {availableClassifications.map((option) => (
+                                <Label 
+                                  key={option.value}
+                                  htmlFor={`q-${option.value}`} 
+                                  className="flex items-center space-x-2 bg-muted/30 px-4 py-2.5 rounded-xl border hover:bg-muted cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 shadow-sm transition-all whitespace-nowrap"
+                                >
+                                  <RadioGroupItem value={option.value} id={`q-${option.value}`} />
+                                  <span className="font-medium text-xs">{option.label}</span>
+                                </Label>
+                              ))}
+                            </RadioGroup>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1512,6 +1535,7 @@ export function ResearchPaperForm() {
                            <p className="text-sm font-bold text-primary mb-1">Click or drag to upload PDF</p>
                            <p className="text-[10px] text-muted-foreground">Select the published paper (Max 10MB)</p>
                            <input
+                            key={(value as FileList)?.[0]?.name || 'empty-upload'}
                             type="file"
                             accept=".pdf"
                             className="absolute inset-0 opacity-0 cursor-pointer"
@@ -1521,9 +1545,12 @@ export function ResearchPaperForm() {
                         </div>
                       </FormControl>
                       {value && (value as FileList).length > 0 && (
-                        <div className="flex items-center gap-2 text-xs font-bold text-green-700 bg-green-50 p-2 rounded-lg border border-green-200">
-                           <CheckCircle2 className="h-3 w-3" />
-                           {(value as FileList)[0].name} successfully selected
+                        <div className="flex items-center gap-2 text-xs font-bold text-green-700 bg-green-50 p-2 rounded-lg border border-green-200 mt-3 relative pr-8 animate-in fade-in duration-300">
+                           <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
+                           <span className="truncate flex-1">{(value as FileList)[0].name} successfully selected</span>
+                           <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 text-green-700/60 hover:text-green-700 hover:bg-green-100/50" onClick={(e) => { e.preventDefault(); onChange(undefined); }}>
+                             <X className="h-3 w-3" />
+                           </Button>
                         </div>
                       )}
                       <FormMessage />

@@ -62,9 +62,46 @@ const getClaimTitle = (claimData: Partial<IncentiveClaim>): string => {
         || 'your recent incentive claim';
 };
 
+const isClaimEmpty = (claimData: Partial<IncentiveClaim>): boolean => {
+    const fieldsToExclude = ['uid', 'userName', 'userEmail', 'faculty', 'status', 'submissionDate', 'claimType', 'benefitMode', 'authors', 'authorUids', 'authorEmails', 'calculatedIncentive', 'originalClaimId', 'id', 'claimId'];
+    
+    // Check if any field other than the technical/metadata fields has a non-empty value
+    const hasContent = Object.entries(claimData).some(([key, value]) => {
+        if (fieldsToExclude.includes(key)) return false;
+        if (value === null || value === undefined) return false;
+        if (typeof value === 'string') return value.trim().length > 0;
+        if (typeof value === 'number') return true; // Any number provided is content
+        if (typeof value === 'boolean') return true; // Any boolean provided is content (e.g. checkbox)
+        return false;
+    });
+
+    return !hasContent;
+};
+
 export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' | 'claimId'>, claimIdToUpdate?: string): Promise<{ success: boolean; error?: string, claimId?: string }> {
     try {
         const claimsRef = adminDb.collection('incentiveClaims');
+
+        // --- Global Draft Restrictions ---
+        if (claimData.status === 'Draft') {
+            // 1. Prevent completely blank drafts
+            if (isClaimEmpty(claimData)) {
+                return { success: false, error: 'A completely blank application cannot be saved as a draft.' };
+            }
+
+            // 2. Draft Limit Check (Max 10) - only for new drafts
+            if (!claimIdToUpdate) {
+                const draftCountSnap = await claimsRef
+                    .where('uid', '==', claimData.uid)
+                    .where('status', '==', 'Draft')
+                    .count()
+                    .get();
+                
+                if (draftCountSnap.data().count >= 10) {
+                    return { success: false, error: 'You cannot have more than 10 active drafts. Please submit or delete existing drafts before creating a new one.' };
+                }
+            }
+        }
 
         // --- Uniqueness Check on Final Submission ---
         if (claimData.status !== 'Draft') {

@@ -2,38 +2,38 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
 } from "@/components/ui/dialog";
-import { 
-  Search, 
-  RefreshCw, 
-  Eye, 
-  Clock, 
-  Filter, 
+import {
+  Search,
+  RefreshCw,
+  Eye,
+  Clock,
+  Filter,
   AlertCircle,
   CheckCircle2,
   Info,
@@ -178,31 +178,31 @@ export function LogViewer() {
             Live Event Stream
           </CardTitle>
           <div className="flex flex-wrap items-center gap-2">
-             <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg">
-                <Select value={category} onValueChange={(v: any) => setCategory(v)}>
-                    <SelectTrigger className="w-[180px] bg-background border-none shadow-none h-9">
-                    <Filter className="h-3.5 w-3.5 mr-2" />
-                    <SelectValue placeholder="Category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {CATEGORIES.map(c => (
-                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-                <Select value={duration} onValueChange={setDuration}>
-                    <SelectTrigger className="w-[150px] bg-background border-none shadow-none h-9">
-                    <Clock className="h-3.5 w-3.5 mr-2" />
-                    <SelectValue placeholder="Duration" />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {DURATIONS.map(d => (
-                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-             </div>
-            
+            <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg">
+              <Select value={category} onValueChange={(v: any) => setCategory(v)}>
+                <SelectTrigger className="w-[180px] bg-background border-none shadow-none h-9">
+                  <Filter className="h-3.5 w-3.5 mr-2" />
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={duration} onValueChange={setDuration}>
+                <SelectTrigger className="w-[150px] bg-background border-none shadow-none h-9">
+                  <Clock className="h-3.5 w-3.5 mr-2" />
+                  <SelectValue placeholder="Duration" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DURATIONS.map(d => (
+                    <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -212,10 +212,10 @@ export function LogViewer() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            
-            <Button 
-              variant="outline" 
-              size="icon" 
+
+            <Button
+              variant="outline"
+              size="icon"
               onClick={() => fetchLogs(true)}
               disabled={refreshing}
               title="Refresh Logs"
@@ -223,9 +223,9 @@ export function LogViewer() {
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </Button>
 
-            <Button 
-              variant="outline" 
-              size="icon" 
+            <Button
+              variant="outline"
+              size="icon"
               onClick={handleDownload}
               disabled={downloading}
               title="Download CSV Report"
@@ -273,9 +273,11 @@ export function LogViewer() {
                         {log.category.replace('_', ' ')}
                       </Badge>
                     </TableCell>
-                    <TableCell className="max-w-md truncate font-medium text-sm">
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(log.status)}
+                    <TableCell className="font-medium text-sm whitespace-normal break-words min-w-[300px]">
+                      <div className="flex items-start gap-2 py-1">
+                        <div className="mt-0.5 shrink-0">
+                          {getStatusIcon(log.status)}
+                        </div>
                         <span>{log.message}</span>
                       </div>
                     </TableCell>
@@ -291,9 +293,9 @@ export function LogViewer() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={() => setSelectedLog(log)}
                       >
@@ -319,7 +321,7 @@ export function LogViewer() {
               Technical details for the event recorded on {selectedLog && format(new Date(selectedLog.timestamp), "PPP 'at' p")}
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedLog && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-4 rounded-lg border">

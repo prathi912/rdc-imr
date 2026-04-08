@@ -20,7 +20,7 @@ import { db } from '@/lib/config';
 import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToApi } from '@/lib/upload-client';
-import { Loader2, AlertCircle, Edit, FileText, CheckCircle2, Info } from 'lucide-react';
+import { Loader2, AlertCircle, Edit, FileText, CheckCircle2, Info, Award } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
@@ -37,6 +37,14 @@ const membershipSchema = z.object({
     membershipPaymentDate: z.string().min(1, 'Payment date is required.'),
     membershipProof: z.any().refine((files) => files?.length > 0, 'Proof of membership/payment is required.').refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
     membershipSelfDeclaration: z.boolean().refine(val => val === true, { message: 'You must agree to the self-declaration.' }),
+}).refine(data => {
+    const paymentDate = new Date(data.membershipPaymentDate);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    return paymentDate <= today;
+}, {
+    message: "Payment date cannot be in the future.",
+    path: ["membershipPaymentDate"]
 });
 
 type MembershipFormValues = z.infer<typeof membershipSchema>;
@@ -65,29 +73,70 @@ function ReviewDetails({ data, onEdit }: { data: MembershipFormValues; onEdit: (
     const proofFile = data.membershipProof?.[0] as File | undefined;
 
     return (
-        <Card className="max-w-4xl mx-auto shadow-xl border-t-4 border-t-primary">
-            <CardHeader className="bg-muted/30">
+        <Card className="max-w-4xl mx-auto shadow-xl border-t-4 border-t-primary overflow-hidden">
+            <CardHeader className="bg-muted/30 pb-6">
                 <div className="flex justify-between items-center">
                     <div className="space-y-1">
                         <CardTitle className="text-2xl flex items-center gap-2 font-bold tracking-tight">
-                            <CheckCircle2 className="h-7 w-7 text-primary" /> Review Application
+                            <CheckCircle2 className="h-7 w-7 text-primary" /> Review Your Application
                         </CardTitle>
-                        <CardDescription className="text-base text-muted-foreground">Please verify your membership details before final submission.</CardDescription>
+                        <CardDescription className="text-base text-muted-foreground font-medium">Please verify your membership details before final submission.</CardDescription>
                     </div>
-                    <Button variant="outline" onClick={onEdit} className="rounded-xl border-primary text-primary hover:bg-primary/5">
-                        <Edit className="h-4 w-4 mr-2" /> Edit
+                    <Button variant="outline" onClick={onEdit} className="rounded-xl border-primary/30 text-primary hover:bg-primary/5 font-bold px-6">
+                        <Edit className="h-4 w-4 mr-2" /> Modify Form
                     </Button>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-1 pt-6">
-                <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10">
-                    {renderDetail("Professional Body", data.professionalBodyName)}
-                    {renderDetail("Membership Type", data.membershipType)}
-                    {renderDetail("Locale", data.membershipLocale)}
-                    {renderDetail("Membership #", data.membershipNumber)}
-                    {renderDetail("Amount Paid", `₹${data.membershipAmountPaid.toLocaleString('en-IN')}`)}
-                    {renderDetail("Payment Date", data.membershipPaymentDate)}
-                    {renderDetail("Proof File", proofFile?.name)}
+            <CardContent className="pt-8 space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+                    <div className="space-y-6">
+                        <div>
+                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Professional Body</p>
+                            <p className="text-base font-bold text-foreground leading-tight">{data.professionalBodyName}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Type</p>
+                                <Badge variant="secondary" className="font-bold">{data.membershipType}</Badge>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Locale</p>
+                                <Badge variant="outline" className="font-bold border-primary/20 text-primary bg-primary/5">{data.membershipLocale}</Badge>
+                            </div>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Membership ID</p>
+                            <p className="text-sm font-mono font-bold bg-muted/30 px-2 py-1 rounded-md inline-block">{data.membershipNumber}</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-6">
+                        <div>
+                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Financials</p>
+                            <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-xs font-medium text-muted-foreground">Amount Paid:</span>
+                                    <span className="text-lg font-black text-primary">₹{data.membershipAmountPaid.toLocaleString('en-IN')}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs font-medium text-muted-foreground">Payment Date:</span>
+                                    <span className="text-xs font-bold">{data.membershipPaymentDate}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Verification Proof</p>
+                            <div className="flex items-center gap-3 bg-muted/20 p-3 rounded-xl border border-dashed hover:bg-muted/30 transition-colors cursor-default">
+                                <div className="bg-primary/10 p-2 rounded-lg">
+                                    <FileText className="h-4 w-4 text-primary" />
+                                </div>
+                                <div className="overflow-hidden">
+                                    <p className="text-xs font-bold truncate">{proofFile?.name || "verified_membership_proof.pdf"}</p>
+                                    <p className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter">Document Attached</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </CardContent>
         </Card>
@@ -419,7 +468,7 @@ export function MembershipForm() {
                         <FormField name="membershipPaymentDate" control={form.control} render={({ field }) => ( 
                             <FormItem>
                                 <FormLabel className="text-base font-semibold">Payment Date</FormLabel>
-                                <FormControl><Input type="date" {...field} className="h-12 shadow-sm" /></FormControl>
+                                <FormControl><Input type="date" {...field} max={new Date().toISOString().split("T")[0]} className="h-12 shadow-sm" /></FormControl>
                                 <FormMessage />
                             </FormItem> 
                         )} />
@@ -458,15 +507,28 @@ export function MembershipForm() {
                 </section>
 
                 {calculatedIncentive !== null && (
-                    <Alert className="bg-primary/5 border-primary/20 py-6 rounded-2xl ring-1 ring-primary/10">
-                        <Info className="h-5 w-5 text-primary" />
-                        <AlertTitle className="text-primary font-bold text-lg">Reimbursement Estimate</AlertTitle>
-                        <AlertDescription className="mt-2 text-primary/90">
-                            <p className="text-lg font-medium">Based on the amount paid, your tentative reimbursement will be:</p>
-                            <p className="text-4xl font-black text-primary mt-1">₹{calculatedIncentive.toLocaleString('en-IN')}</p>
-                            <p className="text-xs mt-2 font-semibold bg-primary/10 inline-block px-2 py-1 rounded">50% of fee, capped at ₹10,000 as per policy.</p>
-                        </AlertDescription>
-                    </Alert>
+                    <div className="bg-primary rounded-3xl p-8 text-white shadow-2xl shadow-primary/20 relative overflow-hidden group transition-all hover:scale-[1.01]">
+                        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-500">
+                           <Award className="h-32 w-32" />
+                        </div>
+                        <div className="relative z-10">
+                            <div className="flex items-center gap-2 mb-4">
+                                <div className="h-6 w-1 bg-white/40 rounded-full"></div>
+                                <span className="text-xs font-black uppercase tracking-[0.2em] text-white/80">Incentive Estimate</span>
+                            </div>
+                            <p className="text-sm font-medium text-white/90 mb-1 leading-relaxed">Based on the amount paid, your tentative reimbursement will be:</p>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-5xl font-black tracking-tighter">₹{calculatedIncentive.toLocaleString('en-IN')}</span>
+                                <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-lg backdrop-blur-sm">TENTATIVE SHARE</span>
+                            </div>
+                            <div className="mt-6 flex items-center gap-4 py-3 px-4 bg-white/10 rounded-2xl border border-white/10 backdrop-blur-md">
+                                <Info className="h-5 w-5 text-white/80 shrink-0" />
+                                <p className="text-[10px] font-medium leading-normal opacity-90">
+                                    50% of fee, capped at ₹10,000 as per RDC policy. Actual amount may vary after technical committee review.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
           </form>

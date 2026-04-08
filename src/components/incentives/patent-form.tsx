@@ -106,11 +106,19 @@ const patentSchema = z
     isPuSoleApplicant: z.boolean().optional(),
     patentSpecificationType: z.enum(['Full', 'Provisional'], { required_error: 'Specification type is required.' }),
   })
-  .refine(data => !(data.patentLocale === 'International') || (!!data.patentCountry && data.patentCountry.length > 0), { message: 'Country is required for international patents.', path: ['patentCountry'] })
+  .refine(data => !(data.patentLocale === 'International') || (!!data.patentCountry && data.patentCountry.length > 0), { message: 'Country is required for international patents.', path: ['country'] })
   .refine(data => !(data.isCollaboration === 'Yes') || (!!data.collaborationDetails && data.collaborationDetails.length > 0), { message: 'Collaboration details are required.', path: ['collaborationDetails'] })
   .refine(data => !(data.isIprSdg === 'Yes') || (!!data.sdgGoals && data.sdgGoals.length > 0), { message: 'Please select at least one SDG.', path: ['sdgGoals'] })
   .refine(data => !(data.isIprDisciplinary === 'Yes') || !!data.disciplinaryType, { message: 'Please select the disciplinary type.', path: ['disciplinaryType'] })
-    .refine(data => !(data.currentStatus === 'Published' || data.currentStatus === 'Granted') || !!data.publicationDate, { message: 'Publication date is required for this status.', path: ['publicationDate'] });
+  .refine(data => {
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (data.filingDate > today) return false;
+      if (data.publicationDate && data.publicationDate > today) return false;
+      if (data.grantDate && data.grantDate > today) return false;
+      return true;
+  }, { message: "Dates cannot be in the future.", path: ["filingDate"] })
+  .refine(data => !(data.currentStatus === 'Published' || data.currentStatus === 'Granted') || !!data.publicationDate, { message: 'Publication date is required for this status.', path: ['publicationDate'] });
 
   type PatentFormValues = z.infer<typeof patentSchema>;
 
@@ -172,56 +180,102 @@ const patentSchema = z
     const govtReceiptFile = data.patentGovtReceipt?.[0] as File | undefined;
 
     return (
-      <Card className="max-w-4xl mx-auto shadow-xl border-t-4 border-t-primary">
-        <CardHeader className="bg-muted/30">
+      <Card className="max-w-4xl mx-auto shadow-xl border-t-4 border-t-primary overflow-hidden transition-all duration-300">
+        <CardHeader className="bg-muted/30 pb-6">
           <div className="flex justify-between items-center">
             <div className="space-y-1">
               <CardTitle className="text-2xl flex items-center gap-2 font-bold tracking-tight">
                 <CheckCircle2 className="h-7 w-7 text-primary" /> Review Your Application
               </CardTitle>
-              <CardDescription className="text-base text-muted-foreground">Please verify all patent details before final submission.</CardDescription>
+              <CardDescription className="text-base text-muted-foreground font-medium">Please verify all patent details before final submission.</CardDescription>
             </div>
-            <Button variant="outline" onClick={onEdit} className="rounded-xl border-primary text-primary hover:bg-primary/5">
-              <Edit className="h-4 w-4 mr-2" /> Edit Details
+            <Button variant="outline" onClick={onEdit} className="rounded-xl border-primary/30 text-primary hover:bg-primary/5 font-bold px-6">
+              <Edit className="h-4 w-4 mr-2" /> Modify Form
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-1 pt-6">
-          <div className="grid grid-cols-1 gap-1">
-            <div className="bg-primary/5 p-4 rounded-xl mb-4 border border-primary/10">
-              <h4 className="text-xs font-black text-primary uppercase tracking-widest mb-2">Core IPR Information</h4>
-              {renderDetail("Locale", data.patentLocale)}
-              {renderDetail("Country", data.patentCountry)}
-              {renderDetail("Patent Title", data.patentTitle)}
-              {renderDetail("Application Number", data.patentApplicationNumber)}
-              {renderDetail("Domain", data.patentDomain)}
+        <CardContent className="pt-8 space-y-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+            {/* Column 1: Core Identity */}
+            <div className="space-y-8">
+              <div>
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Patent Identity</p>
+                <p className="text-lg font-bold text-foreground leading-tight mb-2">{data.patentTitle}</p>
+                <div className="flex flex-wrap gap-2">
+                    <Badge variant="secondary" className="font-bold">{data.patentLocale}</Badge>
+                    {data.patentCountry && <Badge variant="outline" className="font-bold">{data.patentCountry}</Badge>}
+                    <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-bold">{data.patentDomain}</Badge>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Application Identifier</p>
+                <p className="text-sm font-mono font-bold bg-muted/30 px-2 py-1 rounded-md inline-block">{data.patentApplicationNumber}</p>
+              </div>
+
+               <div>
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Status & Timeline</p>
+                <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10 space-y-3">
+                    <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-muted-foreground">Current Status:</span>
+                        <Badge className="font-black bg-primary text-[10px]">{data.currentStatus}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-muted-foreground">Filing Date:</span>
+                        <span className="text-xs font-bold">{data.filingDate ? format(data.filingDate, 'PPP') : 'N/A'}</span>
+                    </div>
+                    {data.publicationDate && (
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs font-medium text-muted-foreground">Publication Date:</span>
+                            <span className="text-xs font-bold">{format(data.publicationDate, 'PPP')}</span>
+                        </div>
+                    )}
+                    {data.grantDate && (
+                        <div className="flex justify-between items-center text-green-700">
+                            <span className="text-xs font-medium">Grant Date:</span>
+                            <span className="text-xs font-black">{format(data.grantDate, 'PPP')}</span>
+                        </div>
+                    )}
+                </div>
+              </div>
             </div>
 
-            <div className="bg-muted/20 p-4 rounded-xl mb-4 border border-muted-foreground/10">
-               <h4 className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Team & Collaboration</h4>
-              {renderDetail("Inventors", data.patentInventors as any)}
-              {renderDetail("Co-Applicants", data.patentCoApplicants as any)}
-              {renderDetail("Collaboration", data.isCollaboration)}
-              {renderDetail("Collaboration Details", data.collaborationDetails)}
-              {renderDetail("Relates to SDGs", data.isIprSdg)}
-              {renderDetail("SDGs", data.sdgGoals)}
-              {renderDetail("Disciplinary Type", data.disciplinaryType)}
-            </div>
+            {/* Column 2: Authors & Compliance */}
+            <div className="space-y-8">
+               <div>
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Inventors & Applicants</p>
+                <div className="space-y-2">
+                    {data.patentInventors.map((inv, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs font-bold p-2 bg-muted/20 rounded-lg">
+                            <div className="h-1.5 w-1.5 rounded-full bg-primary/40"></div>
+                            {inv.name} <span className="text-[9px] text-muted-foreground font-black uppercase">({inv.misId || 'Internal'})</span>
+                        </div>
+                    ))}
+                </div>
+              </div>
 
-            <div className="bg-muted/20 p-4 rounded-xl border border-muted-foreground/10">
-               <h4 className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Filing & Documentation</h4>
-              {renderDetail("Filing Date", data.filingDate ? format(data.filingDate, 'PPP') : 'N/A')}
-              {renderDetail("Publication Date", data.publicationDate ? format(data.publicationDate, 'PPP') : 'N/A')}
-              {renderDetail("Grant Date", data.grantDate ? format(data.grantDate, 'PPP') : 'N/A')}
-              {renderDetail("Current Status", data.currentStatus)}
-              {renderDetail("Specification Type", data.patentSpecificationType)}
-              {renderDetail("Filed in PU Name", data.patentFiledInPuName)}
-              {renderDetail("PU is Sole Applicant", data.isPuSoleApplicant)}
-              {renderDetail("Filed from IPR Cell", data.patentFiledFromIprCell)}
-              {renderDetail("Permission Taken", data.patentPermissionTaken)}
-              {renderDetail("Form 1 Proof", form1File?.name)}
-              {renderDetail("Approval Proof", approvalProofFile?.name)}
-              {renderDetail("Govt. Receipt", govtReceiptFile?.name)}
+              {data.sdgGoals && data.sdgGoals.length > 0 && (
+                <div>
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">SDG Impact</p>
+                    <div className="flex flex-wrap gap-1">
+                        {data.sdgGoals.map((g, i) => <Badge key={i} variant="secondary" className="text-[9px] font-bold h-5">{g}</Badge>)}
+                    </div>
+                </div>
+              )}
+
+              <div>
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Compliance & Verification</p>
+                <div className="grid grid-cols-1 gap-2">
+                    <div className="flex items-center justify-between p-2 bg-muted/10 rounded-xl border border-dashed">
+                        <span className="text-[10px] font-medium text-muted-foreground">Proof of Form 1:</span>
+                        <Badge variant="ghost" className="text-[9px] font-black text-primary"><FileText className="h-3 w-3 mr-1" /> ATTACHED</Badge>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-muted/10 rounded-xl border border-dashed">
+                        <span className="text-[10px] font-medium text-muted-foreground">Govt. Receipt:</span>
+                        <Badge variant="ghost" className="text-[9px] font-black text-primary"><FileText className="h-3 w-3 mr-1" /> ATTACHED</Badge>
+                    </div>
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -977,7 +1031,13 @@ const patentSchema = z
                                             </FormControl>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-auto p-0 rounded-xl" align="start">
-                                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                                            <Calendar 
+                                                mode="single" 
+                                                selected={field.value} 
+                                                onSelect={field.onChange} 
+                                                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                                initialFocus 
+                                            />
                                         </PopoverContent>
                                     </Popover>
                                     <FormMessage />
@@ -1056,15 +1116,28 @@ const patentSchema = z
                 </section>
 
                 {calculatedIncentive !== null && (
-                     <Alert className="bg-primary/5 border-primary/20 py-6 rounded-2xl ring-1 ring-primary/10">
-                        <Info className="h-5 w-5 text-primary" />
-                        <AlertTitle className="text-primary font-bold text-lg">Tentative Incentive Estimate</AlertTitle>
-                        <AlertDescription className="mt-2 text-primary/90">
-                            <p className="text-lg font-medium">Based on the patent status and number of inventors, your shared incentive will be:</p>
-                            <p className="text-4xl font-black text-primary mt-1">₹{calculatedIncentive.toLocaleString('en-IN')}</p>
-                            <p className="text-xs mt-2 font-semibold bg-primary/10 inline-block px-2 py-1 rounded">This is your individual share as per the university policy.</p>
-                        </AlertDescription>
-                    </Alert>
+                    <div className="bg-primary rounded-3xl p-8 text-white shadow-2xl shadow-primary/20 relative overflow-hidden group transition-all hover:scale-[1.01]">
+                        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-500">
+                           <Award className="h-32 w-32" />
+                        </div>
+                        <div className="relative z-10">
+                            <div className="flex items-center gap-2 mb-4">
+                                <div className="h-6 w-1 bg-white/40 rounded-full"></div>
+                                <span className="text-xs font-black uppercase tracking-[0.2em] text-white/80">Individual Incentive Share</span>
+                            </div>
+                            <p className="text-sm font-medium text-white/90 mb-1 leading-relaxed">Based on the patent status and number of inventors, your Individual share will be:</p>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-5xl font-black tracking-tighter">₹{calculatedIncentive.toLocaleString('en-IN')}</span>
+                                <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-lg backdrop-blur-sm">TENTATIVE SHARE</span>
+                            </div>
+                            <div className="mt-6 flex items-center gap-4 py-3 px-4 bg-white/10 rounded-2xl border border-white/10 backdrop-blur-md">
+                                <Info className="h-5 w-5 text-white/80 shrink-0" />
+                                <p className="text-[10px] font-medium leading-normal opacity-90">
+                                   This is your individual share based on Patent status & total internal inventors. Actual amount may vary after technical committee review.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
           </form>

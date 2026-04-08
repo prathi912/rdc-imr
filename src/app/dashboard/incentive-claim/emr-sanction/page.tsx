@@ -46,12 +46,10 @@ export default function EmrSanctionPage() {
   return (
     <div className="container mx-auto py-10 pb-20 px-4">
       <PageHeader
-        title="EMR Sanction Project Incentive Claim"
-        description="Principal Investigators can apply for an incentive claim for projects sanctioned by external agencies (EMR)."
         showBackButton
         backButtonHref="/dashboard/incentive-claim?tab=apply"
       />
-      
+
       <div className="mt-8">
         <EmrSanctionForm user={user} />
       </div>

@@ -358,6 +358,8 @@ export type IncentiveClaim = {
 
   // Workshop/Training/FDP fields
   workshopName?: string;
+  workshopStartDate?: string; // ISO
+  workshopEndDate?: string; // ISO
   attendanceMode?: "Online" | "Offline";
   eventTypeLevel?: "International" | "National" | "Regional/State" | "Other";
   workshopCertificateUrl?: string;
