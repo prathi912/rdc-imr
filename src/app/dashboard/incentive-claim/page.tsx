@@ -495,7 +495,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
         }
         setIsApplying(true);
         try {
-            const { id, claimId, uid, userName, userEmail, status, submissionDate, publicationOrderInYear, ...originalClaimData } = claimToApply;
+            const { id, claimId, uid, userName, userEmail, status, submissionDate, publicationOrderInYear, approvals, finalApprovedAmount, paymentSheetRef, paymentSheetRemarks, ...originalClaimData } = claimToApply;
 
             const newClaim: Omit<IncentiveClaim, 'id' | 'claimId'> = {
                 ...originalClaimData,
@@ -1173,7 +1173,7 @@ export default function IncentiveClaimPage() {
 
     const tabs = [
         { value: 'apply', label: 'Apply' },
-        { value: 'my-claims', label: `My Claims (${otherClaims.length})` },
+        { value: 'my-claims', label: `My Claims (${userClaims.filter(c => c.status !== 'Draft').length})` },
         { value: 'co-author', label: `Co-Author Claims (${coAuthorClaims.filter(c => c.authors?.find(a => a.email.toLowerCase() === user?.email.toLowerCase())?.status === 'pending').length})` },
         { value: 'draft', label: `Drafts (${draftClaims.length})` },];
 

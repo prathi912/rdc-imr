@@ -80,8 +80,19 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                 deductions.push('PU Name Not in Publication (÷2)');
             }
 
-            // Calculate share based on author composition
+            // Calculate shares
+            const mainShare = mainAuthors.length > 0 ? (deductedAmount * 0.7) / mainAuthors.length : 0;
+            const coShare = coAuthors.length > 0 ? (deductedAmount * 0.3) / coAuthors.length : 0;
+
+            // Determine which share to show based on the claimant's role
+            const isMainAuthor = ['First Author', 'Corresponding Author', 'First & Corresponding Author'].includes(claim.authorType || '');
             let finalAmount = 0;
+            if (isMainAuthor) {
+                finalAmount = mainShare;
+            } else {
+                finalAmount = coShare;
+            }
+
             let authorShare = 'N/A';
 
             if (internalAuthors.length === 0) {
@@ -89,22 +100,19 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                 authorShare = 'No internal authors';
             } else if (internalAuthors.length === 1) {
                 if (mainAuthors.length === 1) {
-                    finalAmount = deductedAmount;
+                    finalAmount = isMainAuthor ? deductedAmount : 0;
                     authorShare = 'Sole main author (100%)';
                 } else if (coAuthors.length === 1) {
-                    finalAmount = deductedAmount * 0.8;
+                    finalAmount = !isMainAuthor ? deductedAmount * 0.8 : 0;
                     authorShare = 'Sole co-author (80%)';
                 }
             } else if (mainAuthors.length > 0 && coAuthors.length > 0) {
-                const mainShare = (deductedAmount * 0.7) / mainAuthors.length;
-                const coShare = (deductedAmount * 0.3) / coAuthors.length;
-                finalAmount = mainAuthors.length > 0 ? mainShare : coShare;
                 authorShare = `Mixed: Main (70% ÷ ${mainAuthors.length}), Co-Author (30% ÷ ${coAuthors.length})`;
             } else if (mainAuthors.length === 0 && coAuthors.length > 1) {
-                finalAmount = (deductedAmount * 0.8) / coAuthors.length;
+                finalAmount = !isMainAuthor ? (deductedAmount * 0.8) / coAuthors.length : 0;
                 authorShare = `Multiple co-authors (80% ÷ ${coAuthors.length})`;
             } else if (mainAuthors.length > 0) {
-                finalAmount = deductedAmount / mainAuthors.length;
+                if (isMainAuthor) finalAmount = deductedAmount / mainAuthors.length;
                 authorShare = `Multiple main authors (÷ ${mainAuthors.length})`;
             }
 
