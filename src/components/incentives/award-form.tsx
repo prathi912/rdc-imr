@@ -20,7 +20,7 @@ import { db } from "@/lib/config"
 import { doc, getDoc } from "firebase/firestore"
 import type { User, IncentiveClaim } from "@/types"
 import { uploadFileToApi } from "@/lib/upload-client"
-import { Loader2, AlertCircle, Info, Edit, Trash2, CheckCircle2, FileText, X, Globe, MapPin, Calendar, Award, Search } from "lucide-react"
+import { Loader2, AlertCircle, Info, Edit, Trash2, CheckCircle2, FileText, X, Globe, MapPin, Calendar, Award, Search, ChevronDown } from "lucide-react"
 import { submitIncentiveClaimViaApi } from "@/lib/incentive-claim-client"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
@@ -63,10 +63,16 @@ function ReviewDetails({
   data,
   onEdit,
   isSubmitting,
+  showLogic,
+  setShowLogic,
+  getAwardLogicBreakdown
 }: {
   data: AwardFormValues
   onEdit: () => void
   isSubmitting: boolean
+  showLogic: boolean
+  setShowLogic: (s: boolean) => void
+  getAwardLogicBreakdown: (data: AwardFormValues) => {label: string, value: string}[]
 }) {
   return (
     <Card className="max-w-4xl mx-auto shadow-xl border-t-4 border-t-primary">
@@ -126,10 +132,38 @@ function ReviewDetails({
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-2">Estimated Incentive</p>
                   <p className="text-[11px] opacity-70 mb-4 leading-tight font-medium">Based on the provided details, your tentative incentive claim will be:</p>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-black tracking-tighter">₹{data.amountPaid?.toLocaleString("en-IN") || 0}</span>
+                    <span className="text-4xl font-black tracking-tighter">₹{(data.amountPaid || 0).toLocaleString("en-IN")}</span>
                     <span className="text-xs font-medium opacity-60">INR*</span>
                   </div>
                   <p className="text-[10px] mt-4 font-medium opacity-70 italic">*Subject to final verification by the technical committee.</p>
+                  
+                  <div className="mt-4 border-t border-primary/10 pt-4">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs font-bold w-full flex justify-between items-center text-primary-foreground hover:bg-primary-foreground/10"
+                      onClick={() => setShowLogic(!showLogic)}
+                      type="button"
+                    >
+                      View Calculation Logic
+                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                    </Button>
+                    
+                    {showLogic && (
+                      <div className="mt-3 p-4 bg-background/10 rounded-xl border border-primary-foreground/10 space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1 text-primary-foreground">
+                          {getAwardLogicBreakdown(data).map((step, idx) => (
+                            <div key={idx} className="flex justify-between items-start py-1 border-b last:border-0 border-primary-foreground/10">
+                              <span className="opacity-80 pr-2">{step.label}</span>
+                              <span className={idx === (getAwardLogicBreakdown(data).length - 1) ? "font-bold text-green-200 shrink-0" : "font-semibold shrink-0"}>{step.value}</span>
+                            </div>
+                          ))}
+                        
+                        <div className="text-[9px] italic mt-2 !pt-2 text-center border-t border-primary-foreground/10 opacity-70">
+                          *Awards with a cash component generally receive a direct 100% equivalent claim match pending verification.
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {data.paymentDate && (
@@ -171,6 +205,15 @@ export function AwardForm({ user }: { user: User }) {
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false)
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false)
   const [isLoadingDraft, setIsLoadingDraft] = useState(true)
+  const [showLogic, setShowLogic] = useState(false)
+
+  const getAwardLogicBreakdown = (data: Partial<AwardFormValues>) => {
+    const steps: {label: string, value: string}[] = [];
+    steps.push({ label: '1. National/International Stature', value: data.awardStature || 'Pending' });
+    steps.push({ label: '2. Award Cash Component', value: `₹${data.amountPaid?.toLocaleString('en-IN') || 0}` });
+    steps.push({ label: '3. Final Matched Incentive', value: `₹${data.amountPaid?.toLocaleString('en-IN') || 0}` });
+    return steps;
+  };
 
   const form = useForm<AwardFormValues>({
     resolver: zodResolver(awardSchema),
@@ -379,6 +422,9 @@ export function AwardForm({ user }: { user: User }) {
           data={form.getValues()}
           onEdit={() => setStep("edit")}
           isSubmitting={isSubmitting}
+          showLogic={showLogic}
+          setShowLogic={setShowLogic}
+          getAwardLogicBreakdown={getAwardLogicBreakdown}
         />
         <div className="flex justify-end max-w-4xl mx-auto gap-4">
           <Button variant="ghost" onClick={() => setStep("edit")} disabled={isSubmitting}>Modify Details</Button>
@@ -597,6 +643,46 @@ export function AwardForm({ user }: { user: User }) {
               </section>
 
               <Separator className="bg-muted-foreground/5" />
+              
+              {form.watch("amountPaid") !== undefined && form.watch("amountPaid") > 0 && (
+                 <Alert className="mt-8 bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md mb-8">
+                   <div className="flex flex-col gap-1.5">
+                      <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> Estimated Incentive Amount
+                      </p>
+                      <h4 className="text-4xl font-black text-foreground tracking-tight py-1">₹{(form.watch("amountPaid") || 0).toLocaleString('en-IN')}</h4>
+                      <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
+                      
+                      <div className="mt-4 border-t border-primary/10 pt-4">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
+                          onClick={() => setShowLogic(!showLogic)}
+                          type="button"
+                        >
+                          View Calculation Logic
+                          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                        </Button>
+                        
+                        {showLogic && (
+                          <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1">
+                              {getAwardLogicBreakdown(form.getValues()).map((step, idx) => (
+                                <div key={idx} className="flex justify-between items-start py-1 border-b last:border-0 border-muted">
+                                  <span className="text-muted-foreground pr-2">{step.label}</span>
+                                  <span className={idx === (getAwardLogicBreakdown(form.getValues()).length - 1) ? "font-bold text-green-600 shrink-0" : "font-semibold shrink-0"}>{step.value}</span>
+                                </div>
+                              ))}
+                            
+                            <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
+                              *Awards with a cash component generally receive a direct 100% equivalent claim match pending verification.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                   </div>
+                 </Alert>
+              )}
 
               <section className="space-y-8">
                 <div className="flex items-center justify-between py-2 border-b">

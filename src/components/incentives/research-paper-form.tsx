@@ -452,7 +452,96 @@ export function ResearchPaperForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   const [showWosAccession, setShowWosAccession] = useState(false);
+  const [showLogic, setShowLogic] = useState(false);
 
+  const getPaperLogicBreakdown = (data: any) => {
+    try {
+        const { journalClassification, publicationType, wasApcPaidByUniversity, isPuNameInPublication, authors = [] } = data;
+        const internalAuthors = authors.filter((a: any) => !a.isExternal);
+        const mainAuthors = internalAuthors.filter((a: any) => ['First Author', 'Corresponding Author', 'First & Corresponding Author'].includes(a.role));
+        const coAuthors = internalAuthors.filter((a: any) => a.role === 'Co-Author');
+
+        let baseAmount = 0;
+        switch (journalClassification) {
+            case 'Nature/Science/Lancet': baseAmount = 50000; break;
+            case 'Top 1% Journals': baseAmount = 25000; break;
+            case 'Q1': baseAmount = 15000; break;
+            case 'Q2': baseAmount = 10000; break;
+            case 'Q3': baseAmount = 6000; break;
+            case 'Q4': baseAmount = 4000; break;
+        }
+
+        let adjustedAmount = baseAmount;
+        let pubAdjustStr = '1.0×';
+        if (publicationType === 'Case Reports/Short Surveys') {
+            adjustedAmount = baseAmount * 0.9;
+            pubAdjustStr = '0.9×';
+        } else if (publicationType === 'Review Articles' && ['Q3', 'Q4'].includes(journalClassification || '')) {
+            adjustedAmount = baseAmount * 0.8;
+            pubAdjustStr = '0.8×';
+        } else if (publicationType === 'Letter to the Editor/Editorial') {
+            adjustedAmount = 2500;
+            baseAmount = 2500;
+            pubAdjustStr = 'Fixed';
+        }
+
+        let deductedAmount = adjustedAmount;
+        const deductions = [];
+        if (wasApcPaidByUniversity) {
+            deductedAmount /= 2;
+            deductions.push('APC Paid (÷2)');
+        }
+        if (isPuNameInPublication === false) {
+            deductedAmount /= 2;
+            deductions.push('No PU Name (÷2)');
+        }
+
+        let finalAmount = 0;
+        let authorShare = 'N/A';
+
+        if (internalAuthors.length === 0) {
+            finalAmount = 0;
+            authorShare = 'No internal authors';
+        } else if (internalAuthors.length === 1) {
+            if (mainAuthors.length === 1) {
+                finalAmount = deductedAmount;
+                authorShare = 'Sole main author (100%)';
+            } else if (coAuthors.length === 1) {
+                finalAmount = deductedAmount * 0.8;
+                authorShare = 'Sole co-author (80%)';
+            }
+        } else if (mainAuthors.length > 0 && coAuthors.length > 0) {
+            const mainShare = (deductedAmount * 0.7) / mainAuthors.length;
+            const coShare = (deductedAmount * 0.3) / coAuthors.length;
+            finalAmount = mainAuthors.length > 0 ? mainShare : coShare;
+            authorShare = `Mixed (Main 70%, Co 30%)`;
+        } else if (mainAuthors.length === 0 && coAuthors.length > 1) {
+            finalAmount = (deductedAmount * 0.8) / coAuthors.length;
+            authorShare = `Multiple co-authors (80% ÷ ${coAuthors.length})`;
+        } else if (mainAuthors.length > 0) {
+            finalAmount = deductedAmount / mainAuthors.length;
+            authorShare = `Multiple main authors (÷ ${mainAuthors.length})`;
+        }
+
+        const steps = [
+           { label: '1. Base Amount (by Q-Rating)', value: `₹${baseAmount.toLocaleString('en-IN')}` },
+           { label: `2. Publication Type Adjustment (${pubAdjustStr})`, value: `₹${Math.round(adjustedAmount).toLocaleString('en-IN')}` }
+        ];
+
+        if (deductions.length > 0) {
+            steps.push({ label: `3. University Deductions (${deductions.join(', ')})`, value: `₹${Math.round(deductedAmount).toLocaleString('en-IN')}` });
+        } else {
+            steps.push({ label: `3. University Deductions`, value: 'None' });
+        }
+
+        steps.push({ label: `4. Author Sharing (${authorShare})`, value: `${internalAuthors.length} Internal Authors` });
+        steps.push({ label: '5. Final Individual Share', value: `₹${Math.round(finalAmount).toLocaleString('en-IN')}` });
+
+        return steps;
+    } catch (e) {
+        return [];
+    }
+  }
 
   const form = useForm<ResearchPaperFormValues>({
     resolver: zodResolver(researchPaperSchema),
@@ -1420,21 +1509,43 @@ export function ResearchPaperForm() {
                 </div>
               </section>
 
-              {indexType !== 'other' && (
-                <div className="bg-primary/5 p-6 rounded-2xl border border-primary/20 space-y-4 shadow-inner">
-                  <div className="flex items-center gap-2 text-primary font-bold">
-                    <Info className="h-5 w-5" />
-                    Estimated Incentive Amount
-                  </div>
-                  {calculatedIncentive !== null ? (
-                    <div className="space-y-1">
-                      <p className="text-4xl font-black text-primary tracking-tighter">₹{calculatedIncentive.toLocaleString('en-IN')}</p>
+              {indexType !== 'other' && calculatedIncentive !== null && (
+                 <Alert className="bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md">
+                   <div className="flex flex-col gap-1.5">
+                      <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4" /> Estimated Incentive Amount
+                      </p>
+                      <h4 className="text-4xl font-black text-foreground tracking-tight py-1">₹{calculatedIncentive.toLocaleString('en-IN')}</h4>
                       <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
-                    </div>
-                  ) : (
-                    <p className="text-sm italic text-muted-foreground">Estimate will appear once form is complete.</p>
-                  )}
-                </div>
+                      
+                      <div className="mt-4 border-t border-primary/10 pt-4">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
+                          onClick={() => setShowLogic(!showLogic)}
+                          type="button"
+                        >
+                          View Calculation Logic
+                          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                        </Button>
+                        
+                        {showLogic && (
+                          <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2">
+                            {getPaperLogicBreakdown(form.getValues()).map((step, idx) => (
+                              <div key={idx} className="flex justify-between items-center py-1 border-b last:border-0 border-muted">
+                                <span className="text-muted-foreground">{step.label}</span>
+                                <span className={idx === 4 ? "font-bold text-green-600" : "font-semibold"}>{step.value}</span>
+                              </div>
+                            ))}
+                            <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
+                              *Logic matches official policy matrix evaluated by approvers during technical audit. If author position &gt; 5th, final eligible amount is ₹0 (ARPS only).
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                   </div>
+                 </Alert>
               )}
 
               <Separator />

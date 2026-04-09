@@ -20,7 +20,7 @@ import { db } from '@/lib/config';
 import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToApi } from '@/lib/upload-client';
-import { Loader2, AlertCircle, Edit, FileText, CheckCircle2, Info, Award } from 'lucide-react';
+import { Loader2, AlertCircle, Edit, FileText, CheckCircle2, Info, Award, ChevronDown } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
@@ -49,7 +49,19 @@ const membershipSchema = z.object({
 
 type MembershipFormValues = z.infer<typeof membershipSchema>;
 
-function ReviewDetails({ data, onEdit }: { data: MembershipFormValues; onEdit: () => void }) {
+function ReviewDetails({ 
+    data, 
+    onEdit,
+    showLogic,
+    setShowLogic,
+    getMembershipLogicBreakdown 
+}: { 
+    data: MembershipFormValues; 
+    onEdit: () => void;
+    showLogic: boolean;
+    setShowLogic: (s: boolean) => void;
+    getMembershipLogicBreakdown: (data: Partial<MembershipFormValues>) => {label: string, value: string}[]
+}) {
     const renderDetail = (label: string, value?: string | number | boolean) => {
         if (!value && value !== 0 && value !== false) return null;
         
@@ -113,7 +125,7 @@ function ReviewDetails({ data, onEdit }: { data: MembershipFormValues; onEdit: (
                     <div className="space-y-6">
                         <div>
                             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Financials</p>
-                            <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10">
+                            <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10 mb-4">
                                 <div className="flex justify-between items-center mb-1">
                                     <span className="text-xs font-medium text-muted-foreground">Amount Paid:</span>
                                     <span className="text-lg font-black text-primary">₹{data.membershipAmountPaid.toLocaleString('en-IN')}</span>
@@ -121,6 +133,45 @@ function ReviewDetails({ data, onEdit }: { data: MembershipFormValues; onEdit: (
                                 <div className="flex justify-between items-center">
                                     <span className="text-xs font-medium text-muted-foreground">Payment Date:</span>
                                     <span className="text-xs font-bold">{data.membershipPaymentDate}</span>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-primary p-6 rounded-[2rem] text-primary-foreground shadow-xl shadow-primary/20 relative overflow-hidden group">
+                                <div className="absolute -right-4 -top-4 bg-white/10 w-24 h-24 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-500"></div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-2">Estimated Incentive</p>
+                                <p className="text-[11px] opacity-70 mb-4 leading-tight font-medium">Based on the provided details, your tentative incentive claim will be:</p>
+                                <div className="flex items-baseline gap-2">
+                                  <span className="text-4xl font-black tracking-tighter">₹{Math.min(data.membershipAmountPaid * 0.5, 10000).toLocaleString('en-IN')}</span>
+                                  <span className="text-xs font-medium opacity-60">INR*</span>
+                                </div>
+                                <p className="text-[10px] mt-4 font-medium opacity-70 italic">*Subject to final verification by the technical committee.</p>
+                                
+                                <div className="mt-4 border-t border-primary/10 pt-4">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="text-xs font-bold w-full flex justify-between items-center text-primary-foreground hover:bg-primary-foreground/10"
+                                    onClick={() => setShowLogic(!showLogic)}
+                                    type="button"
+                                  >
+                                    View Calculation Logic
+                                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                                  </Button>
+                                  
+                                  {showLogic && (
+                                    <div className="mt-3 p-4 bg-background/10 rounded-xl border border-primary-foreground/10 space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1 text-primary-foreground">
+                                        {getMembershipLogicBreakdown(data).map((step, idx) => (
+                                          <div key={idx} className="flex justify-between items-start py-1 border-b last:border-0 border-primary-foreground/10">
+                                            <span className="opacity-80 pr-2">{step.label}</span>
+                                            <span className={idx === (getMembershipLogicBreakdown(data).length - 1) ? "font-bold text-green-200 shrink-0" : "font-semibold shrink-0"}>{step.value}</span>
+                                          </div>
+                                        ))}
+                                      
+                                      <div className="text-[9px] italic mt-2 !pt-2 text-center border-t border-primary-foreground/10 opacity-70">
+                                        *50% of the membership fee up to a max cap of ₹10,000 matches logic on approver's side.
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                             </div>
                         </div>
@@ -154,6 +205,33 @@ export function MembershipForm() {
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
+  const [showLogic, setShowLogic] = useState(false);
+
+  const getMembershipLogicBreakdown = (data: Partial<MembershipFormValues>) => {
+      const steps: {label: string, value: string}[] = [];
+      const amtPaid = data.membershipAmountPaid || 0;
+      
+      steps.push({ label: '1. Membership Fee Paid', value: `₹${amtPaid.toLocaleString('en-IN')}` });
+      
+      if (amtPaid === 0) {
+           steps.push({ label: '2. Final Estimation', value: '₹0' });
+           return steps;
+      }
+
+      steps.push({ label: '2. University Support Rate', value: '50% Match' });
+      
+      const matchedAmount = amtPaid * 0.5;
+      steps.push({ label: '3. Provisional Match', value: `₹${matchedAmount.toLocaleString('en-IN')}` });
+
+      const finalAmount = Math.min(matchedAmount, 10000);
+      if (matchedAmount > 10000) {
+           steps.push({ label: '4. Policy Cap Applied', value: 'Capped at ₹10,000 max' });
+      }
+      
+      steps.push({ label: '5. Estimated Final Reimbursement', value: `₹${finalAmount.toLocaleString('en-IN')}` });
+
+      return steps;
+  };
   
   const form = useForm<MembershipFormValues>({
     resolver: zodResolver(membershipSchema),
@@ -321,7 +399,13 @@ export function MembershipForm() {
   if (currentStep === 2) {
     return (
         <div className="space-y-6">
-            <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
+            <ReviewDetails 
+              data={form.getValues()} 
+              onEdit={() => setCurrentStep(1)} 
+              showLogic={showLogic}
+              setShowLogic={setShowLogic}
+              getMembershipLogicBreakdown={getMembershipLogicBreakdown}
+            />
             <Card className="max-w-4xl mx-auto bg-muted/20 border-t">
                 <CardFooter className="flex justify-between p-6">
                     <Button variant="ghost" onClick={() => setCurrentStep(1)} disabled={isSubmitting} className="rounded-xl px-8">
@@ -507,28 +591,43 @@ export function MembershipForm() {
                 </section>
 
                 {calculatedIncentive !== null && (
-                    <div className="bg-primary rounded-3xl p-8 text-white shadow-2xl shadow-primary/20 relative overflow-hidden group transition-all hover:scale-[1.01]">
-                        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-500">
-                           <Award className="h-32 w-32" />
+                   <Alert className="mt-8 bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md mb-8">
+                     <div className="flex flex-col gap-1.5">
+                        <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> Estimated Incentive Amount
+                        </p>
+                        <h4 className="text-4xl font-black text-foreground tracking-tight py-1">₹{calculatedIncentive.toLocaleString('en-IN')}</h4>
+                        <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
+                        
+                        <div className="mt-4 border-t border-primary/10 pt-4">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
+                            onClick={() => setShowLogic(!showLogic)}
+                            type="button"
+                          >
+                            View Calculation Logic
+                            <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                          </Button>
+                          
+                          {showLogic && (
+                            <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1">
+                                {getMembershipLogicBreakdown(form.getValues()).map((step, idx) => (
+                                  <div key={idx} className="flex justify-between items-start py-1 border-b last:border-0 border-muted">
+                                    <span className="text-muted-foreground pr-2">{step.label}</span>
+                                    <span className={idx === (getMembershipLogicBreakdown(form.getValues()).length - 1) ? "font-bold text-green-600 shrink-0" : "font-semibold shrink-0"}>{step.value}</span>
+                                  </div>
+                                ))}
+                              
+                              <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
+                                *50% of the membership fee up to a max cap of ₹10,000 matches logic on approver's side.
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <div className="relative z-10">
-                            <div className="flex items-center gap-2 mb-4">
-                                <div className="h-6 w-1 bg-white/40 rounded-full"></div>
-                                <span className="text-xs font-black uppercase tracking-[0.2em] text-white/80">Incentive Estimate</span>
-                            </div>
-                            <p className="text-sm font-medium text-white/90 mb-1 leading-relaxed">Based on the amount paid, your tentative reimbursement will be:</p>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-5xl font-black tracking-tighter">₹{calculatedIncentive.toLocaleString('en-IN')}</span>
-                                <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-lg backdrop-blur-sm">TENTATIVE SHARE</span>
-                            </div>
-                            <div className="mt-6 flex items-center gap-4 py-3 px-4 bg-white/10 rounded-2xl border border-white/10 backdrop-blur-md">
-                                <Info className="h-5 w-5 text-white/80 shrink-0" />
-                                <p className="text-[10px] font-medium leading-normal opacity-90">
-                                    50% of fee, capped at ₹10,000 as per RDC policy. Actual amount may vary after technical committee review.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                     </div>
+                   </Alert>
                 )}
             </div>
           </form>

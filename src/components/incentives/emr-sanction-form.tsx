@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import type { User, IncentiveClaim, Author, CoPiDetails } from '@/types'
 import { uploadFileToApi } from '@/lib/upload-client'
-import { Loader2, AlertCircle, Plus, Trash2, Info, FileText, CheckCircle2 } from 'lucide-react'
+import { Loader2, AlertCircle, Plus, Trash2, Info, FileText, CheckCircle2, ChevronDown } from 'lucide-react'
 import { calculateEmrSanctionIncentive } from "@/app/incentive-calculation"
 import { submitIncentiveClaimViaApi } from "@/lib/incentive-claim-client"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -124,6 +124,26 @@ export function EmrSanctionForm({ user }: { user: User }) {
     control: form.control,
     name: "externalCoPis"
   })
+
+  const [showLogic, setShowLogic] = useState(false)
+
+  const getEmrSanctionLogicBreakdown = (data: Partial<EmrSanctionFormValues>) => {
+    const steps: {label: string, value: string}[] = [];
+    const sanctionAmt = data.sanctionAmount || 0;
+    steps.push({ label: '1. Sanctioned Amount', value: `₹${sanctionAmt.toLocaleString('en-IN')}` });
+    
+    if (data.wasRoutedThroughRdc !== 'yes') {
+      steps.push({ label: '2. RDC Routing Compliance', value: 'Not Routed (0%)' });
+      steps.push({ label: '3. Final Estimation', value: '₹0' });
+      return steps;
+    }
+    
+    steps.push({ label: '2. Expected Incentive Rate', value: '1.0% of Sanction Value' });
+    const finalAmount = Math.round(sanctionAmt * 0.01);
+    steps.push({ label: '3. Estimated Project Incentive', value: `₹${finalAmount.toLocaleString('en-IN')}` });
+    
+    return steps;
+  };
 
   const sanctionAmount = form.watch("sanctionAmount")
   const tentativeIncentive = useMemo(() => {
@@ -243,10 +263,38 @@ export function EmrSanctionForm({ user }: { user: User }) {
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-2">Estimated Incentive</p>
                     <p className="text-[11px] opacity-70 mb-4 leading-tight font-medium">Based on 1% of the sanction amount, your tentative incentive claim will be:</p>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-black tracking-tighter">₹{tentativeIncentive.toLocaleString('en-IN')}</span>
+                      <span className="text-4xl font-black tracking-tighter">₹{(values.wasRoutedThroughRdc === 'yes' ? tentativeIncentive : 0).toLocaleString('en-IN')}</span>
                       <span className="text-xs font-medium opacity-60">INR*</span>
                     </div>
                     <p className="text-[10px] mt-4 font-medium opacity-70 italic">*Subject to final verification by the technical committee.</p>
+                    
+                    <div className="mt-4 border-t border-primary/10 pt-4">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs font-bold w-full flex justify-between items-center text-primary-foreground hover:bg-primary-foreground/10"
+                        onClick={() => setShowLogic(!showLogic)}
+                        type="button"
+                      >
+                        View Calculation Logic
+                        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                      </Button>
+                      
+                      {showLogic && (
+                        <div className="mt-3 p-4 bg-background/10 rounded-xl border border-primary-foreground/10 space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1 text-primary-foreground">
+                            {getEmrSanctionLogicBreakdown(values).map((step, idx) => (
+                              <div key={idx} className="flex justify-between items-start py-1 border-b last:border-0 border-primary-foreground/10">
+                                <span className="opacity-80 pr-2">{step.label}</span>
+                                <span className={idx === (getEmrSanctionLogicBreakdown(values).length - 1) ? "font-bold text-green-200 shrink-0" : "font-semibold shrink-0"}>{step.value}</span>
+                              </div>
+                            ))}
+                          
+                          <div className="text-[9px] italic mt-2 !pt-2 text-center border-t border-primary-foreground/10 opacity-70">
+                            *Logic matches official policy matrix evaluated by approvers during technical audit.
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -594,15 +642,46 @@ export function EmrSanctionForm({ user }: { user: User }) {
               />
             </section>
 
-             <Alert className="bg-primary/5 border-primary/20 py-6 rounded-2xl ring-1 ring-primary/10">
-              <Info className="h-5 w-5 text-primary" />
-              <AlertTitle className="text-primary font-bold text-lg">Incentive Estimate</AlertTitle>
-              <AlertDescription className="mt-2">
-                <p className="text-lg">Based on the sanction amount, your tentative incentive claim will be:</p>
-                <p className="text-3xl font-black text-primary mt-1">₹{tentativeIncentive.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-muted-foreground mt-2 font-medium">Actual amount may vary after technical committee review.</p>
-              </AlertDescription>
-            </Alert>
+            {form.watch("sanctionAmount") !== undefined && form.watch("sanctionAmount") > 0 && (
+               <Alert className="mt-8 bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md mb-8">
+                 <div className="flex flex-col gap-1.5">
+                    <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> Estimated Incentive Amount
+                    </p>
+                    <h4 className="text-4xl font-black text-foreground tracking-tight py-1">₹{(form.watch("wasRoutedThroughRdc") === 'yes' ? tentativeIncentive : 0).toLocaleString('en-IN')}</h4>
+                    <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
+                    
+                    <div className="mt-4 border-t border-primary/10 pt-4">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
+                        onClick={() => setShowLogic(!showLogic)}
+                        type="button"
+                      >
+                        View Calculation Logic
+                        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                      </Button>
+                      
+                      {showLogic && (
+                        <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1">
+                            {getEmrSanctionLogicBreakdown(form.getValues()).map((step, idx) => (
+                              <div key={idx} className="flex justify-between items-start py-1 border-b last:border-0 border-muted">
+                                <span className="text-muted-foreground pr-2">{step.label}</span>
+                                <span className={idx === (getEmrSanctionLogicBreakdown(form.getValues()).length - 1) ? "font-bold text-green-600 shrink-0" : "font-semibold shrink-0"}>{step.value}</span>
+                              </div>
+                            ))}
+                          
+                          <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
+                            *Logic matches official policy matrix evaluated by approvers during technical audit.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                 </div>
+               </Alert>
+            )}
+
           </form>
         </Form>
       </CardContent>

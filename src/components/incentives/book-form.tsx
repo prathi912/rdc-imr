@@ -20,8 +20,9 @@ import { useToast } from "@/hooks/use-toast"
 import { db } from "@/lib/config"
 import { doc, getDoc } from "firebase/firestore"
 import type { User, IncentiveClaim, Author } from "@/types"
+import { fetchWosDataByUrl } from "@/app/wos-actions";
+import { Loader2, AlertCircle, Info, ChevronDown, Upload, FileText, CheckCircle2, Copy, Globe, Calendar, Award, Search, BookOpen, Edit, Trash2 } from "lucide-react"
 import { uploadFileToApi } from "@/lib/upload-client"
-import { Loader2, AlertCircle, Info, Edit, Trash2, CheckCircle2, FileText, X, Globe, Calendar, Award, Search, BookOpen } from "lucide-react"
 import { submitIncentiveClaimViaApi } from "@/lib/incentive-claim-client"
 import { calculateBookIncentive } from "@/app/incentive-calculation"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -277,6 +278,80 @@ export function BookForm() {
   const [step, setStep] = useState<"edit" | "review">("edit")
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null)
   const [isLoadingDraft, setIsLoadingDraft] = useState(true)
+  const [showLogic, setShowLogic] = useState(false)
+
+  const getBookLogicBreakdown = (data: any) => {
+    try {
+        const isChapter = data.bookApplicationType === 'Book Chapter';
+        const isScopus = data.isScopusIndexed === true;
+        const pubType = data.publisherType;
+        const pages = isChapter ? (data.bookChapterPages || 0) : (data.bookTotalPages || 0);
+
+        let baseIncentive = 0;
+        let baseReason = '';
+        
+        if (isChapter) {
+            if (isScopus) { baseIncentive = 6000; baseReason = 'Scopus Chapter'; }
+            else if (pubType === 'National') {
+                if (pages > 20) { baseIncentive = 2500; baseReason = 'National Chapter (>20 pages)'; }
+                else if (pages >= 10) { baseIncentive = 1500; baseReason = 'National Chapter (10-20 pages)'; }
+                else if (pages >= 5) { baseIncentive = 500; baseReason = 'National Chapter (5-9 pages)'; }
+            } else if (pubType === 'International') {
+                if (pages > 20) { baseIncentive = 3000; baseReason = 'Intl. Chapter (>20 pages)'; }
+                else if (pages >= 10) { baseIncentive = 2000; baseReason = 'Intl. Chapter (10-20 pages)'; }
+                else if (pages >= 5) { baseIncentive = 1000; baseReason = 'Intl. Chapter (5-9 pages)'; }
+            }
+        } else {
+            if (isScopus) { baseIncentive = 18000; baseReason = 'Scopus Book'; }
+            else if (pubType === 'National') {
+                if (pages > 350) { baseIncentive = 3000; baseReason = 'National Book (>350 pages)'; }
+                else if (pages >= 200) { baseIncentive = 2500; baseReason = 'National Book (200-350 pages)'; }
+                else if (pages >= 100) { baseIncentive = 2000; baseReason = 'National Book (100-199 pages)'; }
+                else if (pages > 0) { baseIncentive = 1000; baseReason = 'National Book (<100 pages)'; }
+            } else if (pubType === 'International') {
+                if (pages > 350) { baseIncentive = 6000; baseReason = 'Intl. Book (>350 pages)'; }
+                else if (pages >= 200) { baseIncentive = 3500; baseReason = 'Intl. Book (200-350 pages)'; }
+                else if (pages > 0) { baseIncentive = 2000; baseReason = 'Intl. Book (<200 pages)'; }
+            }
+        }
+
+        const steps = [];
+        steps.push({ label: `1. Policy Base Value (${baseReason || 'Condition not met'})`, value: `₹${baseIncentive.toLocaleString('en-IN')}` });
+
+        if (data.authorRole === 'Editor') {
+            baseIncentive *= 0.5;
+            steps.push({ label: '2. Editor Role Adjustment (-50%)', value: `₹${baseIncentive.toLocaleString('en-IN')}` });
+        } else {
+            steps.push({ label: '2. Author Role Adjustment', value: 'Author (100%)' });
+        }
+
+        let totalIncentive = baseIncentive;
+        if (isChapter && data.chaptersInSameBook && data.chaptersInSameBook > 1) {
+            const n = data.chaptersInSameBook;
+            let fullBookIncentive = 0;
+            if (isScopus) fullBookIncentive = 18000;
+            else if (pubType === 'National') fullBookIncentive = 3000;
+            else if (pubType === 'International') fullBookIncentive = 6000;
+
+            let sum = 0;
+            for (let k = 1; k <= n; k++) {
+                sum += baseIncentive / k;
+            }
+            totalIncentive = Math.min(sum, fullBookIncentive);
+            steps.push({ label: `3. Multi-Chapter Cap (${n} chapters, max full book limit)`, value: `₹${Math.round(totalIncentive).toLocaleString('en-IN')}` });
+        }
+
+        const internalCount = data.authors?.filter((a: any) => !a.isExternal).length || 1;
+        steps.push({ label: '4. Internal PU Authors', value: `${internalCount}` });
+
+        const finalShare = totalIncentive / internalCount;
+        steps.push({ label: '5. Final Individual Share', value: `₹${Math.round(finalShare).toLocaleString('en-IN')}` });
+
+        return steps;
+    } catch (e) {
+        return [];
+    }
+  }
 
   const form = useForm<BookFormValues>({
     resolver: zodResolver(bookSchema),
@@ -807,6 +882,45 @@ export function BookForm() {
                                 )}
                             </div>
                         </div>
+
+                        {calculatedIncentive !== null && (
+                            <Alert className="bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md mb-8">
+                            <div className="flex flex-col gap-1.5">
+                                <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                                    <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> Estimated Incentive Amount
+                                </p>
+                                <h4 className="text-4xl font-black text-foreground tracking-tight py-1">₹{calculatedIncentive.toLocaleString('en-IN')}</h4>
+                                <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
+                                
+                                <div className="mt-4 border-t border-primary/10 pt-4">
+                                    <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
+                                    onClick={() => setShowLogic(!showLogic)}
+                                    type="button"
+                                    >
+                                    View Calculation Logic
+                                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                                    </Button>
+                                    
+                                    {showLogic && (
+                                    <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2">
+                                        {getBookLogicBreakdown(form.getValues()).map((step, idx) => (
+                                        <div key={idx} className="flex justify-between items-center py-1 border-b last:border-0 border-muted">
+                                            <span className="text-muted-foreground">{step.label}</span>
+                                            <span className={idx === (getBookLogicBreakdown(form.getValues()).length - 1) ? "font-bold text-green-600" : "font-semibold"}>{step.value}</span>
+                                        </div>
+                                        ))}
+                                        <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
+                                        *Logic matches official policy matrix evaluated by approvers during technical audit.
+                                        </div>
+                                    </div>
+                                    )}
+                                </div>
+                            </div>
+                            </Alert>
+                        )}
 
                         <FormField name="bookProof" control={form.control} render={({ field: { value, onChange, ...field } }) => (
                             <FormItem className="pt-6">

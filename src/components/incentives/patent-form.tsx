@@ -268,11 +268,11 @@ const patentSchema = z
                 <div className="grid grid-cols-1 gap-2">
                     <div className="flex items-center justify-between p-2 bg-muted/10 rounded-xl border border-dashed">
                         <span className="text-[10px] font-medium text-muted-foreground">Proof of Form 1:</span>
-                        <Badge variant="ghost" className="text-[9px] font-black text-primary"><FileText className="h-3 w-3 mr-1" /> ATTACHED</Badge>
+                        <Badge variant="outline" className="text-[9px] font-black text-primary"><FileText className="h-3 w-3 mr-1" /> ATTACHED</Badge>
                     </div>
                     <div className="flex items-center justify-between p-2 bg-muted/10 rounded-xl border border-dashed">
                         <span className="text-[10px] font-medium text-muted-foreground">Govt. Receipt:</span>
-                        <Badge variant="ghost" className="text-[9px] font-black text-primary"><FileText className="h-3 w-3 mr-1" /> ATTACHED</Badge>
+                        <Badge variant="outline" className="text-[9px] font-black text-primary"><FileText className="h-3 w-3 mr-1" /> ATTACHED</Badge>
                     </div>
                 </div>
               </div>
@@ -296,7 +296,43 @@ const patentSchema = z
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
   const [addType, setAddType] = useState<'inventor' | 'applicant'>('inventor');
-  
+  const [showLogic, setShowLogic] = useState(false);
+
+  const getPatentLogicBreakdown = (data: Partial<PatentFormValues>) => {
+    const steps: {label: string, value: string}[] = [];
+    const status = data.currentStatus || 'Filed';
+    let baseAmount = 0;
+    if (status === 'Published') baseAmount = 3000;
+    else if (status === 'Granted') baseAmount = 15000;
+    
+    steps.push({ label: '1. Patent Lifecycle Stage', value: `${status} (₹${baseAmount.toLocaleString('en-IN')} Base)` });
+    
+    if (baseAmount === 0 || !data.patentFiledInPuName) {
+         steps.push({ label: '2. PU Applicancy Check', value: 'Not Eligible (0%)' });
+         steps.push({ label: '3. Final Estimation', value: '₹0' });
+         return steps;
+    }
+
+    let puShareMultiplier = 1;
+    let labelText = 'Sole Applicant (100% Share)';
+    if (!data.isPuSoleApplicant) {
+        puShareMultiplier = 0.8;
+        labelText = 'Joint Applicant (80% Share)';
+    }
+
+    steps.push({ label: '2. PU Affiliation Share', value: labelText });
+    
+    const pooledAmount = baseAmount * puShareMultiplier;
+    const inventorCount = Math.max(1, data.patentInventors?.length || 1);
+    
+    steps.push({ label: '3. Total Inventors Split', value: `÷ ${inventorCount} Inventor(s)` });
+
+    const finalAmount = Math.round(pooledAmount / inventorCount);
+    steps.push({ label: '4. Estimated Individual Share', value: `₹${finalAmount.toLocaleString('en-IN')}` });
+
+    return steps;
+  };
+   
   const form = useForm<PatentFormValues>({
     resolver: zodResolver(patentSchema),
     defaultValues: {
@@ -1116,28 +1152,42 @@ const patentSchema = z
                 </section>
 
                 {calculatedIncentive !== null && (
-                    <div className="bg-primary rounded-3xl p-8 text-white shadow-2xl shadow-primary/20 relative overflow-hidden group transition-all hover:scale-[1.01]">
-                        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-500">
-                           <Award className="h-32 w-32" />
-                        </div>
-                        <div className="relative z-10">
-                            <div className="flex items-center gap-2 mb-4">
-                                <div className="h-6 w-1 bg-white/40 rounded-full"></div>
-                                <span className="text-xs font-black uppercase tracking-[0.2em] text-white/80">Individual Incentive Share</span>
+                    <Alert className="mt-8 bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md mb-8">
+                    <div className="flex flex-col gap-1.5">
+                        <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> Estimated Incentive Amount
+                        </p>
+                        <h4 className="text-4xl font-black text-foreground tracking-tight py-1">₹{calculatedIncentive.toLocaleString('en-IN')}</h4>
+                        <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
+                        
+                        <div className="mt-4 border-t border-primary/10 pt-4">
+                            <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
+                            onClick={() => setShowLogic(!showLogic)}
+                            type="button"
+                            >
+                            View Calculation Logic
+                            <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                            </Button>
+                            
+                            {showLogic && (
+                            <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2">
+                                {getPatentLogicBreakdown(form.getValues()).map((step, idx) => (
+                                <div key={idx} className="flex justify-between items-center py-1 border-b last:border-0 border-muted">
+                                    <span className="text-muted-foreground">{step.label}</span>
+                                    <span className={idx === (getPatentLogicBreakdown(form.getValues()).length - 1) ? "font-bold text-green-600" : "font-semibold"}>{step.value}</span>
+                                </div>
+                                ))}
+                                <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
+                                *Logic matches official policy matrix evaluated by approvers during technical audit.
+                                </div>
                             </div>
-                            <p className="text-sm font-medium text-white/90 mb-1 leading-relaxed">Based on the patent status and number of inventors, your Individual share will be:</p>
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-5xl font-black tracking-tighter">₹{calculatedIncentive.toLocaleString('en-IN')}</span>
-                                <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-lg backdrop-blur-sm">TENTATIVE SHARE</span>
-                            </div>
-                            <div className="mt-6 flex items-center gap-4 py-3 px-4 bg-white/10 rounded-2xl border border-white/10 backdrop-blur-md">
-                                <Info className="h-5 w-5 text-white/80 shrink-0" />
-                                <p className="text-[10px] font-medium leading-normal opacity-90">
-                                   This is your individual share based on Patent status & total internal inventors. Actual amount may vary after technical committee review.
-                                </p>
-                            </div>
+                            )}
                         </div>
                     </div>
+                    </Alert>
                 )}
             </div>
           </form>

@@ -20,16 +20,15 @@ import { db } from "@/lib/config"
 import { collection, doc, getDoc, getDocs, query, where, orderBy } from "firebase/firestore"
 import type { User, IncentiveClaim, Author } from "@/types"
 import { uploadFileToApi } from "@/lib/upload-client"
-import { Loader2, AlertCircle, Info, Edit, Trash2, CheckCircle2, FileText, X, Globe, MapPin, Calendar, Award, Bot } from "lucide-react"
-import { submitIncentiveClaimViaApi } from "@/lib/incentive-claim-client"
+import { Loader2, AlertCircle, Info, Edit, Trash2, CheckCircle2, FileText, X, Globe, MapPin, Calendar, Award, Bot, ChevronDown } from "lucide-react"
 import { parseISO, addYears, format } from "date-fns"
 import { calculateConferenceIncentive } from "@/app/incentive-calculation"
 import { WorkshopForm } from "@/components/incentives/workshop-form"
 import { AuthorSearch } from "./author-search"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-
+import { submitIncentiveClaimViaApi } from "@/lib/incentive-claim-client"
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 
 const workshopEventTypes = ["STTP", "Workshop", "Training Program", "FDP", "Other"]
@@ -80,6 +79,10 @@ const conferenceSchema = z
       .optional()
       .refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, "File must be less than 10 MB."),
     conferenceProof: z
+      .any()
+      .optional()
+      .refine((files) => !files || Array.from(files as FileList).every((file) => file.size <= MAX_FILE_SIZE), "File must be less than 10 MB."),
+    additionalDocuments: z
       .any()
       .optional()
       .refine((files) => !files || Array.from(files as FileList).every((file) => file.size <= MAX_FILE_SIZE), "File must be less than 10 MB."),
@@ -179,14 +182,18 @@ function ReviewDetails({
   data,
   onEdit,
   isSubmitting,
-  totalIncentive,
+  calculatedIncentive,
   breakdown,
+  showLogic,
+  setShowLogic,
 }: {
   data: ConferenceFormValues
   onEdit: () => void
   isSubmitting: boolean
-  totalIncentive: number | null
+  calculatedIncentive: number | null
   breakdown: { eligibleExpenses?: number; maxReimbursement?: number } | null
+  showLogic: boolean
+  setShowLogic: (val: boolean) => void
 }) {
   return (
     <Card className="max-w-4xl mx-auto shadow-xl border-t-4 border-t-primary">
@@ -261,17 +268,45 @@ function ReviewDetails({
                 <div className="bg-primary p-6 rounded-[2rem] text-primary-foreground shadow-xl shadow-primary/20 relative overflow-hidden group">
                   <div className="absolute -right-4 -top-4 bg-white/10 w-24 h-24 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-500"></div>
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-2">Estimated Incentive</p>
-                  <p className="text-[11px] opacity-70 mb-4 leading-tight font-medium">Based on the provided details, your tentative incentive claim will be:</p>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-black tracking-tighter">₹{totalIncentive?.toLocaleString('en-IN') || '0'}</span>
+                    <span className="text-4xl font-black tracking-tighter">₹{calculatedIncentive?.toLocaleString('en-IN') || '0'}</span>
                     <span className="text-xs font-medium opacity-60">INR*</span>
                   </div>
-                  {breakdown && (
-                    <p className="text-[10px] mt-2 font-bold opacity-60 italic">
-                      (Policy Limit: ₹{breakdown.maxReimbursement?.toLocaleString("en-IN")})
-                    </p>
-                  )}
-                  <p className="text-[10px] mt-4 font-medium opacity-70 italic">*Subject to final verification by the technical committee.</p>
+                  
+                  
+                  <div className="mt-4 border-t border-primary/10 pt-4">
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
+                        onClick={() => setShowLogic(!showLogic)}
+                        type="button"
+                    >
+                        View Calculation Logic
+                        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                    </Button>
+                    
+                    {showLogic && breakdown && (
+                        <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1">
+                            <div className="flex justify-between items-start py-1 border-b border-muted">
+                            <span className="text-muted-foreground pr-2">1. Incurred Expenses (Reg. Fee + Travel)</span>
+                            <span className="font-semibold shrink-0">₹{breakdown.eligibleExpenses?.toLocaleString('en-IN') || 0}</span>
+                            </div>
+                            <div className="flex justify-between items-start py-1 border-b border-muted">
+                            <span className="text-muted-foreground pr-2">2. Maximum Policy Limit</span>
+                            <span className="font-semibold shrink-0">₹{breakdown.maxReimbursement?.toLocaleString('en-IN') || 0}</span>
+                            </div>
+                            <div className="flex justify-between items-start py-1 border-b border-muted">
+                            <span className="text-muted-foreground pr-2">3. Final Admissible Amount</span>
+                            <span className="font-bold text-green-600 shrink-0">₹{calculatedIncentive?.toLocaleString('en-IN') || '0'}</span>
+                            </div>
+                        
+                        <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
+                            *Logic matches official policy matrix evaluated by approvers during technical audit. Reimbursement is min(expenses, limit).
+                        </div>
+                        </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -302,6 +337,20 @@ function ReviewDetails({
                   <Award className="h-3.5 w-3.5" /> Prize Secured
                 </p>
                 <p className="text-xs font-medium">{data.prizeDetails}</p>
+              </div>
+            )}
+
+            {data.additionalDocuments && data.additionalDocuments.length > 0 && (
+              <div>
+                <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Additional Supportive Documents</p>
+                <div className="flex flex-col gap-1.5">
+                  {Array.from(data.additionalDocuments as FileList).map((file: File, idx: number) => (
+                    <div key={idx} className="flex items-center gap-2 p-2.5 rounded-lg border bg-muted/30 shadow-sm transition-all text-xs font-medium">
+                      <FileText className="h-4 w-4 text-primary shrink-0" />
+                      <span className="truncate">{file.name}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -367,6 +416,7 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
   const [step, setStep] = useState<"edit" | "review">("edit")
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null)
   const [calculationBreakdown, setCalculationBreakdown] = useState<{ eligibleExpenses?: number; maxReimbursement?: number } | null>(null)
+  const [showLogic, setShowLogic] = useState(false)
 
   const form = useForm<ConferenceFormValues>({
     resolver: zodResolver(conferenceSchema),
@@ -396,6 +446,7 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
       prizeDetails: "",
       prizeProof: undefined,
       conferenceProof: undefined,
+      additionalDocuments: undefined,
       attendedOtherConference: false,
       travelPlaceVisited: "",
       travelMode: undefined,
@@ -539,6 +590,7 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
               participationCertificate: undefined,
               prizeProof: undefined,
               conferenceProof: undefined,
+              additionalDocuments: undefined,
               travelReceipts: undefined,
             })
           }
@@ -588,7 +640,7 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
         return result.url
       }
 
-      const { govtFundingRequestProof, abstractUpload, registrationFeeProof, participationCertificate, prizeProof, travelReceipts, ...restOfData } =
+      const { govtFundingRequestProof, abstractUpload, registrationFeeProof, participationCertificate, prizeProof, travelReceipts, additionalDocuments, ...restOfData } =
         data
 
       const [
@@ -607,6 +659,12 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
         uploadFileHelper(travelReceipts?.[0], "conference-travel-receipts"),
       ])
 
+      const additionalDocumentsUrlsRaw = additionalDocuments && additionalDocuments.length > 0 
+        ? await Promise.all(Array.from(additionalDocuments as FileList).map(file => uploadFileHelper(file as File, "conference-additional-docs"))) 
+        : []
+      
+      const additionalDocumentsUrls = additionalDocumentsUrlsRaw.filter(Boolean) as string[]
+
       const claimData: Omit<IncentiveClaim, "id" | "claimId"> = {
         ...restOfData,
         govtFundingRequestProofUrl: govtFundingRequestProofUrl ?? undefined,
@@ -615,6 +673,7 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
         participationCertificateUrl: participationCertificateUrl ?? undefined,
         prizeProofUrl: prizeProofUrl ?? undefined,
         travelReceiptsUrl: travelReceiptsUrl ?? undefined,
+        additionalDocumentsUrls: additionalDocumentsUrls.length > 0 ? additionalDocumentsUrls : undefined,
         calculatedIncentive: calculatedIncentive ?? undefined,
         misId: user.misId ?? undefined,
         orcidId: user.orcidId ?? undefined,
@@ -693,8 +752,10 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
           data={form.getValues()}
           onEdit={() => setStep("edit")}
           isSubmitting={isSubmitting}
-          totalIncentive={calculatedIncentive}
+          calculatedIncentive={calculatedIncentive}
           breakdown={calculationBreakdown}
+          showLogic={showLogic}
+          setShowLogic={setShowLogic}
         />
         <div className="flex justify-end max-w-4xl mx-auto gap-4">
           <Button variant="ghost" onClick={() => setStep("edit")} disabled={isSubmitting}>Modify Details</Button>
@@ -876,6 +937,11 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
                   <FormItem className="space-y-3"><FormLabel className="font-bold flex items-center gap-2 underline decoration-primary decoration-2"><Award className="h-4 w-4" /> Participation Certificate</FormLabel><FormControl><Input type="file" accept=".pdf" className="h-12 border-dashed border-2 bg-muted/20" onChange={e => onChange(e.target.files)} disabled={isFormDisabled} {...rest} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
+              <div className="pt-4">
+                <FormField name="additionalDocuments" control={form.control} render={({ field: { value, onChange, ...rest } }) => (
+                  <FormItem className="space-y-3"><FormLabel className="font-bold flex items-center gap-2 text-muted-foreground"><FileText className="h-4 w-4" /> Additional Supportive Documents (Optional)</FormLabel><FormControl><Input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip" className="h-12 border-dashed border-2 bg-muted/5 hover:bg-muted/10 transition-colors" onChange={e => onChange(e.target.files)} disabled={isFormDisabled} {...rest} /></FormControl><FormDescription className="text-xs">Upload any other relevant files, letters, or bills here.</FormDescription><FormMessage /></FormItem>
+                )} />
+              </div>
             </section>
 
             <Separator className="my-10" />
@@ -1037,22 +1103,49 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
               )}
 
               {calculatedIncentive !== null && (
-                <Alert className="bg-primary/5 border-primary/20 py-8 rounded-3xl shadow-sm ring-1 ring-primary/10">
-                  <div className="flex flex-col gap-1">
-                    <p className="text-xs font-black text-primary uppercase tracking-[0.2em] flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4" /> Policy Estimation Result
-                    </p>
-                    <h4 className="text-4xl font-black text-foreground mt-2">₹{calculatedIncentive.toLocaleString("en-IN")}</h4>
-                    {calculationBreakdown && (
-                      <div className="flex gap-4 mt-1">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Eligible: ₹{calculationBreakdown.eligibleExpenses?.toLocaleString("en-IN")}</span>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">|</span>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Policy Cap: ₹{calculationBreakdown.maxReimbursement?.toLocaleString("en-IN")}</span>
+                 <Alert className="bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md">
+                   <div className="flex flex-col gap-1.5">
+                      <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> Estimated Incentive Amount
+                      </p>
+                      <h4 className="text-4xl font-black text-foreground tracking-tight py-1">₹{calculatedIncentive.toLocaleString('en-IN')}</h4>
+                      <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
+                      
+                      <div className="mt-4 border-t border-primary/10 pt-4">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
+                          onClick={() => setShowLogic(!showLogic)}
+                          type="button"
+                        >
+                          View Calculation Logic
+                          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                        </Button>
+                        
+                        {showLogic && calculationBreakdown && (
+                          <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1">
+                              <div className="flex justify-between items-start py-1 border-b border-muted">
+                                <span className="text-muted-foreground pr-2">1. Incurred Expenses (Reg. Fee + Travel)</span>
+                                <span className="font-semibold shrink-0">₹{calculationBreakdown.eligibleExpenses?.toLocaleString('en-IN') || 0}</span>
+                              </div>
+                              <div className="flex justify-between items-start py-1 border-b border-muted">
+                                <span className="text-muted-foreground pr-2">2. Maximum Policy Limit</span>
+                                <span className="font-semibold shrink-0">₹{calculationBreakdown.maxReimbursement?.toLocaleString('en-IN') || 0}</span>
+                              </div>
+                              <div className="flex justify-between items-start py-1 border-b border-muted">
+                                <span className="text-muted-foreground pr-2">3. Final Admissible Amount</span>
+                                <span className="font-bold text-green-600 shrink-0">₹{calculatedIncentive.toLocaleString('en-IN')}</span>
+                              </div>
+                            
+                            <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
+                              *Logic matches official policy matrix evaluated by approvers during technical audit. Reimbursement is min(expenses, limit).
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    <p className="text-[10px] text-muted-foreground font-medium mt-4 italic max-w-md">This estimate represents your admissible share based on institutional policy limits for this event category.</p>
-                  </div>
-                </Alert>
+                   </div>
+                 </Alert>
               )}
             </section>
 
