@@ -1539,7 +1539,7 @@ export function ResearchPaperForm() {
                               </div>
                             ))}
                             <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
-                              *Logic matches official policy matrix evaluated by approvers during technical audit. If author position &gt; 5th, final eligible amount is ₹0 (ARPS only).
+                              *Logic matches official policy matrix evaluated by approvers during technical audit. If author position &gt; 5th, final eligible amount is ₹0.
                             </div>
                           </div>
                         )}

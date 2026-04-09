@@ -140,7 +140,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
             toast({
                 variant: 'destructive',
                 title: 'Not Eligible for Office Noting',
-                description: 'This claim is ARPS-only and excluded from office noting/payment processing.',
+                description: 'This claim is excluded from office noting/payment processing.',
             });
             return;
         }

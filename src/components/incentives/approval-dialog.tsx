@@ -809,7 +809,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                             </p>
                             <p className={`font-bold text-2xl mt-1 ${isEligibleForFinancialDisbursement(claim) ? 'text-blue-600 dark:text-blue-400' : 'text-yellow-600 dark:text-yellow-400'}`}>₹{(isEligibleForFinancialDisbursement(claim) ? claim.calculatedIncentive : 0).toLocaleString('en-IN')}</p>
                             {!isEligibleForFinancialDisbursement(claim) && (
-                                <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-2">This co-author research paper claim is beyond the 5th position and qualifies for ARPS score but not monetary incentive.</p>
+                                <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-2">This co-author research paper claim is beyond the 5th position and not qualifies monetary incentive.</p>
                             )}
                         </div>
                     )}

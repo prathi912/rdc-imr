@@ -379,7 +379,7 @@ function getCalculationLogic(claim: IncentiveClaim): string {
       logic += '\n• APC paid by University: -50%';
     }
     if (!isEligibleForFinancialDisbursement(claim)) {
-      logic += '\n• Co-Author beyond 5th position: ₹0 (ARPS only)';
+      logic += '\n• Co-Author beyond 5th position: ₹0)';
     }
     
     return logic;
