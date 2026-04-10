@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -16,13 +16,14 @@ import { auth, db } from '@/lib/config';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { uploadFileToServer, checkMisIdExists, linkEmrInterestsByMisId } from '@/app/actions';
 import type { User } from '@/types';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Bot, Loader2, Search } from 'lucide-react';
+import { Bot, Loader2, Search, AlertCircle } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
 import { Combobox } from '@/components/ui/combobox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -104,10 +105,12 @@ const fileToDataUrl = (file: File): Promise<string> => {
   });
 };
 
-export default function ProfileSetupPage() {
+function ProfileSetupContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
+  const wasRedirected = searchParams.get('redirected') === 'true';
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
@@ -184,7 +187,7 @@ export default function ProfileSetupPage() {
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
           const appUser = { uid: firebaseUser.uid, ...userDoc.data() } as User;
-          if (appUser.profileComplete) {
+          if (appUser.profileComplete && !wasRedirected) {
             router.replace('/dashboard');
             return;
           }
@@ -216,7 +219,7 @@ export default function ProfileSetupPage() {
     });
 
     return () => unsubscribe();
-  }, [router, toast, form]);
+  }, [router, toast, form, wasRedirected]);
 
   useEffect(() => {
     async function fetchDepartments() {
@@ -348,6 +351,15 @@ export default function ProfileSetupPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {wasRedirected && (
+                  <Alert variant="destructive" className="mb-6 border-red-500/50 bg-red-500/5 dark:bg-red-500/10">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Profile Completion Required</AlertTitle>
+                    <AlertDescription>
+                      You must complete your profile including <strong>MIS ID, Faculty, Institute, and Designation</strong> to access the dashboard.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 {userType !== 'Institutional' && (
                   <div className="space-y-4 mb-6 p-4 border rounded-lg bg-muted/50">
                     <Label>Fetch Details with MIS ID (Optional)</Label>
@@ -579,4 +591,27 @@ export default function ProfileSetupPage() {
       </Dialog>
     </>
   );
+}
+
+export default function ProfileSetupPage() {
+  return (
+    <Suspense fallback={
+      <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+        <Card className="w-full max-w-lg">
+          <CardHeader>
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-3/4" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+            <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+            <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      </main>
+    }>
+      <ProfileSetupContent />
+    </Suspense>
+  )
 }

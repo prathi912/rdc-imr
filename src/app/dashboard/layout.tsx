@@ -349,8 +349,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (userDocSnap.exists()) {
         const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User
 
-        if (!appUser.profileComplete) {
-          router.replace("/profile-setup")
+        // Robust check for mandatory fields: MIS ID, Faculty, Institute, Designation
+        const isProfileIncomplete = !appUser.profileComplete || !appUser.misId || !appUser.faculty || !appUser.institute || !appUser.designation;
+        
+        if (isProfileIncomplete) {
+          router.replace("/profile-setup?redirected=true")
           setLoading(false)
           return
         }
