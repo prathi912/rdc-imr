@@ -21,8 +21,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { db } from '@/lib/config'
 import { collection, doc, getDoc, setDoc } from 'firebase/firestore'
-import type { User, IncentiveClaim, Author } from '@/types'
+import type { User, IncentiveClaim, Author, SystemSettings } from '@/types'
 import { uploadFileToApi } from '@/lib/upload-client'
+import { getSystemSettings } from "@/app/actions";
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
 import { fetchScienceDirectData } from "@/app/sciencedirect-actions";
@@ -453,6 +454,15 @@ export function ResearchPaperForm() {
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   const [showWosAccession, setShowWosAccession] = useState(false);
   const [showLogic, setShowLogic] = useState(false);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+
+  useEffect(() => {
+    async function fetchSettings() {
+      const settings = await getSystemSettings();
+      setSystemSettings(settings);
+    }
+    fetchSettings();
+  }, []);
 
   const getPaperLogicBreakdown = (data: any) => {
     try {
@@ -1127,24 +1137,28 @@ export function ResearchPaperForm() {
                                   className="h-12 shadow-sm focus-visible:ring-primary rounded-xl"
                                 />
                                 <div className="flex gap-1">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="h-12 px-3 hover:bg-primary/10 transition-colors rounded-xl"
-                                    onClick={() => handleFetchData('scopus')}
-                                    disabled={isSubmitting || isFetching || !form.getValues('doi')}
-                                  >
-                                    Scopus
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="h-12 px-3 hover:bg-primary/10 transition-colors rounded-xl"
-                                    onClick={() => handleFetchData('wos')}
-                                    disabled={isSubmitting || isFetching || !form.getValues('doi')}
-                                  >
-                                    WoS
-                                  </Button>
+                                  {(!indexType || indexType === 'scopus' || indexType === 'both' || indexType === 'sci') && systemSettings?.apiIntegrations?.scopus !== false && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="h-12 px-3 hover:bg-primary/10 transition-colors rounded-xl font-bold"
+                                      onClick={() => handleFetchData('scopus')}
+                                      disabled={isSubmitting || isFetching || !form.getValues('doi')}
+                                    >
+                                      Scopus
+                                    </Button>
+                                  )}
+                                  {(!indexType || indexType === 'wos' || indexType === 'both' || indexType === 'sci') && systemSettings?.apiIntegrations?.wos !== false && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="h-12 px-3 hover:bg-primary/10 transition-colors rounded-xl font-bold"
+                                      onClick={() => handleFetchData('wos')}
+                                      disabled={isSubmitting || isFetching || !form.getValues('doi')}
+                                    >
+                                      WoS
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                             </FormControl>

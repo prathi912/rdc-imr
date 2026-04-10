@@ -34,6 +34,7 @@ import {
   logFrontendAction,
   sendLoginOtp,
   verifyLoginOtp,
+  registerUserInDatabase,
 } from "@/app/actions"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { OtpDialog } from "@/components/otp-dialog"
@@ -121,7 +122,12 @@ export default function SignupPage() {
     }
 
     const domainCheck = await isEmailDomainAllowed(firebaseUser.email!)
-    const staffRes = await fetch(`/api/get-staff-data?email=${firebaseUser.email!}`)
+    const idToken = await firebaseUser.getIdToken();
+    const staffRes = await fetch(`/api/get-staff-data?email=${firebaseUser.email!}`, {
+      headers: {
+        'Authorization': `Bearer ${idToken}`
+      }
+    })
     const staffResult = await staffRes.json()
 
     let userDataFromExcel: Partial<User> = {}
@@ -189,7 +195,10 @@ export default function SignupPage() {
       user.photoURL = firebaseUser.photoURL
     }
 
-    await setDoc(userDocRef, user, { merge: true })
+    const regResult = await registerUserInDatabase(user);
+    if (!regResult.success) {
+      throw new Error(regResult.error || "Failed to register user in database.");
+    }
 
     await logFrontendAction('AUTH', 'User signed up successfully', {
       user: user,

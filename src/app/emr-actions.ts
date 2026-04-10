@@ -119,8 +119,8 @@ export async function uploadFileToServer(
       },
     });
 
-    // Make the file public
-    await file.makePublic();
+    // RE-STRICTED: Removed automatic 'makePublic' call to ensure data privacy.
+    // await file.makePublic();
 
     // Get the public URL
     const publicUrl = file.publicUrl();

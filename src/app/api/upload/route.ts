@@ -211,8 +211,8 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        // Make file publicly readable
-        await fileRef.makePublic();
+        // RE-STRICTED: Removed automatic public read permission.
+        // Files are now protected by bucket-level permissions and served via authenticated requests or signed URLs.
         uploadUrl = fileRef.publicUrl();
         uploadedVia = "firebase-storage";
       } catch (firebaseError: any) {
@@ -256,7 +256,7 @@ export async function OPTIONS(req: NextRequest) {
     {
       status: 200,
       headers: {
-        "Access-Control-Allow-Origin": process.env.ALLOWED_ORIGINS || "*",
+        "Access-Control-Allow-Origin": process.env.ALLOWED_ORIGINS || "https://rndprojects.paruluniversity.ac.in" || "http://localhost:9002" || "http://localhost:3000",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
       },

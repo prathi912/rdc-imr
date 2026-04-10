@@ -6,6 +6,7 @@ import type { ResearchPaper, Author, User, Notification, IncentiveClaim } from '
 import { FieldValue } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
 import { sendEmail } from '@/app/actions';
+import { getStaffDataAction } from '@/lib/staff-service';
 
 type PaperUploadData = {
     PublicationTitle: string;
@@ -46,13 +47,11 @@ export async function checkUserOrStaff(email: string): Promise<{ success: boolea
       return { success: true, name: userData.name, uid: userDoc.id };
     }
 
-    // 2. Check staffdata via API route
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
-    const response = await fetch(`${baseUrl}/api/get-staff-data?email=${encodeURIComponent(lowercasedEmail)}`);
-    const staffResult = await response.json();
+    // 2. Check staffdata via direct service call (Server-to-Server)
+    const staffResults = await getStaffDataAction({ email: lowercasedEmail });
     
-    if (staffResult.success && staffResult.data) {
-      return { success: true, name: staffResult.data.name, uid: null }; // No UID because they haven't signed up
+    if (staffResults.length > 0) {
+      return { success: true, name: staffResults[0].name, uid: null }; 
     }
 
     // 3. Not found in either

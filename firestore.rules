@@ -35,8 +35,9 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Allow a user to create their own user document.
-      allow create: if request.auth.uid == userId;
+      // Allow a user to create their own user document, but prohibit setting a role.
+      // Roles must be assigned by an admin or a server-side process.
+      allow create: if request.auth.uid == userId && !('role' in request.resource.data);
 
       // Users can read their own profile, Admins/Super-admins can read any profile.
       allow read: if isOwner(userId) || isAdmin();
@@ -56,9 +57,11 @@ service cloud.firestore {
       // Read access: The PI, Co-PIs, assigned evaluators, and admins/CROs can read.
       allow read: if isSignedIn() && (
                     resource.data.pi_uid == request.auth.uid || 
-                    request.auth.uid in resource.data.coPiUids ||
+                    resource.data.pi_email == request.auth.token.email ||
+                    (resource.data.coPiUids != null && request.auth.uid in resource.data.coPiUids) ||
                     (resource.data.meetingDetails != null && request.auth.uid in resource.data.meetingDetails.assignedEvaluators) ||
-                    isAdmin() || isCRO()
+                    isAdmin() || 
+                    (isCRO() && (resource.data.faculty in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.faculties))
                   );
       
       // Update access: The PI can update their own project. Admins can update any project.
@@ -137,9 +140,9 @@ service cloud.firestore {
       }
     }
 
-    // Health check collection is open for testing purposes.
+    // Health check collection is restricted to admins.
     match /_health_check/{docId} {
-      allow read, write: if true;
+      allow read, write: if isAdmin();
     }
   }
 }

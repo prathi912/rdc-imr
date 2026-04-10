@@ -1,36 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/admin';
+import { adminDb, adminAuth } from '@/lib/admin';
 import type { User } from '@/types';
-import { readExcelFromUrl } from '@/lib/excel-utils';
-
-interface StaffData {
-    Name?: string;
-    Email?: string;
-    Phone?: string | number;
-    Institute?: string;
-    Department?: string;
-    Designation?: string;
-    Faculty?: string;
-    'MIS ID'?: string | number;
-    Scopus_ID?: string | number;
-    Google_Scholar_ID?: string | number;
-    LinkedIn_URL?: string;
-    ORCID_ID?: string | number;
-    Vidwan_ID?: string | number;
-    Type?: 'CRO' | 'Institutional' | 'faculty';
-    Campus?: 'Vadodara' | 'Ahmedabad' | 'Rajkot' | 'Goa';
-    Orcid?: string | number;
-}
-
-const GOA_STAFF_DATA_URL = 'https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/goastaffdata.xlsx';
-const VADODARA_STAFF_DATA_URL = 'https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/staffdatabrc.xlsx';
-
-const readStaffDataFromUrl = async (url: string): Promise<StaffData[]> => {
-    return readExcelFromUrl<StaffData>(url);
-};
+import { searchStaffByNameAction } from '@/lib/staff-service';
 
 export async function GET(request: NextRequest) {
     try {
+        // --- Security: Authenticate Request ---
+        const authHeader = request.headers.get('Authorization');
+        if (!authHeader?.startsWith('Bearer ')) {
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+        const token = authHeader.split('Bearer ')[1];
+        try {
+            await adminAuth.verifyIdToken(token);
+        } catch (error) {
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { searchParams } = new URL(request.url);
         const name = searchParams.get('name');
         const misId = searchParams.get('misId');
@@ -42,6 +28,7 @@ export async function GET(request: NextRequest) {
         const lowercasedName = name?.toLowerCase() || '';
         const lowercasedMisId = misId?.toLowerCase() || '';
 
+        // 1. Search existing users in Firestore
         const usersRef = adminDb.collection('users');
         const querySnapshot = await usersRef.orderBy('name').get();
 
@@ -52,63 +39,41 @@ export async function GET(request: NextRequest) {
                 name: userData.name,
                 email: userData.email,
                 misId: userData.misId || 'N/A',
+                campus: userData.campus || 'Vadodara'
             };
         });
 
-        let filteredUsers = allUsers;
+        let filteredUsers: any[] = allUsers;
         if (lowercasedName) {
             filteredUsers = filteredUsers
                 .filter(user => user.name.toLowerCase().includes(lowercasedName))
                 .slice(0, 10);
         } else if (lowercasedMisId) {
             filteredUsers = filteredUsers
-                .filter(user => user.misId && user.misId.toLowerCase().includes(lowercasedMisId))
+                .filter(user => user.misId && String(user.misId).toLowerCase().includes(lowercasedMisId))
                 .slice(0, 10);
         }
 
-        // If not enough results from Firestore, search staffdata.xlsx
+        // 2. If not enough results from Firestore, search cached staff data
         if (filteredUsers.length < 10) {
             try {
-                const [staffdata, goastaffdata] = await Promise.all([
-                    readStaffDataFromUrl(VADODARA_STAFF_DATA_URL),
-                    readStaffDataFromUrl(GOA_STAFF_DATA_URL)
-                ]);
-
-                const allStaffData = [...staffdata, ...goastaffdata];
+                const staffMatches = await searchStaffByNameAction(name || misId || '');
                 const existingEmails = new Set(allUsers.map(u => u.email.toLowerCase()));
 
-                let staffMatches: any[] = [];
-                if (lowercasedName) {
-                    staffMatches = allStaffData
-                        .filter(row =>
-                            row.Name && row.Name.toLowerCase().includes(lowercasedName) &&
-                            row.Email && !existingEmails.has(row.Email.toLowerCase())
-                        )
-                        .slice(0, 10 - filteredUsers.length)
-                        .map(row => ({
-                            uid: '',
-                            name: row.Name,
-                            email: row.Email,
-                            misId: row['MIS ID'] ? String(row['MIS ID']) : 'N/A',
-                        }));
-                } else if (lowercasedMisId) {
-                    staffMatches = allStaffData
-                        .filter(row =>
-                            row['MIS ID'] && String(row['MIS ID']).toLowerCase().includes(lowercasedMisId) &&
-                            row.Email && !existingEmails.has(row.Email.toLowerCase())
-                        )
-                        .slice(0, 10 - filteredUsers.length)
-                        .map(row => ({
-                            uid: '',
-                            name: row.Name,
-                            email: row.Email,
-                            misId: row['MIS ID'] ? String(row['MIS ID']) : 'N/A',
-                        }));
-                }
+                const newStaffMatches = staffMatches
+                    .filter(staff => staff.email && !existingEmails.has(staff.email.toLowerCase()))
+                    .slice(0, 10 - filteredUsers.length)
+                    .map(staff => ({
+                        uid: '',
+                        name: staff.name,
+                        email: staff.email,
+                        misId: staff.misId || 'N/A',
+                        campus: staff.campus
+                    }));
 
-                filteredUsers = [...filteredUsers, ...staffMatches];
+                filteredUsers = [...filteredUsers, ...newStaffMatches];
             } catch (error) {
-                console.error("Error fetching staffdata.xlsx:", error);
+                console.error("Error fetching staff data from service:", error);
             }
         }
 

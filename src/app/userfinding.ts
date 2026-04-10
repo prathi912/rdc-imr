@@ -3,6 +3,7 @@
 
 import { adminDb } from '@/lib/admin';
 import type { User, FoundUser } from '@/types';
+import { getStaffDataAction, searchStaffByNameAction } from '@/lib/staff-service';
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
     try {
@@ -81,43 +82,35 @@ export async function findUserByMisId(
         }
       });
   
-      // 2. Search staff data files via API by MIS ID
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
-      const staffResponse = await fetch(`${baseUrl}/api/get-staff-data?misId=${encodeURIComponent(searchTerm)}&fetchAll=true`);
+      // 2. Search staff data via direct service call (Server-to-Server)
+      const staffResults = await getStaffDataAction({ misId: searchTerm, fetchAll: true });
       
-      if (staffResponse.ok) {
-        const staffResult = await staffResponse.json();
-        if (staffResult.success && Array.isArray(staffResult.data)) {
-          staffResult.data.forEach((staff: any) => {
+      staffResults.forEach((staff) => {
+        if (staff.email && !allFound.has(staff.email.toLowerCase())) {
+            allFound.set(staff.email.toLowerCase(), {
+                uid: null,
+                name: staff.name,
+                email: staff.email,
+                misId: staff.misId,
+                campus: staff.campus,
+            });
+        }
+      });
+  
+      // 3. If no results yet, search by name via direct service call
+      if (allFound.size === 0) {
+        const nameResults = await searchStaffByNameAction(searchTerm);
+        nameResults.forEach((staff: any) => {
             if (staff.email && !allFound.has(staff.email.toLowerCase())) {
                 allFound.set(staff.email.toLowerCase(), {
-                    uid: null, // No UID for staff not yet registered
+                    uid: null,
                     name: staff.name,
                     email: staff.email,
                     misId: staff.misId,
-                    campus: staff.campus,
+                    campus: staff.campus
                 });
             }
-          });
-        }
-      } else if (staffResponse.status !== 404) {
-        // Only warn for structural errors, not "not found" cases (though legacy code might still return 404)
-        console.warn(`API call to get-staff-data failed with status: ${staffResponse.status}`);
-      }
-
-      // 3. If no results yet, search by name in API
-      if (allFound.size === 0) {
-        const nameSearchResponse = await fetch(`${baseUrl}/api/find-users-by-name?name=${encodeURIComponent(searchTerm)}`);
-        if (nameSearchResponse.ok) {
-            const nameSearchResult = await nameSearchResponse.json();
-            if (nameSearchResult.success && Array.isArray(nameSearchResult.users)) {
-                 nameSearchResult.users.forEach((user: any) => {
-                    if (user.email && !allFound.has(user.email.toLowerCase())) {
-                        allFound.set(user.email.toLowerCase(), user);
-                    }
-                 });
-            }
-        }
+        });
       }
   
       const foundUsers = Array.from(allFound.values());

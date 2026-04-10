@@ -33,6 +33,7 @@ import {
   linkEmrCoPiInterestsToNewUser,
   verifyLoginOtp,
   logFrontendAction,
+  registerUserInDatabase,
 } from "@/app/actions"
 import { LogCategory } from "@/lib/logger"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
@@ -111,7 +112,12 @@ export default function LoginPage() {
         user.name = firebaseUser.displayName
       }
     } else {
-      const staffRes = await fetch(`/api/get-staff-data?email=${firebaseUser.email!}`)
+      const idToken = await firebaseUser.getIdToken();
+      const staffRes = await fetch(`/api/get-staff-data?email=${firebaseUser.email!}`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      })
       const staffResult = await staffRes.json()
 
       let userDataFromExcel: Partial<User> = {}
@@ -175,7 +181,10 @@ export default function LoginPage() {
     }
 
 
-    await setDoc(userDocRef, user, { merge: true })
+    const regResult = await registerUserInDatabase(user);
+    if (!regResult.success) {
+      throw new Error(regResult.error || "Failed to update user in database.");
+    }
     
     await logLoginEvent('AUTH', 'User logged in successfully', user);
 

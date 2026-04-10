@@ -95,14 +95,8 @@ export async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: 
       throw new Error("Failed to get file ID after upload.");
     }
 
-    // Make the file readable by anyone with the link
-    await drive.permissions.create({
-      fileId: fileId,
-      requestBody: {
-        role: 'reader',
-        type: 'anyone',
-      },
-    });
+    // RE-STRICTED: Removed automatic public read permission.
+    // Files are now private and must be accessed via authorized proxies or shared explicitly.
 
     // Get the updated webViewLink (sometimes it's not populated immediately or needs permissions)
     const result = await drive.files.get({
@@ -1374,7 +1368,7 @@ export async function uploadFileToServer(
       
       // Attempt to make public, but fail gracefully
       try {
-        await file.makePublic();
+        // await file.makePublic();
       } catch (e) {
         console.warn(`Could not make public ${path} - expected if uniform access is enabled.`);
       }
@@ -2613,6 +2607,36 @@ export async function notifySuperAdminsOnNewUser(userName: string, role: string)
       error: error.message,
       stack: error.stack,
     });
+  }
+}
+
+/**
+ * SECURE REGISTRATION: Creates the user document via Admin SDK.
+ * This is required because client-side rules prohibit setting 'role' during document creation.
+ */
+export async function registerUserInDatabase(user: User): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!user.uid || !user.email) {
+      return { success: false, error: "User UID and Email are required." };
+    }
+
+    // Use merge: true to avoid overwriting existing data if a doc somehow exists
+    await adminDb.collection("users").doc(user.uid).set(user, { merge: true });
+    
+    await logActivity("INFO", "User document initialized via server action", { 
+      uid: user.uid, 
+      email: user.email,
+      role: user.role 
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error in registerUserInDatabase:", error);
+    await logActivity("ERROR", "Failed to initialize user document", {
+      uid: user.uid,
+      error: error.message
+    });
+    return { success: false, error: error.message || "Failed to register user in database." };
   }
 }
 

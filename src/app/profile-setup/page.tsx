@@ -147,7 +147,12 @@ function ProfileSetupContent() {
     if (!misIdToFetch || !user?.email) return;
     setIsPrefilling(true);
     try {
-      const res = await fetch(`/api/get-staff-data?misId=${misIdToFetch}&userEmailForFileCheck=${user.email}`);
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/get-staff-data?misId=${misIdToFetch}&userEmailForFileCheck=${user.email}`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
       const result = await res.json();
 
       if (result.success && result.data.length > 0) {
@@ -200,7 +205,12 @@ function ProfileSetupContent() {
           }
 
           // Pre-fetch user type based on email to determine if MIS ID is needed.
-          const staffRes = await fetch(`/api/get-staff-data?email=${appUser.email!}`);
+          const idToken = await firebaseUser.getIdToken();
+          const staffRes = await fetch(`/api/get-staff-data?email=${appUser.email!}`, {
+            headers: {
+              'Authorization': `Bearer ${idToken}`
+            }
+          });
           const staffResult = await staffRes.json();
           if (staffResult.success) {
             setUserType(staffResult.data[0]?.type || 'faculty');

@@ -18,7 +18,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { db } from '@/lib/config'
 import { doc, getDoc } from 'firebase/firestore'
-import type { User, IncentiveClaim, Author } from '@/types'
+import type { User, IncentiveClaim, Author, SystemSettings } from '@/types'
+import { getSystemSettings } from '@/app/actions'
 import { uploadFileToApi } from '@/lib/upload-client'
 import { AuthorSearch } from './author-search'
 import { Loader2, AlertCircle, Info, Trash2, Bot, CheckCircle2, FileText, X, Globe, ChevronDown } from 'lucide-react'
@@ -226,6 +227,15 @@ export function ApcForm({ user }: { user: User }) {
   const [isLoadingDraft, setIsLoadingDraft] = useState(true)
   const [step, setStep] = useState<'edit' | 'review'>('edit')
   const [showLogic, setShowLogic] = useState(false)
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+
+  useEffect(() => {
+    async function fetchSettings() {
+      const settings = await getSystemSettings();
+      setSystemSettings(settings);
+    }
+    fetchSettings();
+  }, []);
 
   const getApcLogicBreakdown = (data: any) => {
     const { apcIndexingStatus = [], apcQRating, apcTotalAmount, authors = [] } = data;
@@ -403,6 +413,7 @@ export function ApcForm({ user }: { user: User }) {
 
   const watchArticleType = form.watch('apcTypeOfArticle');
   const watchWaiverRequested = form.watch('apcApcWaiverRequested');
+  const apcIndexingStatus = form.watch('apcIndexingStatus') || [];
 
   const handleFetchData = async (source: 'scopus' | 'wos' | 'sciencedirect') => {
     const doi = form.getValues('doi');
@@ -596,8 +607,12 @@ export function ApcForm({ user }: { user: User }) {
                   <div className="flex flex-col sm:flex-row gap-2">
                     <FormControl><Input placeholder="e.g. 10.1016/j.procbio.2023..." {...field} className="h-12 text-lg font-mono shadow-sm flex-1" /></FormControl>
                     <div className="flex gap-2">
-                      <Button type="button" variant="outline" size="icon" className="h-12 w-12 rounded-xl group" onClick={() => handleFetchData('scopus')} disabled={isFetching || !field.value} title="Fetch Scopus Data"><Bot className="h-6 w-6 group-hover:text-primary transition-colors" /></Button>
-                      <Button type="button" variant="outline" size="icon" className="h-12 w-12 rounded-xl group" onClick={() => handleFetchData('wos')} disabled={isFetching || !field.value} title="Fetch WoS Data"><Bot className="h-6 w-6 group-hover:text-amber-600 transition-colors" /></Button>
+                      {(apcIndexingStatus.length === 0 || apcIndexingStatus.some(s => s.toLowerCase().includes('scopus'))) && systemSettings?.apiIntegrations?.scopus !== false && (
+                        <Button type="button" variant="outline" size="icon" className="h-12 w-12 rounded-xl group" onClick={() => handleFetchData('scopus')} disabled={isFetching || !field.value} title="Fetch Scopus Data"><Bot className="h-6 w-6 group-hover:text-primary transition-colors" /></Button>
+                      )}
+                      {(apcIndexingStatus.length === 0 || apcIndexingStatus.some(s => s.toLowerCase().includes('web of science'))) && systemSettings?.apiIntegrations?.wos !== false && (
+                        <Button type="button" variant="outline" size="icon" className="h-12 w-12 rounded-xl group" onClick={() => handleFetchData('wos')} disabled={isFetching || !field.value} title="Fetch WoS Data"><Bot className="h-6 w-6 group-hover:text-amber-600 transition-colors" /></Button>
+                      )}
                     </div>
                   </div>
                 </FormItem>
