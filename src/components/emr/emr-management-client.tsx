@@ -596,7 +596,7 @@ export function EmrManagementClient({ call, allUsers, currentUser, onActionCompl
 
     useEffect(() => {
         fetchInterests();
-    }, [fetchInterests]);
+    }, [call.id]);
 
 
     const deleteForm = useForm<z.infer<typeof deleteRegistrationSchema>>({

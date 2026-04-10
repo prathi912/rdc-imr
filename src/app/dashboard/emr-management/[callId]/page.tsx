@@ -81,13 +81,28 @@ export default function EmrManagementPage() {
         }
     }, [fetchData, currentUser]);
 
-    if (loading || !call || !currentUser) {
+    if (loading) {
         return (
             <div className="container mx-auto py-10">
                 <PageHeader title="Loading EMR Management..." description="Please wait while we fetch the details." />
                 <div className="mt-8">
                     <Skeleton className="h-96 w-full" />
                 </div>
+            </div>
+        );
+    }
+
+    if (!currentUser) return null;
+
+    if (!call) {
+        return (
+            <div className="container mx-auto py-10 text-center">
+                <PageHeader 
+                    title="Error: Call Not Found" 
+                    description="The requested funding call does not exist or has been removed." 
+                    backButtonHref="/dashboard/emr-management"
+                    backButtonText="Go Back"
+                />
             </div>
         );
     }

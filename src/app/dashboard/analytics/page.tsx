@@ -386,15 +386,15 @@ export default function AnalyticsPage() {
     }, (error) => { console.error("Error fetching project data:", error); setLoading(false); });
 
     const unsubscribeEmr = onSnapshot(emrQuery, (snapshot) => {
-      setEmrProjects(snapshot.docs.map(doc => doc.data() as EmrInterest));
+      setEmrProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest)));
     }, (error) => { console.error("Error fetching EMR data:", error); });
 
     const unsubscribeClaims = onSnapshot(claimsQuery, (snapshot) => {
-      setIncentiveClaims(snapshot.docs.map(doc => doc.data() as IncentiveClaim));
+      setIncentiveClaims(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim)));
     }, (error) => { console.error("Error fetching incentive claims:", error); });
 
     const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
-      setLoginLogs(snapshot.docs.map(doc => doc.data()));
+      setLoginLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => { console.error("Error fetching log data:", error); });
 
     return () => {
