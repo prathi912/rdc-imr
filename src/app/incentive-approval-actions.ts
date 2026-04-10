@@ -105,6 +105,30 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
 
         // --- Uniqueness Check on Final Submission ---
         if (claimData.status !== 'Draft') {
+            // membership frequency check (Once per Calendar Year)
+            if (claimData.claimType === 'Membership of Professional Bodies') {
+                const currentYear = new Date().getFullYear();
+                const startOfYear = `${currentYear}-01-01T00:00:00.000Z`;
+                const endOfYear = `${currentYear}-12-31T23:59:59.999Z`;
+
+                const membershipClaimsSnap = await claimsRef
+                    .where('uid', '==', claimData.uid)
+                    .where('claimType', '==', 'Membership of Professional Bodies')
+                    .where('submissionDate', '>=', startOfYear)
+                    .where('submissionDate', '<=', endOfYear)
+                    .get();
+
+                const existingValidClaim = membershipClaimsSnap.docs.find(doc => 
+                    doc.id !== claimIdToUpdate && 
+                    doc.data().status !== 'Draft' && 
+                    doc.data().status !== 'Rejected'
+                );
+
+                if (existingValidClaim) {
+                    return { success: false, error: 'As per university policy, you can only apply for one Membership Incentive per calendar year.' };
+                }
+            }
+
             let uniquenessQuery;
             const uid = claimData.uid;
             let fieldToCheck: keyof IncentiveClaim | null = null;

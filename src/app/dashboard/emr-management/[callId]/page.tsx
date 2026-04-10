@@ -93,12 +93,14 @@ export default function EmrManagementPage() {
     }
 
     const formattedDeadline = call.applyDeadline ? format(parseISO(call.applyDeadline), 'PPP') : 'N/A';
+    const creator = allUsers.find(u => u.uid === call.createdBy);
+    const createdByName = creator ? creator.name : (call.createdBy === 'Super-admin' ? 'Super-admin' : (call.createdBy || 'N/A'));
 
     return (
         <div className="container mx-auto py-10">
             <PageHeader
                 title={`Manage: ${call.title}`}
-                description={`Agency: ${call.agency} | Agency Deadline: ${formattedDeadline}`}
+                description={`Call ID: ${call.callIdentifier || 'N/A'} | Agency: ${call.agency} | Added by: ${createdByName} | Agency Deadline: ${formattedDeadline}`}
                 backButtonHref="/dashboard/emr-management"
                 backButtonText="Back to All Calls"
             />

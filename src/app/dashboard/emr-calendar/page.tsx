@@ -156,7 +156,7 @@ export function AddEditCallDialog({
             toast({ title: 'Success', description: 'Funding call has been updated.' });
         } else {
             // Create logic
-            const result = await createFundingCall(callDataForServer);
+            const result = await createFundingCall(callDataForServer, user.uid);
             if (!result.success) {
                 throw new Error(result.error);
             }

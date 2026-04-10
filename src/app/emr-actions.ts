@@ -1037,6 +1037,7 @@ export async function addEmrEvaluation(
 
 export async function createFundingCall(
   callData: any,
+  createdBy: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const newCallDocRef = adminDb.collection("fundingCalls").doc()
@@ -1065,7 +1066,7 @@ export async function createFundingCall(
         detailsUrl: callData.detailsUrl,
         driveLink: callData.driveLink || null,
         createdAt: new Date().toISOString(),
-        createdBy: "Super-admin",
+        createdBy: createdBy,
         status: "Open",
         isAnnounced: callData.notifyAllStaff,
       }

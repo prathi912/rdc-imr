@@ -930,20 +930,25 @@ export default function IncentiveClaimPage() {
             const userClaimList = userClaimSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
             setUserClaims(userClaimList);
 
-            const lastMembershipClaim = userClaimList
-                .filter(c => c.claimType === 'Membership of Professional Bodies' && c.status !== 'Draft' && c.status !== 'Rejected')
-                .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())[0];
+            const currentYear = new Date().getFullYear();
+            const claimInCurrentYear = userClaimList.find(c => 
+                c.claimType === 'Membership of Professional Bodies' && 
+                c.status !== 'Draft' && 
+                c.status !== 'Rejected' &&
+                new Date(c.submissionDate).getFullYear() === currentYear
+            );
 
-            if (lastMembershipClaim) {
-                const lastClaimDate = parseISO(lastMembershipClaim.submissionDate);
-                const daysSinceClaim = differenceInDays(new Date(), lastClaimDate);
-                if (daysSinceClaim < 365) {
-                    const nextDate = addYears(lastClaimDate, 1);
-                    setMembershipClaimInfo({
-                        canClaim: false,
-                        nextAvailableDate: format(nextDate, 'PPP')
-                    });
-                }
+            if (claimInCurrentYear) {
+                const nextYear = currentYear + 1;
+                const nextDate = new Date(nextYear, 0, 1); // January 1st of next year
+                setMembershipClaimInfo({
+                    canClaim: false,
+                    nextAvailableDate: format(nextDate, 'PPP')
+                });
+            } else {
+                setMembershipClaimInfo({
+                    canClaim: true
+                });
             }
 
             // Query by authorUids and authorEmails arrays (for newer claims)

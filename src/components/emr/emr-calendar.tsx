@@ -266,7 +266,7 @@ export function AddEditCallDialog({
             });
         } else {
             // Create logic
-            const result = await createFundingCall(callDataForServer);
+            const result = await createFundingCall(callDataForServer, user.uid);
             if (!result.success) {
                 throw new Error(result.error);
             }
