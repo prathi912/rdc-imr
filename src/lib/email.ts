@@ -5,6 +5,7 @@ import { getSystemSettings } from '@/app/actions';
 import { logEvent } from '@/lib/logger';
 
 const GMAIL_USER = process.env.GMAIL_USER;
+const GMAIL_AUTH_USER = process.env.GMAIL_AUTH_USER || process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const RDC_EMAIL = process.env.RDC_EMAIL;
 const RDC_PASSWORD = process.env.RDC_PASSWORD;
@@ -25,7 +26,7 @@ if (!RDC_EMAIL || !RDC_PASSWORD) {
 const defaultTransporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: GMAIL_USER,
+    user: GMAIL_AUTH_USER,
     pass: GMAIL_APP_PASSWORD,
   },
 });
