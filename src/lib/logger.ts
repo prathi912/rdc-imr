@@ -34,7 +34,8 @@ export interface LogEntry {
 /**
  * Redacts sensitive fields from a metadata object.
  */
-function redact(data: any): any {
+function redact(data: any, depth = 0): any {
+  if (depth > 10) return '[Depth Limit Exceeded]';
   if (!data || typeof data !== 'object') return data;
   
   const sensitiveKeys = ['password', 'token', 'apiKey', 'secret', 'cvUrl', 'proofUrl', 'bankName', 'accountNumber'];
@@ -44,7 +45,7 @@ function redact(data: any): any {
     if (sensitiveKeys.some(sk => key.toLowerCase().includes(sk.toLowerCase()))) {
       redacted[key] = '[REDACTED]';
     } else if (typeof redacted[key] === 'object') {
-      redacted[key] = redact(redacted[key]);
+      redacted[key] = redact(redacted[key], depth + 1);
     }
   }
   
@@ -54,13 +55,14 @@ function redact(data: any): any {
 /**
  * Removes undefined properties to prevent Firebase ignoreUndefinedProperties errors.
  */
-function stripUndefined(obj: any): any {
+function stripUndefined(obj: any, depth = 0): any {
+  if (depth > 10) return '[Depth Limit Reached]';
   if (obj === null || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(stripUndefined).filter(v => v !== undefined);
+  if (Array.isArray(obj)) return obj.map(v => stripUndefined(v, depth + 1)).filter(v => v !== undefined);
   return Object.fromEntries(
     Object.entries(obj)
       .filter(([_, v]) => v !== undefined)
-      .map(([k, v]) => [k, stripUndefined(v)])
+      .map(([k, v]) => [k, stripUndefined(v, depth + 1)])
   );
 }
 

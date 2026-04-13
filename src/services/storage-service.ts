@@ -54,22 +54,16 @@ export async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: 
   }
 }
 
-export async function uploadFileToServer(
-  fileDataUrl: string,
+/**
+ * Core upload logic using Buffer to avoid Base64 serialization overhead.
+ */
+export async function uploadFileBuffer(
+  buffer: Buffer,
+  mimeType: string,
   path: string,
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
     const { put } = await import('@vercel/blob');
-
-    if (!fileDataUrl || typeof fileDataUrl !== "string") {
-      throw new Error("Invalid file data URL provided.");
-    }
-    const match = fileDataUrl.match(/^data:(.+);base64,(.+)$/);
-    if (!match) {
-      throw new Error("Invalid data URL format.");
-    }
-    const buffer = Buffer.from(match[2], 'base64');
-    const mimeType = match[1];
     const fileName = path.split('/').pop() || 'uploaded-file';
 
     try {
@@ -77,44 +71,41 @@ export async function uploadFileToServer(
       const file = bucket.file(path);
       await file.save(buffer, { metadata: { contentType: mimeType } });
       
-      // Use the proxy URL format for all internal documents
       const publicUrl = `/api/documents/${path}`;
-      console.log(`File uploaded to Firebase Storage (Admin) at ${path} - Assigned Proxy URL`);
       return { success: true, url: publicUrl, provider: 'firebase' } as any;
     } catch (firebaseError: any) {
-      console.warn("Firebase Admin upload failed, attempting Google Drive fallback:", firebaseError.message);
-      await logActivity("WARNING", "Firebase Admin upload failed, falling back to Google Drive", { path, error: firebaseError.message });
-
+      console.warn("Firebase Storage upload failed, trying fallback:", firebaseError.message);
+      
       try {
         const driveResult = await uploadToDrive(buffer, fileName, mimeType, path);
-        if (driveResult.success) {
-          return { ...driveResult, provider: 'googledrive' } as any;
-        }
-        throw new Error(driveResult.error || "Google Drive upload failed.");
-      } catch (driveError: any) {
-        console.warn("Google Drive fallback failed, trying Vercel Blob:", driveError.message);
-        await logActivity("WARNING", "Google Drive fallback failed, trying Vercel Blob", { path, error: driveError.message });
+        if (driveResult.success) return { ...driveResult, provider: 'googledrive' } as any;
+      } catch (driveError) {}
 
-        try {
-          const blob = await put(path, buffer, {
-            access: 'public',
-            contentType: mimeType,
-            token: process.env.RDC_READ_WRITE_TOKEN,
-          });
-          console.log(`File uploaded to Vercel Blob: ${blob.url}`);
-          return { success: true, url: blob.url, provider: 'vercelblob' } as any;
-        } catch (blobError: any) {
-          const finalError = `FATAL: All upload methods (Firebase, Drive, Vercel) failed. Final error: ${blobError.message}`;
-          console.error(finalError);
-          await logActivity("ERROR", "All upload fallbacks failed", { path, error: blobError.message });
-          return { success: false, error: finalError };
-        }
+      try {
+        const blob = await put(path, buffer, {
+          access: 'public',
+          contentType: mimeType,
+          token: process.env.RDC_READ_WRITE_TOKEN,
+        });
+        return { success: true, url: blob.url, provider: 'vercelblob' } as any;
+      } catch (blobError) {
+        return { success: false, error: "All storage backends failed." };
       }
     }
   } catch (error: any) {
-    console.error("Unhandled error in uploadFileToServer:", error.message);
-    return { success: false, error: error.message || "An unexpected error occurred during file upload." };
+    return { success: false, error: error.message };
   }
+}
+
+export async function uploadFileToServer(
+  fileDataUrl: string,
+  path: string,
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  const match = fileDataUrl.match(/^data:(.+);base64,(.+)$/);
+  if (!match) return { success: false, error: "Invalid data URL format." };
+  const buffer = Buffer.from(match[2], 'base64');
+  const mimeType = match[1];
+  return uploadFileBuffer(buffer, mimeType, path);
 }
 
 export async function uploadFileToDriveAction(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
@@ -127,17 +118,14 @@ export async function uploadFileToServerAction(formData: FormData): Promise<{ su
     const path = formData.get('path') as string;
 
     if (!file || !path) {
-      return { success: false, error: "File and path are required for server-side upload fallback." };
+      return { success: false, error: "File and path are required." };
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const base64 = buffer.toString('base64');
-    const dataUrl = `data:${file.type};base64,${base64}`;
-
-    return await uploadFileToServer(dataUrl, path);
+    return await uploadFileBuffer(buffer, file.type, path);
   } catch (error: any) {
     console.error("Error in uploadFileToServerAction:", error);
-    return { success: false, error: error.message || "Failed to process server-side fallback." };
+    return { success: false, error: error.message || "Failed to process upload." };
   }
 }
 

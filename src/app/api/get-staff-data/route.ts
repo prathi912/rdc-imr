@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { logEvent } from '@/lib/logger';
 import { adminAuth } from '@/lib/admin';
 import { getStaffDataAction } from '@/lib/staff-service';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest) {
   const start = performance.now();
@@ -18,6 +19,18 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Auth Error (get-staff-data):", error);
     return NextResponse.json({ success: false, error: 'Unauthorized: Invalid authentication session.' }, { status: 401 });
+  }
+
+  // --- Security: Rate Limiting ---
+  const ip = request.headers.get('x-forwarded-for') || 'anonymous';
+  const rateLimitKey = `rl_get_staff_${ip}`;
+  const rateLimit = await checkRateLimit(rateLimitKey, { points: 30, duration: 300 });
+
+  if (!rateLimit.success) {
+    return NextResponse.json({ 
+        success: false, 
+        error: 'Too many requests. Please try again later.' 
+    }, { status: 429 });
   }
 
   const { searchParams } = new URL(request.url);

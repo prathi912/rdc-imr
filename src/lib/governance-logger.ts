@@ -84,21 +84,38 @@ export const GovernanceLogger = {
     after: Record<string, any>
   ) {
     const diff: Record<string, any> = {};
-    for (const key in after) {
-      if (JSON.stringify(before[key]) !== JSON.stringify(after[key])) {
-        diff[key] = { from: before[key], to: after[key] };
+    const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+
+    for (const key of keys) {
+      const valBefore = before[key];
+      const valAfter = after[key];
+
+      // Deep cross-reference check to avoid logging the SDK or circular objects
+      const isComplex = (val: any) => val !== null && typeof val === 'object';
+      
+      const strBefore = isComplex(valBefore) ? '[Complex Value]' : String(valBefore);
+      const strAfter = isComplex(valAfter) ? '[Complex Value]' : String(valAfter);
+
+      if (strBefore !== strAfter || (isComplex(valBefore) && JSON.stringify(valBefore) !== JSON.stringify(valAfter))) {
+          try {
+            // Only store the diff if it's not too deep
+            diff[key] = { from: valBefore, to: valAfter };
+          } catch (e) {
+            diff[key] = { from: '[Circular/Deep]', to: '[Circular/Deep]' };
+          }
       }
     }
 
     if (Object.keys(diff).length === 0) return;
 
-    const changeRecord: EntityChange = {
+    // To prevent "Maximum array nesting exceeded" in Firestore,
+    // we don't store the full 'before' and 'after' snapshots in change_history.
+    // The history only keeps the diff for auditability.
+    const changeRecord = {
       entityId,
       entityType,
       changedBy,
       timestamp: new Date(),
-      before,
-      after,
       diff
     };
 

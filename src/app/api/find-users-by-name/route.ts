@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/admin';
 import type { User } from '@/types';
 import { searchStaffByNameAction } from '@/lib/staff-service';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest) {
     try {
@@ -15,6 +16,18 @@ export async function GET(request: NextRequest) {
             await adminAuth.verifyIdToken(token);
         } catch (error) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // --- Security: Rate Limiting ---
+        const ip = request.headers.get('x-forwarded-for') || 'anonymous';
+        const rateLimitKey = `rl_find_users_${ip}`;
+        const rateLimit = await checkRateLimit(rateLimitKey, { points: 20, duration: 300 });
+
+        if (!rateLimit.success) {
+            return NextResponse.json({ 
+                success: false, 
+                error: 'Too many requests. Please try again later.' 
+            }, { status: 429 });
         }
 
         const { searchParams } = new URL(request.url);

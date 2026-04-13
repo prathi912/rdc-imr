@@ -16,7 +16,6 @@ import { doc, updateDoc, addDoc, collection, getDoc, getDocs, where, query } fro
 import {
   awardInitialGrant,
   updateProjectStatus,
-  updateProjectWithRevision,
   updateProjectDuration,
   updateProjectEvaluators,
   notifyAdminsOnCompletionRequest,
@@ -82,7 +81,8 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Checkbox } from "../ui/checkbox"
-import { uploadFileToServer } from '@/app/actions';
+import { uploadFileToServerAction } from "@/services/storage-service";
+import { updateProjectWithRevision } from "@/services/project-service";
 
 interface ProjectDetailsClientProps {
   project: Project
@@ -725,16 +725,19 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     }
     setIsSubmittingRevision(true)
     try {
-      const dataUrl = await fileToDataUrl(revisedProposalFile);
+      const formData = new FormData();
+      formData.append('file', revisedProposalFile);
       const path = `revisions/${project.id}/${revisedProposalFile.name}`;
-      const uploadResult = await uploadFileToServer(dataUrl, path);
-
+      formData.append('path', path);
+      
+      const uploadResult = await uploadFileToServerAction(formData);
+      
       if (!uploadResult.success || !uploadResult.url) {
         throw new Error(uploadResult.error || "Revision upload failed")
       }
-
+      
       const revisionResult = await updateProjectWithRevision(project.id, uploadResult.url)
-
+      
       if (!revisionResult.success) {
         throw new Error(revisionResult.error || "Failed to update project with revision.")
       }
