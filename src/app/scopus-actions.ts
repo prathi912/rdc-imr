@@ -1,15 +1,17 @@
 
 'use server';
 
-import type { IncentiveClaim } from '@/types';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 
-export async function fetchAdvancedScopusData(
+export async function fetchScopusDataByUrl(
   identifier: string, // Can be a URL or just a DOI
   claimantName: string,
+  userId: string,
 ): Promise<{
   success: boolean
   data?: {
+    title: string;
     paperTitle: string;
     journalName: string;
     publicationMonth: string;
@@ -20,11 +22,19 @@ export async function fetchAdvancedScopusData(
     journalWebsite?: string;
     publicationType?: string;
     journalClassification?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+    totalAuthors: number;
+    totalInternalAuthors: number;
+    totalInternalCoAuthors: number;
   }
   error?: string
   warning?: string
   claimantIsAuthor?: boolean
 }> {
+  // Rate limiting [CRIT-02]
+  const rateLimit = await checkRateLimit(`scopus-fetch-${userId}`, { points: 5, duration: 600 }); // 5 lookups per 10 mins
+  if (!rateLimit.success) {
+    return { success: false, error: "Too many search requests. Please try again after 10 minutes." };
+  }
   const apiKey = process.env.SCOPUS_API_KEY
   if (!apiKey) {
     console.error("Scopus API key is not configured.")
@@ -162,9 +172,23 @@ export async function fetchAdvancedScopusData(
     }
 
 
+    const authorsSource = retrievalResponse.authors?.author || [];
+    const authorsCount = Array.isArray(authorsSource) ? authorsSource.length : 1;
+    
+    // Simplistic internal author counting: check if any of their affiliations contain 'parul'
+    // Usually each author in retrievalResponse has an affiliation list
+    let totalInternalAuthors = isPuNameInPublication ? 1 : 0; // At least the claimant if PU check passed
+    if (Array.isArray(authorsSource)) {
+        totalInternalAuthors = authorsSource.filter((a: any) => {
+            const affils = Array.isArray(a.affiliation) ? a.affiliation : [a.affiliation];
+            return affils.some((af: any) => af?.['affilname']?.toLowerCase().includes('parul'));
+        }).length;
+    }
+
     return {
       success: true,
       data: {
+        title: paperTitle,
         paperTitle,
         journalName,
         publicationMonth,
@@ -175,6 +199,9 @@ export async function fetchAdvancedScopusData(
         journalWebsite: journalWebsite || '',
         publicationType,
         journalClassification,
+        totalAuthors: authorsCount,
+        totalInternalAuthors: totalInternalAuthors,
+        totalInternalCoAuthors: Math.max(0, totalInternalAuthors - 1),
       },
       warning,
     }
@@ -183,3 +210,33 @@ export async function fetchAdvancedScopusData(
     return { success: false, error: error.message || "An unexpected error occurred while fetching Scopus data." }
   }
 }
+
+export async function getJournalWebsite({ journalName }: { journalName: string }): Promise<{ success: boolean; url?: string; error?: string }> {
+    const springerApiKey = process.env.SPRINGER_API_KEY;
+    if (!springerApiKey) {
+        return { success: false, error: "Springer Nature API key is not configured." };
+    }
+
+    try {
+        const springerUrl = `https://api.springernature.com/meta/v2/json?q=journal:"${encodeURIComponent(journalName)}"&p=1&api_key=${springerApiKey}`;
+        const springerResponse = await fetch(springerUrl);
+        if (!springerResponse.ok) {
+            throw new Error(`Springer Nature API Error: ${springerResponse.statusText}`);
+        }
+        
+        const springerData = await springerResponse.json();
+        if (springerData.records && springerData.records.length > 0 && springerData.records[0].url) {
+            const springerLink = springerData.records[0].url.find((u: { platform: string; value: string; }) => u.platform === 'springerlink');
+            if (springerLink && springerLink.value) {
+                return { success: true, url: springerLink.value };
+            }
+        }
+        return { success: false, error: "No website found for this journal." };
+    } catch (error: any) {
+        console.error("Error finding journal website:", error);
+        return { success: false, error: error.message || "An unexpected error occurred." };
+    }
+}
+
+// Backward compatibility alias
+export const fetchAdvancedScopusData = fetchScopusDataByUrl;

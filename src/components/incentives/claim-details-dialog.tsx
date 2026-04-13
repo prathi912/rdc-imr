@@ -10,7 +10,7 @@ import type { User, IncentiveClaim, Author, ApprovalStage } from '@/types';
 import { Loader2, Printer, Check, X, Download, Bot, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
-import { generateOfficeNotingForClaim } from '@/app/document-actions';
+import { generateOfficeNotingForClaim } from '@/app/actions';
 import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
 
 
@@ -148,7 +148,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
         setIsPrinting(true);
         try {
             if (!claim) return;
-            const result = await generateOfficeNotingForClaim(claim.id);
+            const result = await generateOfficeNotingForClaim(claim.id) as any;
             let fileName = result?.fileName || `Office_Noting_${claim.userName.replace(/\s/g, '_')}.docx`;
 
             if (result.success && result.fileData) {

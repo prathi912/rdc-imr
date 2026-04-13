@@ -57,13 +57,13 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
         linebreaks: true,
     });
 
-    const coAuthors = claim.bookCoAuthors?.filter(a => a.email !== user.email).map(a => a.name) || [];
+    const coAuthors = claim.authors?.filter(a => a.email !== user.email).map(a => a.name) || [];
     const coAuthorData: { [key: string]: string } = {};
     for (let i = 0; i < 6; i++) {
         coAuthorData[`coauthor${i + 1}`] = coAuthors[i] || '';
     }
     
-    const internalAuthorsCount = claim.bookCoAuthors?.filter(a => !a.isExternal).length || 0;
+    const internalAuthorsCount = claim.authors?.filter(a => !a.isExternal).length || 0;
 
     const data = {
         name: user.name, // Use the current applicant's name

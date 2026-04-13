@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FileWarning, Upload, Loader2, CheckCircle, XCircle, Link as LinkIcon, Send, AlertTriangle } from 'lucide-react';
-import { bulkUploadPapers, sendCoAuthorRequest } from '@/app/bulkpapers';
+import { bulkUploadPapers, sendCoAuthorRequest } from '@/app/actions';
 import type { User, ResearchPaper, Author } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 

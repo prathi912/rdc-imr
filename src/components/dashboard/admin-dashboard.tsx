@@ -25,7 +25,7 @@ interface DashboardStats {
   totalUsers: number;
 }
 
-export function AdminDashboard() {
+export function AdminDashboard({ user }: { user: User }) {
   const [stats, setStats] = useState<DashboardStats>({
     totalImrProjects: 0,
     totalEmrProjects: 0,
@@ -36,14 +36,14 @@ export function AdminDashboard() {
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const [chartData, setChartData] = useState<{ group: string, projects: number }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
+  // const [user, setUser] = useState<User | null>(null);
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-        setUser(JSON.parse(storedUser));
-    }
-  }, []);
+  // useEffect(() => {
+  //   const storedUser = localStorage.getItem('user');
+  //   if (storedUser) {
+  //       setUser(JSON.parse(storedUser));
+  //   }
+  // }, []);
 
   const chartConfig = {
     projects: { label: 'Projects', color: 'hsl(var(--accent))' },

@@ -1,25 +1,31 @@
 
 'use server';
 
-import type { IncentiveClaim } from '@/types';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // This function is designed to fetch publication data from the ScienceDirect API.
 export async function fetchScienceDirectData(
   identifier: string,
-  claimantName: string
+  claimantName: string,
+  userId: string
 ): Promise<{
-  success: boolean;
-  data?: {
-    paperTitle: string;
-    journalName: string;
-    publicationMonth: string;
-    publicationYear: string;
-    isPuNameInPublication: boolean;
-    printIssn?: string;
-    electronicIssn?: string;
-  };
-  error?: string;
-}> {
+    success: boolean;
+    data?: {
+      paperTitle: string;
+      journalName: string;
+      publicationMonth: string;
+      publicationYear: string;
+      isPuNameInPublication: boolean;
+      printIssn?: string;
+      electronicIssn?: string;
+    };
+    error?: string;
+  }> {
+  // Rate limiting [CRIT-02]
+  const rateLimit = await checkRateLimit(`sd-fetch-${userId}`, { points: 5, duration: 600 }); // 5 lookups per 10 mins
+  if (!rateLimit.success) {
+    return { success: false, error: "Too many search requests. Please try again after 10 minutes." };
+  }
   const apiKey = process.env.SCOPUS_API_KEY;
   if (!apiKey) {
     console.error("Scopus/ScienceDirect API key is not configured.");

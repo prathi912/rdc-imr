@@ -122,10 +122,10 @@ export async function uploadFileToServer(
     // RE-STRICTED: Removed automatic 'makePublic' call to ensure data privacy.
     // await file.makePublic();
 
-    // Get the public URL
-    const publicUrl = file.publicUrl();
+    // Use the proxy URL format for all internal documents
+    const publicUrl = `/api/documents/${path}`;
 
-    console.log(`File uploaded successfully to ${path}, URL: ${publicUrl}`);
+    console.log(`File uploaded successfully to ${path}, Assigned Proxy URL: ${publicUrl}`);
 
     return { success: true, url: publicUrl };
 

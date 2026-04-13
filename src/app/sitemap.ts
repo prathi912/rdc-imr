@@ -19,7 +19,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   ].map((route) => ({
     url: `${baseUrl}${route}`,
     lastModified,
-    changeFrequency: route === '' ? 'weekly' : 'monthly' as const,
+    changeFrequency: (route === '' ? 'weekly' : 'monthly') as any,
     priority: route === '' ? 1 : 0.8,
   }))
 

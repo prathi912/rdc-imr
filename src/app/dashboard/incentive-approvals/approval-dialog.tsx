@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import type { User, IncentiveClaim, ApprovalStage } from '@/types';
-import { processIncentiveClaimAction } from '@/app/incentive-approval-actions';
+import { processIncentiveClaimAction } from '@/app/actions';
 import {
   Dialog,
   DialogContent,

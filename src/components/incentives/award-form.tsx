@@ -644,7 +644,7 @@ export function AwardForm({ user }: { user: User }) {
 
               <Separator className="bg-muted-foreground/5" />
               
-              {form.watch("amountPaid") !== undefined && form.watch("amountPaid") > 0 && (
+              {Number(form.watch("amountPaid") || 0) > 0 && (
                  <Alert className="mt-8 bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md mb-8">
                    <div className="flex flex-col gap-1.5">
                       <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">

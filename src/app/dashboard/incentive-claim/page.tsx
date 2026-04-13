@@ -34,7 +34,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { getSystemSettings } from '@/app/actions';
-import { deleteIncentiveClaim } from '@/app/incentive-approval-actions';
+import { deleteIncentiveClaim } from '@/app/actions';
 import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
 import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -971,19 +971,6 @@ export default function IncentiveClaimPage() {
                 }
             });
 
-            // Fallback: Also check the authors array directly for older claims that might not have authorUids/authorEmails
-            const allClaimsSnapshot = await getDocs(claimsCollection);
-            allClaimsSnapshot.forEach(doc => {
-                const claim = { ...doc.data(), id: doc.id } as IncentiveClaim;
-                // Check if user is in the authors array
-                if (claim.authors && claim.authors.some(author =>
-                    (author.uid === uid || author.email.toLowerCase() === email.toLowerCase())
-                )) {
-                    if (!allCoAuthorClaims.has(doc.id)) {
-                        allCoAuthorClaims.set(doc.id, claim);
-                    }
-                }
-            });
 
             // Filter out claims where the current user is the primary author (uid)
             // and exclude co-author-derived claims to avoid duplicate listings and re-application.

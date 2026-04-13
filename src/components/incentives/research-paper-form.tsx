@@ -24,7 +24,7 @@ import { collection, doc, getDoc, setDoc } from 'firebase/firestore'
 import type { User, IncentiveClaim, Author, SystemSettings } from '@/types'
 import { uploadFileToApi } from '@/lib/upload-client'
 import { getSystemSettings } from "@/app/actions";
-import { fetchAdvancedScopusData } from "@/app/scopus-actions";
+import { fetchScopusDataByUrl } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
 import { fetchScienceDirectData } from "@/app/sciencedirect-actions";
 import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus, Edit, Info, FileText, CheckCircle2, X } from 'lucide-react'
@@ -52,7 +52,7 @@ const ACCEPTED_FILE_TYPES = ["application/pdf"]
 const researchPaperSchema = z
   .object({
     publicationType: z.string({ required_error: "Please select a publication type." }),
-    indexType: z.enum(["wos", "scopus", "both", "sci", "other"]).optional(),
+    indexType: z.enum(["wos", "scopus", "both", "sci", "other", "esci"]).optional(),
     doi: z.string().optional().or(z.literal('')),
     wosAccessionNumber: z.string().optional().or(z.literal('')),
     relevantLink: z.string().optional().or(z.literal('')),
@@ -764,14 +764,14 @@ export function ResearchPaperForm() {
     try {
       let result;
       if (source === 'scopus') {
-        result = await fetchAdvancedScopusData(identifier, user.name);
+        result = await fetchScopusDataByUrl(identifier, user.name, user.uid);
       } else if (source === 'wos') {
-        result = await fetchWosDataByUrl(identifier, user.name);
+        result = await fetchWosDataByUrl(identifier, user.name, user.uid);
         if (!result.success) {
           setShowWosAccession(true); // Show fallback on failure
         }
       } else {
-        result = await fetchScienceDirectData(identifier, user.name);
+        result = await fetchScienceDirectData(identifier, user.name, user.uid);
       }
 
       if (result.success && result.data) {

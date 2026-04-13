@@ -1,5 +1,7 @@
 'use server';
 
+import { checkRateLimit } from '@/lib/rate-limit';
+
 type WoSAuthor = {
   displayName?: string;
   researcherId?: string;
@@ -43,9 +45,11 @@ type WoSRecord = {
 export async function fetchWosDataByUrl(
   identifier: string,
   claimantName: string,
+  userId: string,
 ): Promise<{
   success: boolean;
   data?: {
+    title: string;
     paperTitle: string;
     journalName: string;
     publicationYear: string;
@@ -54,12 +58,17 @@ export async function fetchWosDataByUrl(
     electronicIssn?: string;
     wosUrl?: string;
     publicationType?: string;
-    
+    totalAuthors: number;
   };
   error?: string;
   warning?: string;
   claimantIsAuthor?: boolean;
 }> {
+  // Rate limiting [CRIT-02]
+  const rateLimit = await checkRateLimit(`wos-fetch-${userId}`, { points: 5, duration: 600 }); // 5 lookups per 10 mins
+  if (!rateLimit.success) {
+    return { success: false, error: "Too many search requests. Please try again after 10 minutes." };
+  }
   const apiKey = process.env.WOS_API_KEY;
 
   if (!apiKey) {
@@ -159,6 +168,7 @@ export async function fetchWosDataByUrl(
     return {
       success: true,
       data: {
+        title: paperTitle,
         paperTitle,
         journalName,
         publicationYear,
@@ -167,10 +177,9 @@ export async function fetchWosDataByUrl(
         electronicIssn,
         wosUrl: record.links?.record,
         publicationType: 'Journal Article',
-   
+        totalAuthors: authors.length,
       },
       claimantIsAuthor,
-    
     };
   } catch (err: any) {
     return {

@@ -297,6 +297,7 @@ function ProfileSetupContent() {
 
       const updateData: Partial<User> = {
         ...data,
+        campus: data.campus as any,
         photoURL: photoURL,
         profileComplete: true,
       };

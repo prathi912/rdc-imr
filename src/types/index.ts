@@ -259,7 +259,7 @@ export type IncentiveClaim = {
 
   // Research Paper Fields
   publicationType?: string;
-  indexType?: "wos" | "scopus" | "both" | "sci" | "other";
+  indexType?: "wos" | "scopus" | "both" | "sci" | "other" | "esci";
   doi?: string;
   scopusLink?: string;
   wosLink?: string;
@@ -353,6 +353,7 @@ export type IncentiveClaim = {
   travelPlaceVisited?: string
   travelMode?: "Bus" | "Train" | "Air" | "Other"
   travelReceiptsUrl?: string
+  flightTicketsUrl?: string
   conferenceSelfDeclaration?: boolean
   totalAuthors?: string;
 
@@ -412,7 +413,10 @@ export type IncentiveClaim = {
   amountPaid?: number;
   paymentDate?: string; // ISO string
   awardDate?: string; // ISO string
-  awardProofUrls?: string[];
+  totalInternalAuthors?: number;
+  totalInternalCoAuthors?: number;
+  awardProofUrls?: string[]
+  additionalDocumentsUrls?: string[];
   awardSelfDeclaration?: boolean;
 
   // Seed Money for APC Fields
@@ -566,6 +570,7 @@ export type TemplateUrls = {
   IMR_OFFICE_NOTING?: string;
   INCENTIVE_PAYMENT_SHEET?: string;
   IMR_SANCTION_ORDER?: string;
+  INCENTIVE_OFFICE_NOTING?: string;
 };
 
 export type ApiIntegrations = {

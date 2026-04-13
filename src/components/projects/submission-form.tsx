@@ -237,7 +237,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
     if (!file) {
       if (email) {
         const newCvFiles = { ...coPiCvFiles };
-        delete newCvFiles[emailToRemove];
+        delete newCvFiles[email];
         setCoPiCvFiles(newCvFiles);
       } else {
         setPiCvFile(null);

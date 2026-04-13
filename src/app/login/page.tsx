@@ -34,6 +34,7 @@ import {
   verifyLoginOtp,
   logFrontendAction,
   registerUserInDatabase,
+  setSession,
 } from "@/app/actions"
 import { LogCategory } from "@/lib/logger"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
@@ -111,8 +112,11 @@ export default function LoginPage() {
       if (user.name === user.email.split("@")[0] && firebaseUser.displayName) {
         user.name = firebaseUser.displayName
       }
+      const idToken = await firebaseUser.getIdToken();
+      await setSession(idToken);
     } else {
       const idToken = await firebaseUser.getIdToken();
+      await setSession(idToken);
       const staffRes = await fetch(`/api/get-staff-data?email=${firebaseUser.email!}`, {
         headers: {
           'Authorization': `Bearer ${idToken}`

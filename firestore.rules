@@ -81,8 +81,14 @@ service cloud.firestore {
     match /incentiveClaims/{claimId} {
         // Any signed-in user can create a claim.
         allow create: if isSignedIn();
-        // Read: The user who created the claim or an admin/CRO can read it.
-        allow read: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin() || isCRO());
+        // Read: The user who created the claim, co-authors, or an admin/CRO can read it.
+        allow read: if isSignedIn() && (
+                      resource.data.uid == request.auth.uid || 
+                      (resource.data.authorUids != null && request.auth.uid in resource.data.authorUids) ||
+                      (resource.data.authorEmails != null && request.auth.token.email != null && request.auth.token.email.lower() in resource.data.authorEmails) ||
+                      isAdmin() || 
+                      isCRO()
+                    );
         // Update/Delete: Only admins can update or delete claims.
         allow update, delete: if isAdmin();
     }

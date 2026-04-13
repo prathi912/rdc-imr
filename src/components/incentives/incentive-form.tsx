@@ -63,14 +63,14 @@ const incentiveSchema = z
   .object({
     claimType: z.string().min(1, 'Please select a claim type.'),
     publicationType: z.string().optional(),
-    indexType: z.enum(['wos', 'scopus', 'both', 'esci']).optional(),
+    indexType: z.enum(['wos', 'scopus', 'both', 'esci', 'sci', 'other']).optional(),
     relevantLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     journalClassification: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
     wosType: z.enum(['SCIE', 'SSCI', 'A&HCI']).optional(),
     impactFactor: z.coerce.number().optional(),
-    totalAuthors: z.string().optional(),
-    totalInternalAuthors: z.string().optional(),
-    totalInternalCoAuthors: z.string().optional(),
+    totalAuthors: z.coerce.number().optional(),
+    totalInternalAuthors: z.coerce.number().optional(),
+    totalInternalCoAuthors: z.coerce.number().optional(),
     authorType: z.string().optional(),
     benefitMode: z.string().default('incentives'),
     journalName: z.string().optional(),
@@ -480,7 +480,7 @@ export function IncentiveForm() {
     toast({ title: 'Fetching Scopus Data', description: 'Please wait...' });
 
     try {
-        const result = await fetchScopusDataByUrl(link, user.name);
+        const result = await fetchScopusDataByUrl(link, user.name, user.uid);
         if (result.success && result.data) {
             const { title, journalName, totalAuthors, totalInternalAuthors, totalInternalCoAuthors } = result.data;
             form.setValue('paperTitle', title, { shouldValidate: true });
@@ -538,7 +538,7 @@ export function IncentiveForm() {
     toast({ title: 'Fetching WoS Data', description: 'Please wait...' });
 
     try {
-        const result = await fetchWosDataByUrl(link, user.name);
+        const result = await fetchWosDataByUrl(link, user.name, user.uid);
         if (result.success && result.data) {
             const { title, journalName, totalAuthors } = result.data;
             form.setValue('paperTitle', title, { shouldValidate: true });

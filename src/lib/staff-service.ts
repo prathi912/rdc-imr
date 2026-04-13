@@ -52,14 +52,25 @@ const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 async function readStaffDataFromUrlWithCache(url: string): Promise<StaffData[]> {
     const now = Date.now();
-    if (staffCache[url] && (now - staffCache[url].timestamp < CACHE_TTL)) {
+    
+    // Hardened cache check: Ensure data exists and TTL is strictly honored [CRIT-07]
+    if (staffCache[url] && staffCache[url].data && (now - staffCache[url].timestamp < CACHE_TTL)) {
         return staffCache[url].data;
     }
-    const data = await readExcelFromUrl<StaffData>(url);
-    if (data && data.length > 0) {
-        staffCache[url] = { data, timestamp: now };
+    
+    try {
+        const data = await readExcelFromUrl<StaffData>(url);
+        if (data && Array.isArray(data) && data.length > 0) {
+            staffCache[url] = { data, timestamp: now };
+            return data;
+        }
+    } catch (error) {
+        console.error(`Failed to fetch staff data from ${url}:`, error);
+        // If fetch fails, return partial stale data if available as fallback, or empty
+        if (staffCache[url]?.data) return staffCache[url].data;
     }
-    return data;
+    
+    return [];
 }
 
 export function formatStaffRecord(record: StaffData, defaultCampus: string): FormattedStaffUser {

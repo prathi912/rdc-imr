@@ -425,9 +425,9 @@ export function ApcForm({ user }: { user: User }) {
     toast({ title: `Connecting to ${source.toUpperCase()}`, description: 'Retrieving article metadata...' });
     try {
       let result;
-      if (source === 'scopus') result = await fetchAdvancedScopusData(doi, user.name);
-      else if (source === 'wos') result = await fetchWosDataByUrl(doi, user.name);
-      else result = await fetchScienceDirectData(doi, user.name);
+      if (source === 'scopus') result = await fetchAdvancedScopusData(doi, user.name, user.uid);
+      else if (source === 'wos') result = await fetchWosDataByUrl(doi, user.name, user.uid);
+      else result = await fetchScienceDirectData(doi, user.name, user.uid);
 
       if (result.success && result.data) {
         form.setValue('apcPaperTitle', result.data.paperTitle || '');

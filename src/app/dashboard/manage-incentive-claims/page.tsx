@@ -35,8 +35,13 @@ import type { IncentiveClaim, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { generateOfficeNotingsZip } from '@/app/document-actions';
-import { markPaymentsCompleted, submitToAccounts, generateIncentivePaymentSheet, downloadPaymentSheetByRef } from '@/app/manage-claims-actions';
+import { 
+  generateOfficeNotingsZip, 
+  markPaymentsCompleted, 
+  submitToAccounts, 
+  generateIncentivePaymentSheet, 
+  downloadPaymentSheetByRef 
+} from '@/app/actions';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';

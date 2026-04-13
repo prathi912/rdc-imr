@@ -116,12 +116,14 @@ export function ScheduleMeetingForm() {
       time: data.time,
       venue: "RDC Committee Room, PIMSR",
       evaluatorUids: data.evaluatorUids,
+      mode: "Offline" as const,
     };
     
     const projectsToSchedule = projects
       .filter(p => selectedProjects.includes(p.id))
       .map(p => ({ 
           id: p.id, 
+          pi: p.pi,
           pi_uid: p.pi_uid, 
           title: p.title, 
           pi_email: p.pi_email 

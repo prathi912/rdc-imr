@@ -28,8 +28,8 @@ import {
   getSystemSettings,
   generateSanctionOrder,
   adminUploadProposal,
+  generateRecommendationForm,
 } from "@/app/actions"
-import { generateRecommendationForm } from "@/app/document-actions"
 import { findUserByMisId } from '@/app/userfinding';
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"

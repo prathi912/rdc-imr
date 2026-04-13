@@ -10,8 +10,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { addGrantPhase, addTransaction, updatePhaseStatus, deleteTransaction, updateTransaction } from "@/app/actions"
-import { generateInstallmentOfficeNoting } from "@/app/document-actions"
+import { addGrantPhase, addTransaction, updatePhaseStatus, deleteTransaction, updateTransaction, generateInstallmentOfficeNoting } from "@/app/actions"
 import React, { useState } from "react"
 import {
   DollarSign,
@@ -333,7 +332,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           ...finalValues,
           isDraft,
           invoiceUrl,
-          invoiceFileName,
         });
       } else {
         // Add new transaction
@@ -341,7 +339,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           ...finalValues,
           isDraft,
           invoiceUrl,
-          invoiceFileName,
         });
       }
 

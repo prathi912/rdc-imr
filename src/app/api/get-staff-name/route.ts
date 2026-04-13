@@ -1,51 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import ExcelJS from 'exceljs';
-import path from 'path';
-import fs from 'fs';
+import { getStaffDataAction } from '@/lib/staff-service';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json();
+    
+    // Auth-gate: Check for valid Bearer token [CRIT-05]
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.split(' ')[1];
+    
+    if (!token || token !== process.env.MIS_API_KEY) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Rate limiting [CRIT-04]
+    const rateLimit = await checkRateLimit(`api-staff-name-${email}`);
+    if (!rateLimit.success) {
+      return NextResponse.json({ success: false, error: 'Too many requests' }, { status: 429 });
+    }
+
     if (!email) {
       return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
     }
 
-    // Read staffdata.xlsx from the project root
-    const filePath = path.resolve(process.cwd(), 'staffdata.xlsx');
-    if (!fs.existsSync(filePath)) {
-      return NextResponse.json({ success: false, error: 'staffdata.xlsx not found' }, { status: 500 });
-    }
+    // Use the centralized caching service instead of manual Excel parsing
+    const staffRecords = await getStaffDataAction({ email });
 
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(filePath);
-    const worksheet = workbook.getWorksheet(1);
-    if (!worksheet) {
-      return NextResponse.json({ success: false, error: 'Worksheet not found' }, { status: 500 });
-    }
-
-    const jsonData: any[] = [];
-    const headerRow = worksheet.getRow(1);
-    const headers = headerRow.values as any[];
-
-    worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return;
-      const rowData: any = {};
-      row.eachCell((cell, colNumber) => {
-        const header = headers[colNumber];
-        if (header) {
-          rowData[header] = cell.value;
-        }
-      });
-      jsonData.push(rowData);
-    });
-
-    // Find staff by email (case-insensitive)
-    const staff = jsonData.find((row) => {
-      return row['Email'] && row['Email'].toLowerCase() === email.toLowerCase();
-    });
-
-    if (staff && staff['Name']) {
-      return NextResponse.json({ success: true, name: staff['Name'] });
+    if (staffRecords.length > 0) {
+      return NextResponse.json({ success: true, name: staffRecords[0].name });
     } else {
       return NextResponse.json({ success: true, name: null });
     }

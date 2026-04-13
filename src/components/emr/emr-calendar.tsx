@@ -45,6 +45,7 @@ import type { FundingCall, User, EmrInterest, EmrEvaluation } from '@/types';
 import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, setHours, setMinutes, setSeconds, isBefore } from 'date-fns';
 import { uploadFileToServer } from '@/app/actions';
 import { createFundingCall, announceEmrCall, registerEmrInterest, updateFundingCall } from '@/app/emr-actions';
+import DOMPurify from 'isomorphic-dompurify';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '../ui/checkbox';
@@ -478,7 +479,7 @@ function ViewDescriptionDialog({ call }: { call: FundingCall }) {
                     <DialogDescription>Full description for the funding call from {call.agency}.</DialogDescription>
                 </DialogHeader>
                 <div className="max-h-[60vh] overflow-y-auto pr-4">
-                    <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: call.description || 'No description provided.' }} />
+                    <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(call.description || 'No description provided.') }} />
                 </div>
             </DialogContent>
         </Dialog>

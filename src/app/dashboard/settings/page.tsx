@@ -84,12 +84,7 @@ const bankDetailsSchema = z.object({
 })
 type BankDetailsFormValues = z.infer<typeof bankDetailsSchema>
 
-const croAssignmentSchema = z.object({
-    email: z.string().email("Please enter a valid email address."),
-    faculty: z.string().min(1, "Please select a faculty."),
-    campus: z.string().min(1, "Please select a campus."),
-})
-type CroAssignmentFormValues = z.infer<typeof croAssignmentSchema>
+
 
 const faculties = [
   "Faculty of Engineering & Technology",
@@ -204,7 +199,10 @@ const incentiveClaimTypes = [
     'Conference Presentations',
     'Books',
     'Membership of Professional Bodies',
-    'Seed Money for APC'
+    'Seed Money for APC',
+    'Award',
+    'EMR Sanction Project',
+    'Workshop/FDP/Training'
 ];
 
 const fileToDataUrl = (file: File): Promise<string> => {
@@ -275,27 +273,11 @@ export default function SettingsPage() {
     },
   })
   
-  const croAssignmentForm = useForm<CroAssignmentFormValues>({
-    resolver: zodResolver(croAssignmentSchema),
-    defaultValues: {
-        email: '',
-        faculty: '',
-        campus: '',
-    },
-  })
+
 
   const dummyForm = useForm(); // For the incentive approvers section
 
-  const selectedCampusForCro = croAssignmentForm.watch('campus');
-  const facultyOptionsForCro = selectedCampusForCro === 'Goa' ? goaFaculties : faculties;
 
-  useEffect(() => {
-    // When campus changes, reset faculty if it's not in the new list
-    const currentFaculty = croAssignmentForm.getValues('faculty');
-    if (currentFaculty && !facultyOptionsForCro.includes(currentFaculty)) {
-        croAssignmentForm.setValue('faculty', '');
-    }
-  }, [selectedCampusForCro, facultyOptionsForCro, croAssignmentForm]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -569,30 +551,7 @@ export default function SettingsPage() {
     await handleSystemSettingsSave({ ...systemSettings, allowedDomains: currentDomains.filter((d) => d !== domainToRemove) });
   }
 
-  const addCroAssignment = async (values: CroAssignmentFormValues) => {
-    if (!systemSettings) return;
 
-    const newAssignment: CroAssignment = {
-        email: values.email.toLowerCase(),
-        faculty: values.faculty,
-        campus: values.campus,
-    };
-
-    const currentAssignments = systemSettings.croAssignments || [];
-    if (currentAssignments.some(c => c.email === newAssignment.email)) {
-        toast({ variant: "destructive", title: "Email exists", description: "This email is already assigned." });
-        return;
-    }
-
-    await handleSystemSettingsSave({ ...systemSettings, croAssignments: [...currentAssignments, newAssignment] });
-    croAssignmentForm.reset();
-  };
-
-  const removeCroAssignment = async (emailToRemove: string) => {
-    if (!systemSettings) return;
-    const currentAssignments = systemSettings.croAssignments || [];
-    await handleSystemSettingsSave({ ...systemSettings, croAssignments: currentAssignments.filter(c => c.email !== emailToRemove) });
-  };
 
   const handleApproverChange = async (stage: 1 | 2 | 3 | 4, email: string) => {
     if (!systemSettings) return;
@@ -784,8 +743,7 @@ export default function SettingsPage() {
                 <div className="space-y-4"><div className="flex items-center gap-2"><Mail className="h-5 w-5" /><Label className="text-base">Do Not Disturb (DND) Email</Label></div><p className="text-sm text-muted-foreground">The email address entered here will be excluded from all automated system email notifications.</p><Input placeholder="dnd.user@paruluniversity.ac.in" value={systemSettings.dndEmail || ''} onChange={(e) => setSystemSettings(prev => prev ? { ...prev, dndEmail: e.target.value } : null)} onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, dndEmail: e.target.value })} disabled={isSavingSettings} /></div>
                 <Separator />
                 <div className="space-y-4"><Label className="text-base">Allowed Email Domains</Label><p className="text-sm text-muted-foreground">Users with these email domains can register and access the portal.</p><div className="flex gap-2"><Input placeholder="@newcampus.paruluniversity.ac.in" value={newAllowedDomain} onChange={(e) => setNewAllowedDomain(e.target.value)} /><Button onClick={addAllowedDomain} disabled={isSavingSettings || !newAllowedDomain.trim()}><Plus className="h-4 w-4" /></Button></div><div className="flex flex-wrap gap-2">{(systemSettings.allowedDomains || []).map((domain) => (<Badge key={domain} variant="secondary" className="flex items-center gap-1">{domain}<Button variant="ghost" size="icon" className="h-4 w-4 hover:bg-destructive hover:text-destructive-foreground" onClick={() => removeAllowedDomain(domain)} disabled={isSavingSettings}><X className="h-3 w-3" /></Button></Badge>))}</div></div>
-                <Separator />
-                <div className="space-y-4"><Label className="text-base">CRO Pre-assignment</Label><p className="text-sm text-muted-foreground">Pre-assign the CRO role and their primary faculty/campus to a specific email. This will be automatically applied upon sign-up.</p><Form {...croAssignmentForm}><form onSubmit={croAssignmentForm.handleSubmit(addCroAssignment)} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end p-4 border rounded-lg"><FormField control={croAssignmentForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>CRO Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} /><FormField control={croAssignmentForm.control} name="campus" render={({ field }) => ( <FormItem><FormLabel>Campus</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select campus" /></SelectTrigger></FormControl><SelectContent>{campuses.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} /><FormField control={croAssignmentForm.control} name="faculty" render={({ field }) => ( <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select faculty" /></SelectTrigger></FormControl><SelectContent>{facultyOptionsForCro.map(f => (<SelectItem key={f} value={f}>{f}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} /><Button type="submit" disabled={isSavingSettings}><Plus className="h-4 w-4 mr-2" /> Add CRO</Button></form></Form>{(systemSettings.croAssignments || []).length > 0 && (<Table><TableHeader><TableRow><TableHead>Email</TableHead><TableHead>Faculty</TableHead><TableHead>Campus</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader><TableBody>{systemSettings.croAssignments?.map((assignment) => (<TableRow key={assignment.email}><TableCell>{assignment.email}</TableCell><TableCell>{assignment.faculty}</TableCell><TableCell>{assignment.campus}</TableCell><TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => removeCroAssignment(assignment.email)} disabled={isSavingSettings}><X className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table>)}</div>
+
                 <Separator />
                 <div className="space-y-4"><div className="flex items-center gap-2"><Mail className="h-5 w-5" /><Label className="text-base">Utilization Report Email Recipient</Label></div><p className="text-sm text-muted-foreground">The email address that will receive a notification when a PI submits a utilization report and requests the next grant phase.</p><Input placeholder="finance.rdc@paruluniversity.ac.in" value={systemSettings?.utilizationNotificationEmail || ''} onChange={(e) => handleSystemSettingsSave({ ...systemSettings, utilizationNotificationEmail: e.target.value })} disabled={isSavingSettings} /></div>
                 <Separator />

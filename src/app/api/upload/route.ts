@@ -3,6 +3,7 @@ import { uploadFileToServer } from "@/app/actions";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 function ensureFirebaseAdminInitialized() {
   if (getApps().length) return;
@@ -61,6 +62,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Invalid or expired token" },
         { status: 401 }
+      );
+    }
+
+    // Rate Limiting [CRIT-02]
+    const rateLimit = await checkRateLimit(`api-upload-${userId}`, { points: 10, duration: 300 }); // 10 uploads per 5 mins
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: "Too many upload requests. Please try again after some time." },
+        { status: 429 }
       );
     }
 
@@ -251,15 +261,17 @@ export async function POST(req: NextRequest) {
 
 // OPTIONS for CORS preflight
 export async function OPTIONS(req: NextRequest) {
-  return NextResponse.json(
-    {},
-    {
-      status: 200,
-      headers: {
-        "Access-Control-Allow-Origin": process.env.ALLOWED_ORIGINS || "https://rndprojects.paruluniversity.ac.in" || "http://localhost:9002" || "http://localhost:3000",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
-    }
-  );
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || "https://rndprojects.paruluniversity.ac.in,http://localhost:3002,http://localhost:3000").split(',');
+  const origin = req.headers.get("origin");
+  
+  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": corsOrigin,
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
 }

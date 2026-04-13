@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { submitIncentiveClaim } from "@/app/incentive-approval-actions";
+import { submitIncentiveClaim } from "@/app/actions";
 
 function ensureFirebaseAdminInitialized() {
   if (getApps().length) return;
