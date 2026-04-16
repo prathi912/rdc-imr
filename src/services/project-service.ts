@@ -67,6 +67,7 @@ export async function deleteImrProject(
         subject: `Regarding Your IMR Project Submission: ${project.title}`,
         html: emailHtml,
         from: "default",
+        category: 'IMR',
       })
     }
 
@@ -201,10 +202,10 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     if (project.pi_email) {
       await sendEmailUtility({
         to: project.pi_email,
-        bcc: "process.env.ADMIN_EMAIL",
         subject: `Project Status Update: ${project.title}`,
         html: emailHtml,
         from: "default",
+        category: 'IMR',
       })
     }
 
@@ -484,7 +485,13 @@ export async function updateCoInvestigators(
               ${EMAIL_STYLES.footer}
             </div>`
 
-          await sendEmailUtility({ to: coPi.email, subject: `Added to IMR Project`, html: emailHtml, from: "default" })
+          await sendEmailUtility({ 
+            to: coPi.email, 
+            subject: `Added to IMR Project`, 
+            html: emailHtml, 
+            from: "default",
+            category: 'IMR'
+          })
         }
       }
       await batch.commit()
