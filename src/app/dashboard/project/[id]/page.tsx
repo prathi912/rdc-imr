@@ -54,13 +54,26 @@ export default function ProjectDetailsPage() {
       const projectData = { id: projectSnap.id, ...projectSnap.data() } as Project;
       setProject(projectData);
       
-      const usersRef = collection(db, 'users');
-      const usersSnap = await getDocs(usersRef);
-      const userList = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() }) as User);
-      setAllUsers(userList);
+      // Fetch specific users needed for display: PI and Evaluators
+      // (Co-PIs are fetched separately in the ProjectDetailsClient component)
+      const uidsToFetch = Array.from(new Set([projectData.pi_uid, ...(projectData.meetingDetails?.assignedEvaluators || [])].filter(Boolean)));
       
-      const pi = userList.find(u => u.uid === projectData.pi_uid);
-      setPiUser(pi || null);
+      if (uidsToFetch.length > 0) {
+        const userDocs = await Promise.all(
+          uidsToFetch.map(uid => getDoc(doc(db, 'users', uid)))
+        );
+        const userList = userDocs
+          .filter(snap => snap.exists())
+          .map(snap => ({ uid: snap.id, ...snap.data() }) as User);
+          
+        setAllUsers(userList);
+        
+        const pi = userList.find(u => u.uid === projectData.pi_uid);
+        setPiUser(pi || null);
+      } else {
+        setAllUsers([]);
+        setPiUser(null);
+      }
 
     } catch (err: any) {
       setError(err.message || 'Failed to load project data.');
@@ -82,25 +95,13 @@ export default function ProjectDetailsPage() {
       }
     });
 
-    // Initial fetch for users
-    const fetchUsers = async () => {
-      try {
-        const usersRef = collection(db, 'users');
-        const usersSnap = await getDocs(usersRef);
-        const userList = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() }) as User);
-        setAllUsers(userList);
-      } catch (err) {
-        console.error('Error fetching users:', err);
-      }
-    };
-
-    fetchUsers();
+    // Initial fetch for project and necessary users
     fetchProjectAndUsers();
 
     return () => {
       unsubscribeProject();
     };
-  }, [projectId]);
+  }, [projectId, fetchProjectAndUsers]);
   
   const handleProjectUpdate = (updatedProject: Project) => {
     setProject(updatedProject);

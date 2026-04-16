@@ -407,10 +407,13 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     const fetchCoPiUsers = async () => {
       const coPiUids = (project.coPiUids || []).filter((uid): uid is string => !!uid);
       if (coPiUids.length > 0) {
-        const usersRef = collection(db, "users")
-        const q = query(usersRef, where("__name__", "in", coPiUids))
-        const querySnapshot = await getDocs(q)
-        const fetchedUsers = querySnapshot.docs.map((coPiDoc) => ({ uid: coPiDoc.id, ...coPiDoc.data() }) as User)
+        const userDocs = await Promise.all(
+          coPiUids.map(uid => getDoc(doc(db, "users", uid)))
+        );
+        const fetchedUsers = userDocs
+          .filter(snap => snap.exists())
+          .map(snap => ({ uid: snap.id, ...snap.data() }) as User);
+          
         setCoPiUsers(fetchedUsers)
         setCoPiList(fetchedUsers.map((u) => ({ uid: u.uid, name: u.name })))
       }
