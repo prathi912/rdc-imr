@@ -179,9 +179,13 @@ const isClaimEmpty = (claimData: Partial<IncentiveClaim>): boolean => {
   return !hasContent;
 }
 
-export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' | 'claimId'>, claimIdToUpdate?: string): Promise<{ success: boolean; error?: string, claimId?: string }> {
+export async function submitIncentiveClaim(
+    claimData: Omit<IncentiveClaim, 'id' | 'claimId'>, 
+    claimIdToUpdate?: string, 
+    sessionOverride?: { authenticated: boolean; uid: string; role: string }
+): Promise<{ success: boolean; error?: string, claimId?: string }> {
   try {
-      const session = await checkAuth();
+      const session = sessionOverride || await checkAuth();
       if (!session.authenticated) return { success: false, error: "Unauthorized." };
       const isAdmin = session.role === 'admin' || session.role === 'Super-admin';
 

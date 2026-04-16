@@ -1167,6 +1167,28 @@ export function ResearchPaperForm() {
                           </FormItem>
                         )}
                       />
+
+                      {(indexType === 'wos' || indexType === 'both' || showWosAccession) && (
+                        <FormField
+                          control={form.control}
+                          name="wosAccessionNumber"
+                          render={({ field }) => (
+                            <FormItem className="animate-in slide-in-from-top-2">
+                              <FormLabel className="text-base font-semibold">WoS Accession Number</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="e.g. WOS:000123456700001" 
+                                  {...field} 
+                                  disabled={isSubmitting || isFetching} 
+                                  className="h-12 shadow-sm border-primary/20 focus-visible:ring-primary rounded-xl"
+                                />
+                              </FormControl>
+                              <FormDescription className="text-xs">Required if DOI is not available for Web of Science papers.</FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
                    </div>
                  </div>
 
@@ -1390,38 +1412,72 @@ export function ResearchPaperForm() {
                   )}
                 </div>
 
-                {(indexType === 'scopus' || indexType === 'wos' || indexType === 'both' || indexType === 'sci') && (
-                  <FormField
-                    control={form.control}
-                    name="journalClassification"
-                    render={({ field }) => (
-                      <FormItem className="space-y-3">
-                        <FormLabel className="text-base font-semibold">Classification (Q-rating)</FormLabel>
-                        <FormControl>
-                          <div>
-                            <RadioGroup 
-                              onValueChange={field.onChange} 
-                              value={field.value} 
-                              className="flex flex-wrap gap-3 mt-2" 
-                              disabled={isSubmitting}
-                            >
-                              {availableClassifications.map((option) => (
-                                <Label 
-                                  key={option.value}
-                                  htmlFor={`q-${option.value}`} 
-                                  className="flex items-center space-x-2 bg-muted/30 px-4 py-2.5 rounded-xl border hover:bg-muted cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 shadow-sm transition-all whitespace-nowrap"
-                                >
-                                  <RadioGroupItem value={option.value} id={`q-${option.value}`} />
-                                  <span className="font-medium text-xs">{option.label}</span>
-                                </Label>
-                              ))}
-                            </RadioGroup>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+                 {(indexType === 'scopus' || indexType === 'wos' || indexType === 'both' || indexType === 'sci') && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {(indexType === 'wos' || indexType === 'both') && (
+                      <FormField
+                        control={form.control}
+                        name="wosType"
+                        render={({ field }) => (
+                          <FormItem className="space-y-3">
+                            <FormLabel className="text-base font-semibold">Web of Science Type</FormLabel>
+                            <FormControl>
+                              <RadioGroup
+                                onValueChange={field.onChange}
+                                value={field.value}
+                                className="flex flex-wrap gap-3 mt-2"
+                                disabled={isSubmitting}
+                              >
+                                {wosTypeOptions.map((option) => (
+                                  <Label
+                                    key={option.value}
+                                    htmlFor={`wos-${option.value}`}
+                                    className="flex items-center space-x-2 bg-muted/30 px-4 py-2.5 rounded-xl border hover:bg-muted cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 shadow-sm transition-all whitespace-nowrap"
+                                  >
+                                    <RadioGroupItem value={option.value} id={`wos-${option.value}`} />
+                                    <span className="font-medium text-xs">{option.label}</span>
+                                  </Label>
+                                ))}
+                              </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     )}
-                  />
+
+                    <FormField
+                      control={form.control}
+                      name="journalClassification"
+                      render={({ field }) => (
+                        <FormItem className="space-y-3">
+                          <FormLabel className="text-base font-semibold">Classification (Q-rating)</FormLabel>
+                          <FormControl>
+                            <div>
+                              <RadioGroup 
+                                onValueChange={field.onChange} 
+                                value={field.value} 
+                                className="flex flex-wrap gap-3 mt-2" 
+                                disabled={isSubmitting}
+                              >
+                                {availableClassifications.map((option) => (
+                                  <Label 
+                                    key={option.value}
+                                    htmlFor={`q-${option.value}`} 
+                                    className="flex items-center space-x-2 bg-muted/30 px-4 py-2.5 rounded-xl border hover:bg-muted cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 shadow-sm transition-all whitespace-nowrap"
+                                  >
+                                    <RadioGroupItem value={option.value} id={`q-${option.value}`} />
+                                    <span className="font-medium text-xs">{option.label}</span>
+                                  </Label>
+                                ))}
+                              </RadioGroup>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 )}
               </section>
 
