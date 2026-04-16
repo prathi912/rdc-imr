@@ -6,7 +6,7 @@ import { sendEmail as sendEmailUtility } from "@/lib/email"
 import { parseISO, isToday } from "date-fns"
 import { logActivity, EMAIL_STYLES } from "./utils"
 
-export async function sendEmail(options: { to: string; subject: string; html: string; from: "default" | "rdc", icalEvent?: any }) {
+export async function sendEmail(options: { to: string; subject: string; html: string; from: "default" | "rdc", icalEvent?: any, category?: 'IMR' | 'EMR' | 'Incentive' | 'Other' }) {
   return await sendEmailUtility(options)
 }
 
@@ -240,7 +240,8 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
         to: settings.utilizationNotificationEmail,
         subject: `Action Required: Next Grant Phase Request for Project: ${projectTitle}`,
         html: emailHtml,
-        from: 'default'
+        from: 'default',
+        category: 'IMR'
       });
       await logActivity("INFO", "Utilization report notification sent to designated email", { projectId, projectTitle, notifiedEmail: settings.utilizationNotificationEmail });
     }
@@ -361,7 +362,8 @@ export async function sendGlobalEvaluationReminders(adminName: string): Promise<
             to: evaluator.email,
             subject: `Reminder: Pending IMR Project Evaluations`,
             html: emailHtml,
-            from: 'default'
+            from: 'default',
+            category: 'IMR'
         });
         emailsSentCount++;
     }
@@ -413,7 +415,7 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
               ${EMAIL_STYLES.footer}
           </div>
         `;
-        emailPromises.push(sendEmailUtility({ to: user.email, subject: `Action Required: New Job Posting for Approval`, html: emailHtml, from: "default" }));
+        emailPromises.push(sendEmailUtility({ to: user.email, subject: `Action Required: New Job Posting for Approval`, html: emailHtml, from: "default", category: 'IMR' }));
       }
     }
 

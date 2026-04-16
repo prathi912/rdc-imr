@@ -143,6 +143,20 @@ export function ArpsResultsDisplay({ results, evaluationYear, evaluationWindow }
                                 <p className="text-muted-foreground font-medium">Evaluation Period</p>
                                 <p className="text-lg font-semibold">{evaluationWindow}</p>
                             </div>
+                            <div className="col-span-2 sm:col-span-1">
+                                <p className="text-muted-foreground font-medium text-center sm:text-left">Category</p>
+                                <div className="flex justify-center sm:justify-start">
+                                    <Badge className={cn(
+                                        "text-2xl px-6 py-2 font-bold mt-1",
+                                        grade.startsWith('SEE') && "bg-emerald-600 hover:bg-emerald-700",
+                                        grade.startsWith('EE') && "bg-blue-600 hover:bg-blue-700",
+                                        grade.startsWith('ME') && "bg-amber-600 hover:bg-amber-700",
+                                        grade.startsWith('DME') && "bg-slate-600 hover:bg-slate-700"
+                                    )}>
+                                        {grade}
+                                    </Badge>
+                                </div>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>

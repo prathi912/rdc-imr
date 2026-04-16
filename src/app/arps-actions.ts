@@ -139,14 +139,14 @@ function getJournalPoints(claim: IncentiveClaim): { quartileBase: number, articl
     switch (publicationType) {
         case 'Original Research Article':
         case 'Research Articles/Short Communications':
-            points = 20;
+            points = 30;
             break;
         case 'Short Communication':
             points = 8;
             break;
         case 'Review Article':
         case 'Review Articles':
-            points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 20 : 14;
+            points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 30 : 21;
             multiplier = 1.0;
             break;
         case 'Case Report / Case Study':
@@ -623,20 +623,9 @@ export async function calculateArpsForUser(userId: string, year: number) {
         }
 
         let grade = 'DME';
-        if (totalArps >= 80) grade = 'SEE';
-        else if (totalArps >= 50) grade = 'EE';
-        else if (totalArps >= 30) grade = 'ME';
-
-        // Force Rule: If 6 or more papers published, minimum grade is ME
-        if (pubCount >= 6) {
-            if (grade === 'DME') {
-                grade = 'ME';
-            }
-        }
-
-        if (pubCount < POLICY.MIN_PUBLICATIONS_REQUIRED) {
-            grade += ' (Minimum 10 publications required)';
-        }
+        if (pubCount >= 8) grade = 'SEE';
+        else if (pubCount >= 6) grade = 'EE';
+        else if (pubCount >= 4) grade = 'ME';
 
         const result = {
             success: true,

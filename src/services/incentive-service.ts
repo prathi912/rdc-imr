@@ -125,6 +125,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
             </div>
             `,
         from: "default",
+        category: "Incentive",
       })
     }
 
@@ -187,7 +188,7 @@ export async function submitIncentiveClaim(
   try {
       const session = sessionOverride || await checkAuth();
       if (!session.authenticated) return { success: false, error: "Unauthorized." };
-      const isAdmin = session.role === 'admin' || session.role === 'Super-admin';
+      const isAdmin = session.role === 'admin' || session.role === 'Super-admin' || session.role === 'CRO';
 
       if (!isAdmin && session.uid !== claimData.uid) {
           return { success: false, error: "Unauthorized." };
@@ -342,6 +343,7 @@ export async function submitIncentiveClaim(
                               to: coAuthor.email,
                               subject: `[${standardizedClaimId}] You've been added as a co-author on a claim`,
                               from: 'default',
+                              category: 'Incentive',
                               html: `<div ${EMAIL_STYLES.background}>${EMAIL_STYLES.logo}<p>Dear ${coAuthor.name}, ${claimData.userName} submitted a claim for "${claimTitle}". ${message}</p>${EMAIL_STYLES.footer}</div>`
                           });
                       }
@@ -362,7 +364,7 @@ export async function deleteIncentiveClaim(claimId: string, userId: string): Pro
   try {
       const session = await checkAuth();
       if (!session.authenticated) return { success: false, error: "Unauthorized." };
-      const isAdmin = session.role === 'admin' || session.role === 'Super-admin';
+      const isAdmin = session.role === 'admin' || session.role === 'Super-admin' || session.role === 'CRO';
 
       if (!isAdmin && session.uid !== userId) {
           return { success: false, error: "Unauthorized." };
@@ -469,7 +471,7 @@ export async function processIncentiveClaimAction(
     }
 
     if (newStatus === 'Accepted' && claim.userEmail) {
-        await sendEmailUtility({ to: claim.userEmail, subject: `Claim Approved: ${getClaimTitle(claim)}`, from: 'default', html: `<div ${EMAIL_STYLES.background}>${EMAIL_STYLES.logo}<p>Approved! Amount: ₹${effectiveApprovedAmount}</p>${EMAIL_STYLES.footer}</div>` });
+        await sendEmailUtility({ to: claim.userEmail, subject: `Claim Approved: ${getClaimTitle(claim)}`, from: 'default', category: 'Incentive', html: `<div ${EMAIL_STYLES.background}>${EMAIL_STYLES.logo}<p>Approved! Amount: ₹${effectiveApprovedAmount}</p>${EMAIL_STYLES.footer}</div>` });
         if (claim.claimType === 'Research Papers') await addPaperFromApprovedClaim(claim);
         else if (claim.claimType === 'EMR Sanction Project') await addEmrProjectFromApprovedClaim(claim);
     }
@@ -505,7 +507,7 @@ export async function markPaymentsCompleted(claimIds: string[]): Promise<{ succe
         await adminDb.collection('notifications').add({ uid: claim.uid, title: `Payment processed for "${getClaimTitle(claim)}".`, createdAt: new Date().toISOString(), isRead: false });
 
         if (claim.userEmail) {
-            await sendEmailUtility({ to: claim.userEmail, subject: `Payment Processed`, from: 'default', html: `<div ${EMAIL_STYLES.background}>${EMAIL_STYLES.logo}<p>Disbursed: ₹${claim.finalApprovedAmount}</p>${EMAIL_STYLES.footer}</div>` });
+            await sendEmailUtility({ to: claim.userEmail, subject: `Payment Processed`, from: 'default', category: 'Incentive', html: `<div ${EMAIL_STYLES.background}>${EMAIL_STYLES.logo}<p>Disbursed: ₹${claim.finalApprovedAmount}</p>${EMAIL_STYLES.footer}</div>` });
         }
         count++;
       }

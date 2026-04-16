@@ -3,7 +3,7 @@ import { adminDb } from '@/lib/admin';
 import { sendEmail } from '@/lib/email';
 import { format, subDays, startOfWeek, endOfWeek } from 'date-fns';
 
-const EMAIL_RECIPIENT = 'vishal.sandhwar8850@paruluniversity.ac.in';
+const EMAIL_RECIPIENT = 'process.env.ADMIN_EMAIL';
 const EMAIL_STYLES = {
   background: 'style=\"background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;\"',
   logo: '<div style=\"text-align:center; margin-bottom:20px;\"><img src=\"https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/RDC-PU-LOGO-WHITE.png\" alt=\"RDC Logo\" style=\"max-width:300px; height:auto;\" /></div>',

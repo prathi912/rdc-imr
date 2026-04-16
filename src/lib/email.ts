@@ -9,6 +9,7 @@ const GMAIL_AUTH_USER = process.env.GMAIL_AUTH_USER || process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const RDC_EMAIL = process.env.RDC_EMAIL;
 const RDC_PASSWORD = process.env.RDC_PASSWORD;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
 if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
   console.warn(
@@ -50,6 +51,7 @@ interface EmailOptions {
   html: string;
   attachments?: { filename: string; path: string }[];
   from: 'default' | 'rdc';
+  category?: 'IMR' | 'EMR' | 'Incentive' | 'Other';
   icalEvent?: {
     filename: string;
     method: 'REQUEST';
@@ -63,7 +65,7 @@ type MailSendResult = {
   message?: string;
 };
 
-export async function sendEmail({ to, cc, bcc, subject, html, attachments, from = 'default', icalEvent }: EmailOptions): Promise<MailSendResult> {
+export async function sendEmail({ to, cc, bcc, subject, html, attachments, from = 'default', icalEvent, category }: EmailOptions): Promise<MailSendResult> {
   // DND Check
   try {
     const settings = await getSystemSettings();
@@ -107,11 +109,16 @@ export async function sendEmail({ to, cc, bcc, subject, html, attachments, from 
     selectedSender = 'default';
   }
   
+  let finalBcc = bcc;
+  if ((category === 'IMR' || category === 'EMR') && ADMIN_EMAIL) {
+    finalBcc = bcc ? `${bcc}, ${ADMIN_EMAIL}` : ADMIN_EMAIL;
+  }
+
   const mailOptions = {
     from: fromAddress,
     to: to,
     cc: cc,
-    bcc: bcc,
+    bcc: finalBcc,
     subject: subject,
     html: html,
     attachments: attachments,

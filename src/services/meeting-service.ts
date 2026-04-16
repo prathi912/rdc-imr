@@ -164,6 +164,7 @@ export async function scheduleMeeting(
           subject,
           html: htmlContent,
           from: "default",
+          category: 'IMR',
           icalEvent: {
             filename: 'invite.ics',
             method: 'REQUEST',
@@ -205,7 +206,8 @@ export async function scheduleMeeting(
             to: projectData.pi_email!,
             subject,
             html: htmlContent,
-            from: "default"
+            from: "default",
+            category: 'IMR'
         }));
     }
 

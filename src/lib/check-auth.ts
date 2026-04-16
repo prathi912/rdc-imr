@@ -23,7 +23,16 @@ export async function checkAuth(options: {
 
   try {
     const decodedToken = await getAuth().verifyIdToken(sessionToken);
-    const userRole = decodedToken.role as string;
+    let userRole = decodedToken.role as string;
+    const uid = decodedToken.uid;
+
+    if (role && !userRole) {
+      const { adminDb } = await import('./admin');
+      const userDoc = await adminDb.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        userRole = userDoc.data()?.role;
+      }
+    }
 
     if (role) {
       const allowedRoles = Array.isArray(role) ? role : [role];
@@ -33,6 +42,8 @@ export async function checkAuth(options: {
           authenticated: true, 
           authorized: false, 
           user: decodedToken,
+          uid: uid,
+          role: userRole,
           error: 'Insufficient permissions' 
         };
       }
@@ -42,7 +53,7 @@ export async function checkAuth(options: {
       authenticated: true, 
       authorized: true, 
       user: decodedToken,
-      uid: decodedToken.uid,
+      uid: uid,
       role: userRole
     };
   } catch (error) {

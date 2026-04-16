@@ -17,7 +17,7 @@ export async function deleteImrProject(
   deletedBy: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await checkAuth({ role: ['admin', 'Super-admin'] });
+    const session = await checkAuth({ role: ['admin', 'Super-admin', 'CRO'] });
     if (!session.authenticated || !session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
 
     const projectRef = adminDb.collection("projects").doc(projectId)
@@ -119,7 +119,7 @@ export async function saveProjectSubmission(
 
 export async function updateProjectStatus(projectId: string, newStatus: Project["status"], comments?: string) {
   try {
-    const session = await checkAuth({ role: ['admin', 'Super-admin'] });
+    const session = await checkAuth({ role: ['admin', 'Super-admin', 'CRO'] });
     if (!session.authenticated || !session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
 
     const projectRef = adminDb.collection("projects").doc(projectId)
@@ -140,13 +140,13 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     }
 
     await projectRef.update(updateData)
-    
+
     await GovernanceLogger.logEntityChange(
-        projectId,
-        'PROJECT',
-        'SYSTEM_ADMIN',
-        project,
-        { ...project, ...updateData }
+      projectId,
+      'PROJECT',
+      'SYSTEM_ADMIN',
+      project,
+      { ...project, ...updateData }
     );
 
     await logActivity("INFO", "Project status updated", { projectId, newStatus, piUid: project.pi_uid })
@@ -201,7 +201,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     if (project.pi_email) {
       await sendEmailUtility({
         to: project.pi_email,
-        bcc: "vishal.sandhwar8850@paruluniversity.ac.in",
+        bcc: "process.env.ADMIN_EMAIL",
         subject: `Project Status Update: ${project.title}`,
         html: emailHtml,
         from: "default",
@@ -259,7 +259,7 @@ export async function updateProjectDuration(
   endDate: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await checkAuth({ role: ['admin', 'Super-admin'] });
+    const session = await checkAuth({ role: ['admin', 'Super-admin', 'CRO'] });
     if (!session.authenticated || !session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
 
     if (!projectId || !startDate || !endDate) {
@@ -287,7 +287,7 @@ export async function updateProjectEvaluators(
   evaluatorUids: string[],
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await checkAuth({ role: ['admin', 'Super-admin'] });
+    const session = await checkAuth({ role: ['admin', 'Super-admin', 'CRO'] });
     if (!session.authenticated || !session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
 
     if (!projectId || !evaluatorUids) {
@@ -320,7 +320,7 @@ export async function markImrAttendance(
   meetingIdentifier?: { date: string; time: string; venue: string }
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await checkAuth({ role: ['admin', 'Super-admin'] });
+    const session = await checkAuth({ role: ['admin', 'Super-admin', 'CRO'] });
     if (!session.authenticated || !session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
 
     const batch = adminDb.batch();
@@ -415,15 +415,15 @@ export async function updateCoInvestigators(
     if (!session.authenticated) return { success: false, error: "Unauthorized." };
 
     if (!projectId) return { success: false, error: "Project ID is required." }
-    
+
     const projectRef = adminDb.collection("projects").doc(projectId)
     const projectSnap = await projectRef.get()
     if (!projectSnap.exists) return { success: false, error: "Project not found." }
-    
+
     const project = projectSnap.data() as Project
     const existingCoPis = project.coPiUids || []
     const filteredCoPiUids = (coPiUids || []).filter((uid): uid is string => !!uid);
-    
+
     let coPiDetails: CoPiDetails[] = [];
     let coPiEmails: string[] = [];
     let coPiNames: string[] = [];
@@ -483,13 +483,13 @@ export async function updateCoInvestigators(
               </div>
               ${EMAIL_STYLES.footer}
             </div>`
-          
+
           await sendEmailUtility({ to: coPi.email, subject: `Added to IMR Project`, html: emailHtml, from: "default" })
         }
       }
       await batch.commit()
     }
-    
+
     await logActivity("INFO", "Co-investigators updated", { projectId, coPiCount: filteredCoPiUids.length })
     return { success: true }
   } catch (error: any) {
@@ -517,7 +517,7 @@ export async function adminUploadProposal(
   fileName: string,
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
-    const session = await checkAuth({ role: ['admin', 'Super-admin'] });
+    const session = await checkAuth({ role: ['admin', 'Super-admin', 'CRO'] });
     if (!session.authenticated || !session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
 
     const { uploadFileToServer } = await import("./storage-service")

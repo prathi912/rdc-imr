@@ -254,10 +254,11 @@ export async function registerEmrInterest(
         ${EMAIL_STYLES.footer}
       </div>`;
       await sendEmailUtility({
-        to: 'vishal.sandhwar8850@paruluniversity.ac.in',
+        to: 'process.env.ADMIN_EMAIL',
         subject: `FIRST EMR Interest: ${callTitle}`,
         html: firstInterestEmail,
-        from: 'default'
+        from: 'default',
+        category: 'EMR'
       });
       await logActivity("INFO", "First EMR interest email sent to super-admin", { callId, userId: user.uid });
     }
@@ -289,7 +290,8 @@ export async function registerEmrInterest(
         to: user.email,
         subject: `Your EMR Interest Registration for: ${callTitle}`,
         html: emailHtml,
-        from: 'default'
+        from: 'default',
+        category: 'EMR'
       });
     }
 
@@ -312,6 +314,7 @@ export async function registerEmrInterest(
                 ${EMAIL_STYLES.footer}
               </div>`,
             from: "default",
+            category: 'EMR'
           });
         }
 
@@ -471,6 +474,7 @@ export async function scheduleEmrMeeting(
             subject: `Your EMR Presentation Slot for: ${call.title}${subjectOnlineIndicator}`,
             html: emailHtml,
             from: "default",
+            category: 'EMR',
             icalEvent: {
               filename: 'invite.ics',
               method: 'REQUEST',
@@ -566,6 +570,7 @@ export async function scheduleEmrMeeting(
                 subject: `EMR Evaluation Assignment: ${call.title}${subjectOnlineIndicator}`,
                 html: emailHtml,
                 from: "default",
+                category: 'EMR',
                 icalEvent: {
                   filename: 'invite.ics',
                   method: 'REQUEST',
@@ -643,6 +648,7 @@ export async function uploadEmrPpt(
         subject: `Presentation Uploaded for EMR Call: ${callTitle}`,
         html: emailHtml,
         from: 'default',
+        category: 'EMR',
         attachments: [{
           filename: originalFileName,
           path: result.url,
@@ -728,6 +734,7 @@ export async function uploadEmrProposal(
         subject: `Proposal Uploaded for EMR Call: ${callTitle}`,
         html: emailHtml,
         from: 'default',
+        category: 'EMR',
         attachments: [{
           filename: originalFileName,
           path: result.url,
@@ -989,19 +996,19 @@ export async function addEmrEvaluation(
     const interestSnap = await adminDb.collection("emrInterests").doc(interestId).get()
     if (interestSnap.exists) {
       const interest = interestSnap.data() as EmrInterest
-      
+
       // SLA Tracking
       if (interest.meetingSlot?.date) {
         const deadlineDate = new Date(`${interest.meetingSlot.date}T${interest.meetingSlot.time || '00:00'}:00`);
         const now = new Date();
         const delayHours = differenceInHours(now, deadlineDate);
-        
+
         await GovernanceLogger.logPolicyTrace({
-            policyName: 'SLA_EMR_EVALUATION',
-            entityId: interestId,
-            inputs: { deadline: deadlineDate.toISOString(), completion: now.toISOString() },
-            outputs: { delayHours, isBreached: delayHours > 24 }, // Breach if > 24h after meeting
-            logicVersion: '1.0.0'
+          policyName: 'SLA_EMR_EVALUATION',
+          entityId: interestId,
+          inputs: { deadline: deadlineDate.toISOString(), completion: now.toISOString() },
+          outputs: { delayHours, isBreached: delayHours > 24 }, // Breach if > 24h after meeting
+          logicVersion: '1.0.0'
         });
       }
 
