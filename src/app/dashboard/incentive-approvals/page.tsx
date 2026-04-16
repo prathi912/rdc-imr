@@ -233,8 +233,10 @@ export default function IncentiveApprovalsPage() {
             <TableBody>
                 {claimsList.map(claim => {
                     const claimant = allUsers.find(u => u.uid === claim.uid);
-                    const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
-                    const hasProfileLink = claimant && claimant.misId;
+                    const hasProfileLink = !!claimant?.misId;
+                    const profileLink = hasProfileLink 
+                        ? (claimant?.campus === 'Goa' ? `/goa/${claimant?.misId}` : `/profile/${claimant?.misId}`)
+                        : '#';
                     const myApproval = isHistory ? claim.approvals?.find(a => a?.approverUid === user?.uid) : null;
                     return (
                         <TableRow key={claim.id}>
@@ -290,8 +292,10 @@ export default function IncentiveApprovalsPage() {
       <div className="grid md:hidden grid-cols-1 sm:grid-cols-2 gap-4">
           {claimsList.map(claim => {
               const claimant = allUsers.find(u => u.uid === claim.uid);
-              const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
-              const hasProfileLink = claimant && claimant.misId;
+              const hasProfileLink = !!claimant?.misId;
+              const profileLink = hasProfileLink 
+                  ? (claimant?.campus === 'Goa' ? `/goa/${claimant?.misId}` : `/profile/${claimant?.misId}`)
+                  : '#';
               const myApproval = isHistory ? claim.approvals?.find(a => a?.approverUid === user?.uid) : null;
               
               return (

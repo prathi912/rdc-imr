@@ -260,8 +260,10 @@ a.href = url;
     const isPendingForBank = ['Accepted', 'Submitted to Accounts'].includes(claim.status);
     const canGenerateNoting = isEligibleForFinancialDisbursement(claim);
 
-    const profileLink = claimant && claimant.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant?.misId}`;
-    const hasProfileLink = claimant && claimant.misId;
+    const hasProfileLink = !!claimant?.misId;
+    const profileLink = hasProfileLink 
+        ? (claimant?.campus === 'Goa' ? `/goa/${claimant?.misId}` : `/profile/${claimant?.misId}`)
+        : '#';
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

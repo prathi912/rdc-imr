@@ -499,8 +499,10 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
     const previousApprovals = (claim.approvals || []).filter(a => a?.stage < stageIndex + 1);
     
-    const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
-    const hasProfileLink = claimant && claimant.misId;
+    const hasProfileLink = !!claimant?.misId;
+    const profileLink = hasProfileLink 
+        ? (claimant?.campus === 'Goa' ? `/goa/${claimant?.misId}` : `/profile/${claimant?.misId}`)
+        : '#';
     const isViewerAdminOrApprover =
   approver?.role === 'Super-admin' ||
   approver?.role === 'admin' ||
