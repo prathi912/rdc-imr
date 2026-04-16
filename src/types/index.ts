@@ -499,6 +499,7 @@ export type EmrInterest = {
   status:
   | "Registered"
   | "PPT Submitted"
+  | "Documents Submitted"
   | "Revision Submitted"
   | "Evaluation Pending"
   | "Evaluation Done"

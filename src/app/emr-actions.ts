@@ -141,6 +141,7 @@ export async function registerEmrInterest(
   callId: string,
   user: User,
   pptData: { dataUrl: string; fileName: string },
+  proposalData: { dataUrl: string; fileName: string },
   coPis: CoPiDetails[] = [],
   registeredByAdmin?: { adminUid: string, adminName: string }
 ): Promise<{ success: boolean; error?: string }> {
@@ -159,6 +160,13 @@ export async function registerEmrInterest(
       }
     }
 
+    if (!proposalData || !proposalData.dataUrl) {
+      return {
+        success: false,
+        error: "Project Proposal upload is mandatory for registration.",
+      }
+    }
+
     const interestsRef = adminDb.collection("emrInterests")
     const q = interestsRef.where("callId", "==", callId).where("userId", "==", user.uid)
     const docSnap = await q.get()
@@ -166,13 +174,22 @@ export async function registerEmrInterest(
       return { success: false, error: "This user has already registered interest for this call." }
     }
 
-    const fileExtension = path.extname(pptData.fileName);
-    const standardizedName = `emr_${user.name.replace(/\s+/g, "_")}${fileExtension}`;
-    const filePath = `emr-presentations/${callId}/${user.uid}/${standardizedName}`;
-    const uploadResult = await uploadFileToServer(pptData.dataUrl, filePath);
+    const pptExtension = path.extname(pptData.fileName);
+    const pptStandardizedName = `emr_ppt_${user.name.replace(/\s+/g, "_")}${pptExtension}`;
+    const pptPath = `emr-presentations/${callId}/${user.uid}/${pptStandardizedName}`;
+    const pptUploadResult = await uploadFileToServer(pptData.dataUrl, pptPath);
 
-    if (!uploadResult.success || !uploadResult.url) {
-      throw new Error(uploadResult.error || "PPT upload failed.");
+    if (!pptUploadResult.success || !pptUploadResult.url) {
+      throw new Error(pptUploadResult.error || "PPT upload failed.");
+    }
+
+    const proposalExtension = path.extname(proposalData.fileName);
+    const proposalStandardizedName = `emr_proposal_${user.name.replace(/\s+/g, "_")}${proposalExtension}`;
+    const proposalPath = `emr-proposals/${callId}/${user.uid}/${proposalStandardizedName}`;
+    const proposalUploadResult = await uploadFileToServer(proposalData.dataUrl, proposalPath);
+
+    if (!proposalUploadResult.success || !proposalUploadResult.url) {
+      throw new Error(proposalUploadResult.error || "Proposal upload failed.");
     }
 
     const allInterestsForCallQuery = interestsRef.where("callId", "==", callId)
@@ -200,13 +217,15 @@ export async function registerEmrInterest(
         faculty: user.faculty || "N/A",
         department: user.department || "N/A",
         registeredAt: new Date().toISOString(),
-        status: "PPT Submitted",
+        status: "Documents Submitted",
         coPiDetails: coPis,
         coPiUids: coPis.map((p) => p.uid).filter(Boolean) as string[],
         coPiNames: coPis.map((p) => p.name),
         coPiEmails: coPis.map((p) => p.email.toLowerCase()),
-        pptUrl: uploadResult.url,
+        pptUrl: pptUploadResult.url,
         pptSubmissionDate: new Date().toISOString(),
+        proposalUrl: proposalUploadResult.url,
+        proposalSubmissionDate: new Date().toISOString(),
       }
 
       if (registeredByAdmin) {
@@ -409,9 +428,14 @@ export async function scheduleEmrMeeting(
       const interestRef = interestDoc.ref
       const interest = interestDoc.data() as EmrInterest
 
-      if (interest.pptUrl || interest.proposalUrl) {
-        anyDocumentUploaded = true;
+      if (!interest.pptUrl || !interest.proposalUrl) {
+        return { 
+          success: false, 
+          error: `Cannot schedule meeting: ${interest.userName} has not uploaded all mandatory documents (PPT and Proposal).` 
+        }
       }
+
+      anyDocumentUploaded = true;
 
       batch.update(interestRef, {
         meetingSlot: { date, time, pptDeadline },
@@ -2016,8 +2040,8 @@ export async function sendPptReminderEmails(callId: string): Promise<{ success: 
     const interestsToRemind = snapshot.docs.filter(doc => {
       const interest = doc.data() as EmrInterest;
       const needsReminder = (interest.status === 'Registered' || interest.status === 'Evaluation Pending');
-      const hasNotUploaded = !interest.pptUrl;
-      return needsReminder && hasNotUploaded;
+      const hasMissingDocs = !interest.pptUrl || !interest.proposalUrl;
+      return needsReminder && hasMissingDocs;
     });
 
     if (interestsToRemind.length === 0) {
@@ -2034,13 +2058,14 @@ export async function sendPptReminderEmails(callId: string): Promise<{ success: 
 
         const deadlineText = isValidDate
           ? `Your submission deadline is <strong>${formatInTimeZone(parseISO(pptDeadline!), 'Asia/Kolkata', 'PPpp (z)')}</strong>.`
-          : 'Please upload your presentation & Project Proposal at your earliest convenience to be considered for an evaluation slot. In case you do not wish to apply for call, please withdraw your interest from the portal.';
+          : 'Please upload your <strong>Presentation & Project Proposal</strong> at your earliest convenience to be considered for an evaluation slot. Both documents are mandatory. In case you do not wish to apply for call, please withdraw your interest from the portal.';
 
         const emailHtml = `
             <div ${EMAIL_STYLES.background}>
+              ${EMAIL_STYLES.logo}
               <p style="color:#ffffff;">Dear ${interest.userName},</p>
-              <p style="color:#cccccc;">
-                This is a friendly reminder to upload your presentation for the EMR funding call, "<strong style="color:#ffffff;">${call.title}</strong>".
+              <p style="color:#e0e0e0;">
+                This is a reminder that your mandatory documents (<strong>Presentation and Project Proposal</strong>) are still pending for the EMR call "<strong style="color:#ffffff;">${call.title}</strong>".
               </p>
               <p style="color:#e0e0e0;">${deadlineText}</p>
               ${EMAIL_STYLES.footer}

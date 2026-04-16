@@ -100,6 +100,7 @@ function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterS
     const [foundUsers, setFoundUsers] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [pptFile, setPptFile] = useState<File | null>(null);
+    const [proposalFile, setProposalFile] = useState<File | null>(null);
 
 
     const handleSearch = async () => {
@@ -116,20 +117,33 @@ function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterS
     };
 
     const handleRegister = async (userToRegister: User) => {
-        if (!pptFile) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Please upload a presentation (PPT) first.' });
+        if (!pptFile || !proposalFile) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please upload both presentation (PPT) and project proposal (PDF/ZIP).' });
             return;
         }
         if (pptFile.size > 10 * 1024 * 1024) {
             toast({ variant: 'destructive', title: 'Error', description: 'Presentation size must be less than 10MB.' });
             return;
         }
+        if (proposalFile.size > 15 * 1024 * 1024) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Proposal size must be less than 15MB.' });
+            return;
+        }
         setIsSubmitting(true);
 
         try {
-            const result = await registerEmrInterest(call.id, userToRegister, { dataUrl: await fileToDataUrl(pptFile!), fileName: pptFile!.name }, [], { adminUid: adminUser.uid, adminName: adminUser.name });
+            const pptDataUrl = await fileToDataUrl(pptFile);
+            const proposalDataUrl = await fileToDataUrl(proposalFile);
+            const result = await registerEmrInterest(
+                call.id, 
+                userToRegister, 
+                { dataUrl: pptDataUrl, fileName: pptFile.name }, 
+                { dataUrl: proposalDataUrl, fileName: proposalFile.name },
+                [], 
+                { adminUid: adminUser.uid, adminName: adminUser.name }
+            );
             if (result.success) {
-                toast({ title: 'Success', description: `${userToRegister.name} has been registered for the call.` });
+                toast({ title: 'Success', description: `${userToRegister.name} has been registered for the call with mandatory documents.` });
                 onRegisterSuccess();
                 onOpenChange(false);
             } else {
@@ -151,7 +165,13 @@ function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterS
                     <div className="space-y-2">
                         <Label>User Presentation (PPT/PDF) <span className="text-destructive">*</span></Label>
                         <Input type="file" accept=".ppt,.pptx,.pdf" onChange={(e) => setPptFile(e.target.files?.[0] || null)} />
-                        <p className="text-xs text-muted-foreground">Uploading a presentation (PPT or PDF) is mandatory for EMR registration. (Max size: 10MB)</p>
+                        <p className="text-xs text-muted-foreground">Mandatory for EMR registration. (Max size: 10MB)</p>
+                    </div>
+
+                    <div className="space-y-2 border-t pt-4">
+                        <Label>Project Proposal (PDF/ZIP) <span className="text-destructive">*</span></Label>
+                        <Input type="file" accept=".pdf,.zip" onChange={(e) => setProposalFile(e.target.files?.[0] || null)} />
+                        <p className="text-xs text-muted-foreground">Mandatory for EMR registration. (Max size: 15MB)</p>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -166,7 +186,7 @@ function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterS
                                         <p className="font-semibold">{user.name}</p>
                                         <p className="text-xs text-muted-foreground">{user.email}</p>
                                     </div>
-                                    <Button size="sm" onClick={() => handleRegister(user)} disabled={isSubmitting || !pptFile}>
+                                    <Button size="sm" onClick={() => handleRegister(user)} disabled={isSubmitting || !pptFile || !proposalFile}>
                                         {isSubmitting ? 'Registering...' : 'Register'}
                                     </Button>
                                 </div>
