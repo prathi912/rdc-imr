@@ -450,11 +450,13 @@ export function ResearchPaperForm() {
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false)
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false)
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
+  const [calculationBreakdown, setCalculationBreakdown] = useState<any>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   const [showWosAccession, setShowWosAccession] = useState(false);
   const [showLogic, setShowLogic] = useState(false);
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
 
   useEffect(() => {
     async function fetchSettings() {
@@ -465,92 +467,59 @@ export function ResearchPaperForm() {
   }, []);
 
   const getPaperLogicBreakdown = (data: any) => {
-    try {
-        const { journalClassification, publicationType, wasApcPaidByUniversity, isPuNameInPublication, authors = [] } = data;
-        const internalAuthors = authors.filter((a: any) => !a.isExternal);
-        const mainAuthors = internalAuthors.filter((a: any) => ['First Author', 'Corresponding Author', 'First & Corresponding Author'].includes(a.role));
-        const coAuthors = internalAuthors.filter((a: any) => a.role === 'Co-Author');
-
-        let baseAmount = 0;
-        switch (journalClassification) {
-            case 'Nature/Science/Lancet': baseAmount = 50000; break;
-            case 'Top 1% Journals': baseAmount = 25000; break;
-            case 'Q1': baseAmount = 15000; break;
-            case 'Q2': baseAmount = 10000; break;
-            case 'Q3': baseAmount = 6000; break;
-            case 'Q4': baseAmount = 4000; break;
-        }
-
-        let adjustedAmount = baseAmount;
-        let pubAdjustStr = '1.0×';
-        if (publicationType === 'Case Reports/Short Surveys') {
-            adjustedAmount = baseAmount * 0.9;
-            pubAdjustStr = '0.9×';
-        } else if (publicationType === 'Review Articles' && ['Q3', 'Q4'].includes(journalClassification || '')) {
-            adjustedAmount = baseAmount * 0.8;
-            pubAdjustStr = '0.8×';
-        } else if (publicationType === 'Letter to the Editor/Editorial') {
-            adjustedAmount = 2500;
-            baseAmount = 2500;
-            pubAdjustStr = 'Fixed';
-        }
-
-        let deductedAmount = adjustedAmount;
-        const deductions = [];
-        if (wasApcPaidByUniversity) {
-            deductedAmount /= 2;
-            deductions.push('APC Paid (÷2)');
-        }
-        if (isPuNameInPublication === false) {
-            deductedAmount /= 2;
-            deductions.push('No PU Name (÷2)');
-        }
-
-        let finalAmount = 0;
-        let authorShare = 'N/A';
-
-        if (internalAuthors.length === 0) {
-            finalAmount = 0;
-            authorShare = 'No internal authors';
-        } else if (internalAuthors.length === 1) {
-            if (mainAuthors.length === 1) {
-                finalAmount = deductedAmount;
-                authorShare = 'Sole main author (100%)';
-            } else if (coAuthors.length === 1) {
-                finalAmount = deductedAmount * 0.8;
-                authorShare = 'Sole co-author (80%)';
-            }
-        } else if (mainAuthors.length > 0 && coAuthors.length > 0) {
-            const mainShare = (deductedAmount * 0.7) / mainAuthors.length;
-            const coShare = (deductedAmount * 0.3) / coAuthors.length;
-            finalAmount = mainAuthors.length > 0 ? mainShare : coShare;
-            authorShare = `Mixed (Main 70%, Co 30%)`;
-        } else if (mainAuthors.length === 0 && coAuthors.length > 1) {
-            finalAmount = (deductedAmount * 0.8) / coAuthors.length;
-            authorShare = `Multiple co-authors (80% ÷ ${coAuthors.length})`;
-        } else if (mainAuthors.length > 0) {
-            finalAmount = deductedAmount / mainAuthors.length;
-            authorShare = `Multiple main authors (÷ ${mainAuthors.length})`;
-        }
-
+    if (calculationBreakdown) {
+        const { baseAmount, adjustedAmount, publicationTypeAdjustment, deductions, deductedAmount, authorShare, finalAmount, poolAmount, poolPercentage, sharingAuthorsCount } = calculationBreakdown;
+        
         const steps = [
            { label: '1. Base Amount (by Q-Rating)', value: `₹${baseAmount.toLocaleString('en-IN')}` },
-           { label: `2. Publication Type Adjustment (${pubAdjustStr})`, value: `₹${Math.round(adjustedAmount).toLocaleString('en-IN')}` }
+           { label: `2. Adjusted Base (${publicationTypeAdjustment})`, value: `₹${Math.round(adjustedAmount).toLocaleString('en-IN')}` }
         ];
 
         if (deductions.length > 0) {
-            steps.push({ label: `3. University Deductions (${deductions.join(', ')})`, value: `₹${Math.round(deductedAmount).toLocaleString('en-IN')}` });
+            steps.push({ label: `3. After PU Deductions`, value: `₹${Math.round(deductedAmount).toLocaleString('en-IN')}` });
         } else {
             steps.push({ label: `3. University Deductions`, value: 'None' });
         }
 
-        steps.push({ label: `4. Author Sharing (${authorShare})`, value: `${internalAuthors.length} Internal Authors` });
-        steps.push({ label: '5. Final Individual Share', value: `₹${Math.round(finalAmount).toLocaleString('en-IN')}` });
+        if (authorShare.includes('Ineligible')) {
+            steps.push({ label: '4. Eligibility Check', value: 'Ineligible' });
+            steps.push({ label: '5. Reason', value: authorShare.split(': ')[1] || authorShare });
+        } else {
+            // Mapping technical shorthand to friendly text
+            let friendlyShare = authorShare;
+            if (authorShare.includes('Mixed')) {
+                const isMain = authorShare.includes('Main (70%');
+                friendlyShare = `Mixed Roles (${isMain ? 'Main' : 'Co-Author'} ${poolPercentage}% Pool Share)`;
+            } else if (authorShare.includes('Sole')) {
+                friendlyShare = authorShare.replace('Sole', 'Sole Author').replace('(', '').replace(')', '');
+            } else if (authorShare.includes('Multiple')) {
+                friendlyShare = authorShare.replace('Multiple', 'Shared').replace('(', '').replace(')', '');
+            }
+
+            steps.push({ label: '4. Author Sharing Policy', value: friendlyShare });
+            
+            // Show the explicit pool math
+            if (poolAmount !== undefined && poolAmount !== adjustedAmount) {
+                steps.push({ label: '5. Your Group Pool Amount', value: `₹${poolAmount.toLocaleString('en-IN')} (${poolPercentage}% of ₹${Math.round(deductedAmount).toLocaleString('en-IN')})` });
+            }
+
+            // Show the final division if multiple authors
+            if (sharingAuthorsCount && sharingAuthorsCount > 1) {
+                steps.push({ label: '6. Internal Members (Sharing)', value: `${sharingAuthorsCount} Authors` });
+                steps.push({ label: 'Final Individual Share', value: `₹${Math.round(finalAmount).toLocaleString('en-IN')} (₹${poolAmount?.toLocaleString('en-IN')} / ${sharingAuthorsCount})` });
+            } else {
+                steps.push({ label: 'Final Individual Share', value: `₹${Math.round(finalAmount).toLocaleString('en-IN')} (100% Allocation)` });
+            }
+        }
 
         return steps;
-    } catch (e) {
-        return [];
     }
+
+    // Fallback if breakdown not yet calculated
+    return [
+        { label: '1. Calculation Pending', value: '...' },
+        { label: '2. Please wait', value: '...' }
+    ];
   }
 
   const form = useForm<ResearchPaperFormValues>({
@@ -593,33 +562,32 @@ export function ResearchPaperForm() {
 
   const calculate = useCallback(async () => {
     if (!user || !user.faculty) return;
+    setIsCalculating(true);
+    const formValues = form.getValues();
+    
+    // Server-side calculation
     const result = await calculateResearchPaperIncentive({ ...formValues, userEmail: user.email } as any, user.faculty, user.designation);
-    if (result.success) {
-      // Apply eligibility policy check: if co-author beyond 5th position, set to 0
-      let finalAmount = result.amount ?? null;
-
-      // Build claim object for eligibility check
-      const claimForEligibility: Partial<IncentiveClaim> = {
-        claimType: 'Research Papers',
-        userEmail: user.email,
-        authors: formValues.authors,
-        authorType: formValues.authors.find(a => a.email.toLowerCase() === user.email.toLowerCase())?.role as any,
-        authorPosition: formValues.authorPosition,
-      };
-
-      if (!isEligibleForFinancialDisbursement(claimForEligibility as IncentiveClaim)) {
-        finalAmount = 0;
-      }
+    
+    setIsCalculating(false);
+    if (result.success && result.amount !== undefined) {
+      const finalAmount = result.amount;
+      form.setValue('calculatedIncentive', finalAmount);
       setCalculatedIncentive(finalAmount);
+      setCalculationBreakdown(result.breakdown);
     } else {
       console.error("Incentive calculation failed:", result.error);
-      setCalculatedIncentive(null);
+      form.setValue('calculatedIncentive', 0);
+      setCalculatedIncentive(0);
+      setCalculationBreakdown(null);
     }
-  }, [formValues, user]);
+  }, [user, form]);
 
   useEffect(() => {
-    calculate();
-  }, [calculate]);
+    const timer = setTimeout(() => {
+      calculate();
+    }, 400); // 400ms debounce
+    return () => clearTimeout(timer);
+  }, [calculate, formValues]);
 
 
   useEffect(() => {
@@ -1581,11 +1549,14 @@ export function ResearchPaperForm() {
 
               {indexType !== 'other' && calculatedIncentive !== null && (
                  <Alert className="bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md">
-                   <div className="flex flex-col gap-1.5">
+                   <div className="flex flex-col gap-1.5 relative">
                       <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4" /> Estimated Incentive Amount
+                        <CheckCircle2 className="h-4 w-4" /> 
+                        Estimated Incentive Amount
                       </p>
-                      <h4 className="text-4xl font-black text-foreground tracking-tight py-1">₹{calculatedIncentive.toLocaleString('en-IN')}</h4>
+                      <h4 className="text-4xl font-black text-foreground tracking-tight py-1">
+                        ₹{calculatedIncentive.toLocaleString('en-IN')}
+                      </h4>
                       <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
                       
                       <div className="mt-4 border-t border-primary/10 pt-4">

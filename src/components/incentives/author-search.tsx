@@ -99,7 +99,7 @@ export function AuthorSearch({
             name: user.name,
             email: user.email,
             uid: user.uid,
-            isExternal: !user.uid,
+            isExternal: false, // If found in search, they ARE internal
             organization: user.campus || 'Vadodara',
             status: 'pending'
         };
@@ -128,11 +128,13 @@ export function AuthorSearch({
             return;
         }
 
+        const isInternalEmail = extEmail.trim().toLowerCase().endsWith('@paruluniversity.ac.in');
+
         const newAuthor: any = {
             name: extName.trim(),
             email: extEmail.trim().toLowerCase(),
-            organization: extOrg.trim() || 'External',
-            isExternal: true,
+            organization: isInternalEmail ? 'Parul University' : (extOrg.trim() || 'External'),
+            isExternal: !isInternalEmail,
             uid: null,
             status: 'pending'
         };

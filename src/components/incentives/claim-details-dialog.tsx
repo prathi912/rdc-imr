@@ -42,10 +42,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
         
         try {
             const { journalClassification, publicationType, wasApcPaidByUniversity, isPuNameInPublication, authors = [] } = claim;
-            const internalAuthors = authors.filter(a => !a.isExternal);
-            const mainAuthors = internalAuthors.filter(a => ['First Author', 'Corresponding Author', 'First & Corresponding Author'].includes(a.role));
-            const coAuthors = internalAuthors.filter(a => a.role === 'Co-Author');
-
+            
             // Base incentive
             let baseAmount = 0;
             switch (journalClassification) {
@@ -59,40 +56,43 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
 
             // Apply publication type adjustment
             let adjustedAmount = baseAmount;
+            let publicationTypeAdjustment = '1.0×';
             if (publicationType === 'Case Reports/Short Surveys') {
                 adjustedAmount = baseAmount * 0.9;
+                publicationTypeAdjustment = '0.9×';
             } else if (publicationType === 'Review Articles' && ['Q3', 'Q4'].includes(journalClassification || '')) {
                 adjustedAmount = baseAmount * 0.8;
+                publicationTypeAdjustment = '0.8×';
             } else if (publicationType === 'Letter to the Editor/Editorial') {
                 adjustedAmount = 2500;
+                publicationTypeAdjustment = 'Fixed';
             }
 
             // Apply university-level deductions
             let deductedAmount = adjustedAmount;
             const deductions = [];
-            
             if (wasApcPaidByUniversity) {
                 deductedAmount /= 2;
-                deductions.push('APC Paid by University (÷2)');
+                deductions.push('APC Paid (÷2)');
             }
             if (isPuNameInPublication === false) {
                 deductedAmount /= 2;
-                deductions.push('PU Name Not in Publication (÷2)');
+                deductions.push('No PU Name (÷2)');
             }
 
-            // Calculate shares
-            const mainShare = mainAuthors.length > 0 ? (deductedAmount * 0.7) / mainAuthors.length : 0;
-            const coShare = coAuthors.length > 0 ? (deductedAmount * 0.3) / coAuthors.length : 0;
+            const internalAuthors = authors.map(a => ({
+                ...a,
+                isExternal: a.email.toLowerCase() === claim.userEmail?.toLowerCase() ? false : a.isExternal
+            })).filter(a => !a.isExternal);
+            
+            // Categorize authors
+            const mainRoles = ['First Author', 'Corresponding Author', 'First & Corresponding Author', 'First & Presenting Author'];
+            const mainAuthors = internalAuthors.filter(a => mainRoles.includes(a.role));
+            const coAuthors = internalAuthors.filter(a => a.role === 'Co-Author' || a.role === 'Presenting Author');
+            
+            const isMainAuthor = mainRoles.includes(claim.authorType || '');
 
-            // Determine which share to show based on the claimant's role
-            const isMainAuthor = ['First Author', 'Corresponding Author', 'First & Corresponding Author'].includes(claim.authorType || '');
             let finalAmount = 0;
-            if (isMainAuthor) {
-                finalAmount = mainShare;
-            } else {
-                finalAmount = coShare;
-            }
-
             let authorShare = 'N/A';
 
             if (internalAuthors.length === 0) {
@@ -106,19 +106,39 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     finalAmount = !isMainAuthor ? deductedAmount * 0.8 : 0;
                     authorShare = 'Sole co-author (80%)';
                 }
-            } else if (mainAuthors.length > 0 && coAuthors.length > 0) {
+            }
+            // Mixed roles
+            else if (mainAuthors.length > 0 && coAuthors.length > 0) {
+                if (isMainAuthor) {
+                    finalAmount = (deductedAmount * 0.7) / mainAuthors.length;
+                } else {
+                    finalAmount = (deductedAmount * 0.3) / coAuthors.length;
+                }
                 authorShare = `Mixed: Main (70% ÷ ${mainAuthors.length}), Co-Author (30% ÷ ${coAuthors.length})`;
-            } else if (mainAuthors.length === 0 && coAuthors.length > 1) {
+            }
+            // Multiple Co-Authors only
+            else if (mainAuthors.length === 0 && coAuthors.length > 0) {
                 finalAmount = !isMainAuthor ? (deductedAmount * 0.8) / coAuthors.length : 0;
                 authorShare = `Multiple co-authors (80% ÷ ${coAuthors.length})`;
-            } else if (mainAuthors.length > 0) {
+            }
+            // Multiple main authors only
+            else if (mainAuthors.length > 0) {
                 if (isMainAuthor) finalAmount = deductedAmount / mainAuthors.length;
                 authorShare = `Multiple main authors (÷ ${mainAuthors.length})`;
             }
 
+            // --- Post-Calculation Policy Enforcement ---
+            
+            // Policy: Co-Authors beyond 5th author position are not eligible for monetary incentive.
+            const position = parseInt(claim.authorPosition || '0', 10);
+            if (!isMainAuthor && position > 5) {
+                finalAmount = 0;
+                authorShare = `Ineligible: Co-author at position ${position} (Max position is 5th)`;
+            }
+
             return {
                 baseAmount,
-                publicationTypeAdjustment: publicationType === 'Case Reports/Short Surveys' ? '0.9×' : publicationType === 'Review Articles' && ['Q3', 'Q4'].includes(journalClassification || '') ? '0.8×' : '1.0×',
+                publicationTypeAdjustment,
                 adjustedAmount: Math.round(adjustedAmount),
                 deductions,
                 deductedAmount: Math.round(deductedAmount),

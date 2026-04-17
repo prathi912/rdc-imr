@@ -376,6 +376,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
     const [claimToApply, setClaimToApply] = useState<IncentiveClaim | null>(null);
     const [isApplying, setIsApplying] = useState(false);
     const [calculatedAmount, setCalculatedAmount] = useState<number | undefined>(undefined);
+    const [calculationBreakdown, setCalculationBreakdown] = useState<any>(null);
     const [isCalculating, setIsCalculating] = useState(false);
     const [statusFilter, setStatusFilter] = useState<string>('pending');
 
@@ -465,6 +466,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
 
             if (result.success) {
                 setCalculatedAmount(result.amount ?? 0);
+                setCalculationBreakdown(result.breakdown);
             } else {
                 toast({
                     variant: 'destructive',
@@ -668,13 +670,43 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                                         <p className="text-sm"><strong>Indexing:</strong> {claimToApply.indexType?.toUpperCase()}</p>
                                         <p className="text-sm"><strong>Q-Rating:</strong> {claimToApply.journalClassification}</p>
                                         {claimToApply.publicationType && <p className="text-sm"><strong>Publication Type:</strong> {claimToApply.publicationType}</p>}
+                                        {claimToApply.publicationMonth && <p className="text-sm"><strong>Month of Publication:</strong> {claimToApply.publicationMonth}</p>}
                                         {claimToApply.publicationYear && <p className="text-sm"><strong>Year of Publication:</strong> {claimToApply.publicationYear}</p>}
+                                        {(claimToApply.printIssn || claimToApply.electronicIssn) && (
+                                            <p className="text-sm"><strong>ISSN:</strong> {claimToApply.printIssn || 'N/A'} (Print) / {claimToApply.electronicIssn || 'N/A'} (Online)</p>
+                                        )}
                                         {claimToApply.doi && <p className="text-sm"><strong>DOI:</strong> {claimToApply.doi}</p>}
                                         {claimToApply.relevantLink && (
                                             <p className="text-sm"><strong>Link:</strong> <a href={claimToApply.relevantLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View Publication</a></p>
                                         )}
                                         {claimToApply.authors && claimToApply.authors.length > 0 && (
-                                            <p className="text-sm"><strong>Total Authors:</strong> {claimToApply.authors.length}</p>
+                                            <div className="pt-2">
+                                                <p className="text-sm font-semibold mb-1 uppercase text-xs text-muted-foreground">List of Authors</p>
+                                                <div className="rounded-md border overflow-hidden">
+                                                    <table className="w-full text-xs">
+                                                        <thead className="bg-muted/60">
+                                                            <tr>
+                                                                <th className="text-left font-medium p-2">Author Name</th>
+                                                                <th className="text-left font-medium p-2">Role</th>
+                                                                <th className="text-left font-medium p-2">Type</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {claimToApply.authors.map((author, index) => (
+                                                                <tr key={`${author.email || author.name}-${index}`} className="border-t">
+                                                                    <td className="p-2">{author.name}</td>
+                                                                    <td className="p-2">{author.role}</td>
+                                                                    <td className="p-2">
+                                                                        <Badge variant={(author.isExternal && author.email.toLowerCase() !== userProfile?.email?.toLowerCase()) ? "secondary" : "outline"} className="text-[10px] h-4">
+                                                                            {(author.isExternal && author.email.toLowerCase() !== userProfile?.email?.toLowerCase()) ? 'External' : 'Internal'}
+                                                                        </Badge>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
                                 </>
@@ -748,38 +780,22 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                                 <div className="space-y-1 text-sm">
                                     <div className="flex justify-between">
                                         <span><strong>1. Base Amount (Q-Rating):</strong></span>
-                                        <span>
-                                            {claimToApply.claimType === 'Research Papers' ? (
-                                                <>
-                                                    {claimToApply.journalClassification === 'Nature/Science/Lancet' && '₹50,000'}
-                                                    {claimToApply.journalClassification === 'Top 1% Journals' && '₹25,000'}
-                                                    {claimToApply.journalClassification === 'Q1' && '₹15,000'}
-                                                    {claimToApply.journalClassification === 'Q2' && '₹10,000'}
-                                                    {claimToApply.journalClassification === 'Q3' && '₹6,000'}
-                                                    {claimToApply.journalClassification === 'Q4' && '₹4,000'}
-                                                </>
-                                            ) : 'N/A'}
-                                        </span>
+                                        <span>₹{calculationBreakdown?.baseAmount?.toLocaleString('en-IN') || '---'}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span><strong>2. Publication Type Adjustment:</strong></span>
-                                        <span>×1.0×</span>
+                                        <span>×{calculationBreakdown?.publicationTypeAdjustment || '1.0'}×</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span><strong>3. After Adjustment:</strong></span>
-                                        <span>
-                                            {claimToApply.claimType === 'Research Papers' ? (
-                                                <>
-                                                    {claimToApply.journalClassification === 'Nature/Science/Lancet' && '₹50,000'}
-                                                    {claimToApply.journalClassification === 'Top 1% Journals' && '₹25,000'}
-                                                    {claimToApply.journalClassification === 'Q1' && '₹15,000'}
-                                                    {claimToApply.journalClassification === 'Q2' && '₹10,000'}
-                                                    {claimToApply.journalClassification === 'Q3' && '₹6,000'}
-                                                    {claimToApply.journalClassification === 'Q4' && '₹4,000'}
-                                                </>
-                                            ) : 'N/A'}
-                                        </span>
+                                        <span>₹{calculationBreakdown?.adjustedAmount?.toLocaleString('en-IN') || '---'}</span>
                                     </div>
+                                    {calculationBreakdown?.deductions?.length > 0 && (
+                                        <div className="flex justify-between text-destructive">
+                                            <span><strong>4. University Deductions ({calculationBreakdown.deductions.join(', ')}):</strong></span>
+                                            <span>₹{calculationBreakdown.deductedAmount?.toLocaleString('en-IN')}</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -788,24 +804,11 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                                 <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-md">
                                     <p className="text-sm font-semibold">Author Distribution:</p>
                                     <div className="space-y-1 text-sm">
-                                        {(() => {
-                                            const mainAuthorRoles = ['First Author', 'Corresponding Author', 'First & Corresponding Author'];
-                                            const mainAuthors = claimToApply.authors.filter(a => mainAuthorRoles.includes(a.role));
-                                            const coAuthors = claimToApply.authors.filter(a => a.role === 'Co-Author');
-                                            const internalCount = claimToApply.authors.length;
-
-                                            return (
-                                                <>
-                                                    <p><strong>Internal Authors:</strong> {internalCount}</p>
-                                                    <p><strong>Main Authors:</strong> {mainAuthors.length}, <strong>Co-Authors:</strong> {coAuthors.length}</p>
-                                                    {mainAuthors.length > 0 && coAuthors.length > 0 ? (
-                                                        <p><strong>Mixed:</strong> Main (70% ÷ {mainAuthors.length}), Co-Author (30% ÷ {coAuthors.length})</p>
-                                                    ) : null}
-                                                    <p className="font-semibold mt-2"><strong>Final Incentive per Author:</strong></p>
-                                                    <p className="text-lg">₹{calculatedAmount?.toLocaleString('en-IN') ?? 'Calculating...'}</p>
-                                                </>
-                                            );
-                                        })()}
+                                        <p><strong>Internal Authors:</strong> {calculationBreakdown?.internalAuthorsCount || claimToApply.authors.length}</p>
+                                        <p><strong>Main Authors:</strong> {calculationBreakdown?.mainAuthorsCount || '---'}, <strong>Co-Authors:</strong> {calculationBreakdown?.coAuthorsCount || '---'}</p>
+                                        <p><strong>Sharing Policy:</strong> {calculationBreakdown?.authorShare || 'Standard Distribution'}</p>
+                                        <p className="font-semibold mt-2"><strong>Final Incentive per Author:</strong></p>
+                                        <p className="text-lg">₹{calculatedAmount?.toLocaleString('en-IN') ?? 'Calculating...'}</p>
                                     </div>
                                 </div>
                             )}

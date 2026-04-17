@@ -418,9 +418,15 @@ function ResearchPaperClaimDetails({
     const calculateIncentiveBreakdown = () => {
         try {
             const { journalClassification, publicationType, wasApcPaidByUniversity, isPuNameInPublication, authors = [] } = claim;
-            const internalAuthors = authors.filter(a => !a.isExternal);
-            const mainAuthors = internalAuthors.filter(a => ['First Author', 'Corresponding Author', 'First & Corresponding Author'].includes(a.role));
-            const coAuthors = internalAuthors.filter(a => a.role === 'Co-Author');
+            const internalAuthors = authors.map(a => ({
+                ...a,
+                isExternal: a.email.toLowerCase() === claim.userEmail?.toLowerCase() ? false : a.isExternal
+            })).filter(a => !a.isExternal);
+            const mainRoles = ['First Author', 'Corresponding Author', 'First & Corresponding Author', 'First & Presenting Author'];
+            const mainAuthors = internalAuthors.filter(a => mainRoles.includes(a.role));
+            const coAuthors = internalAuthors.filter(a => a.role === 'Co-Author' || a.role === 'Presenting Author');
+            
+            const isMainAuthor = mainRoles.includes(claim.authorType || '');
 
             // Base incentive
             let baseAmount = 0;
@@ -465,23 +471,32 @@ function ResearchPaperClaimDetails({
                 authorShare = 'No internal authors';
             } else if (internalAuthors.length === 1) {
                 if (mainAuthors.length === 1) {
-                    finalAmount = deductedAmount;
+                    finalAmount = isMainAuthor ? deductedAmount : 0;
                     authorShare = 'Sole main author (100%)';
                 } else if (coAuthors.length === 1) {
-                    finalAmount = deductedAmount * 0.8;
+                    finalAmount = !isMainAuthor ? deductedAmount * 0.8 : 0;
                     authorShare = 'Sole co-author (80%)';
                 }
             } else if (mainAuthors.length > 0 && coAuthors.length > 0) {
                 const mainShare = (deductedAmount * 0.7) / mainAuthors.length;
                 const coShare = (deductedAmount * 0.3) / coAuthors.length;
-                finalAmount = mainAuthors.length > 0 ? mainShare : coShare;
+                finalAmount = isMainAuthor ? mainShare : coShare;
                 authorShare = `Mixed: Main (70% ÷ ${mainAuthors.length}), Co-Author (30% ÷ ${coAuthors.length})`;
             } else if (mainAuthors.length === 0 && coAuthors.length > 1) {
-                finalAmount = (deductedAmount * 0.8) / coAuthors.length;
+                finalAmount = !isMainAuthor ? (deductedAmount * 0.8) / coAuthors.length : 0;
                 authorShare = `Multiple co-authors (80% ÷ ${coAuthors.length})`;
             } else if (mainAuthors.length > 0) {
-                finalAmount = deductedAmount / mainAuthors.length;
+                finalAmount = isMainAuthor ? deductedAmount / mainAuthors.length : 0;
                 authorShare = `Multiple main authors (÷ ${mainAuthors.length})`;
+            }
+
+            // --- Post-Calculation Policy Enforcement ---
+            
+            // Policy: Co-Authors beyond 5th author position are not eligible for monetary incentive.
+            const position = parseInt(claim.authorPosition || '0', 10);
+            if (!isMainAuthor && position > 5) {
+                finalAmount = 0;
+                authorShare = `Ineligible: Co-author at position ${position} (Max position is 5th)`;
             }
 
             return {
