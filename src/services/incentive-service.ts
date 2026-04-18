@@ -295,6 +295,34 @@ export async function submitIncentiveClaim(
 
       await newClaimRef.set(finalClaimData, { merge: true });
 
+      // If this is a co-author application, update the original claim's author status
+      if (claimData.originalClaimId) {
+          try {
+              const originalClaimRef = adminDb.collection('incentiveClaims').doc(claimData.originalClaimId);
+              const originalClaimSnap = await originalClaimRef.get();
+              if (originalClaimSnap.exists) {
+                  const originalClaim = originalClaimSnap.data() as IncentiveClaim;
+                  const updatedAuthors = originalClaim.authors?.map(author => {
+                      const isCurrentUser = (author.uid && author.uid === session.uid) || 
+                                           (author.email && author.email.toLowerCase() === (session.user?.email || claimData.userEmail || '').toLowerCase());
+                      return isCurrentUser ? { ...author, status: 'Applied' } : author;
+                  });
+                  await originalClaimRef.update({ authors: updatedAuthors });
+                  
+                  // Sync to RTDB
+                  try {
+                      const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
+                      await adminRtdb.ref(`incentiveClaims/${claimData.originalClaimId}`).update(sanitizeForRtdb({ 
+                          authors: updatedAuthors, 
+                          lastSyncedAt: new Date().toISOString() 
+                      }));
+                  } catch (e) {}
+              }
+          } catch (e) {
+              console.error("Error updating original claim status:", e);
+          }
+      }
+
       try {
           const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
           const sanitizedData = sanitizeForRtdb({ id: claimId, ...finalClaimData, lastSyncedAt: new Date().toISOString() });

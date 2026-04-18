@@ -519,13 +519,6 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
 
             await submitIncentiveClaimViaApi(newClaim as Omit<IncentiveClaim, 'id' | 'claimId'>);
 
-            // Update the status on the original claim for this co-author
-            const originalClaimRef = doc(db, 'incentiveClaims', claimToApply.id);
-            const updatedCoAuthors = claimToApply.authors?.map(author =>
-                author.uid === currentUser.uid ? { ...author, status: 'Applied' } : author
-            );
-            await updateDoc(originalClaimRef, { authors: updatedCoAuthors });
-
             toast({ title: 'Success', description: 'Your claim has been submitted based on the original publication details.' });
             setClaimToApply(null);
             onClaimApplied();
