@@ -697,8 +697,8 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                                                                     <td className="p-2">{author.name}</td>
                                                                     <td className="p-2">{author.role}</td>
                                                                     <td className="p-2">
-                                                                        <Badge variant={(author.isExternal && author.email.toLowerCase() !== userProfile?.email?.toLowerCase()) ? "secondary" : "outline"} className="text-[10px] h-4">
-                                                                            {(author.isExternal && author.email.toLowerCase() !== userProfile?.email?.toLowerCase()) ? 'External' : 'Internal'}
+                                                                        <Badge variant={(author.isExternal && author.email.toLowerCase() !== currentUser?.email?.toLowerCase()) ? "secondary" : "outline"} className="text-[10px] h-4">
+                                                                            {(author.isExternal && author.email.toLowerCase() !== currentUser?.email?.toLowerCase()) ? 'External' : 'Internal'}
                                                                         </Badge>
                                                                     </td>
                                                                 </tr>

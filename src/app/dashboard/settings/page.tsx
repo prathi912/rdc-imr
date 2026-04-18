@@ -107,7 +107,7 @@ const faculties = [
   "Faculty of Nursing",
   "Faculty of Pharmacy",
   "Faculty of Physiotherapy",
-  "Faculty of Public Health", 
+  "Faculty of Public Health",
   "Parul Sevashram Hospital",
   "RDC",
   "University Office",
@@ -115,13 +115,13 @@ const faculties = [
 ]
 
 const goaFaculties = [
-    "Faculty of Engineering, IT & CS",
-    "Faculty of Management Studies",
-    "Faculty of Pharmacy",
-    "Faculty of Applied and Health Sciences",
-    "Faculty of Nursing",
-    "Faculty of Physiotherapy",
-    "University Office"
+  "Faculty of Engineering, IT & CS",
+  "Faculty of Management Studies",
+  "Faculty of Pharmacy",
+  "Faculty of Applied and Health Sciences",
+  "Faculty of Nursing",
+  "Faculty of Physiotherapy",
+  "University Office"
 ];
 
 const campuses = ["Rajkot", "Ahmedabad", "Vadodara", "Goa"];
@@ -180,29 +180,29 @@ const institutes = [
 ]
 
 const goaInstitutes = [
-    "Parul College of Applied and Health Sciences",
-    "Parul College of Engineering",
-    "Parul College of Information Technology & Computer Science",
-    "Parul College of Management",
-    "Parul College of Nursing",
-    "Parul College of Pharmacy",
-    "Parul College of Physiotherapy",
-    "University Office"
+  "Parul College of Applied and Health Sciences",
+  "Parul College of Engineering",
+  "Parul College of Information Technology & Computer Science",
+  "Parul College of Management",
+  "Parul College of Nursing",
+  "Parul College of Pharmacy",
+  "Parul College of Physiotherapy",
+  "University Office"
 ];
 
 
 const salaryBanks = ["AU Bank", "HDFC Bank", "Central Bank of India"]
 
 const incentiveClaimTypes = [
-    'Research Papers',
-    'Patents',
-    'Conference Presentations',
-    'Books',
-    'Membership of Professional Bodies',
-    'Seed Money for APC',
-    'Award',
-    'EMR Sanction Project',
-    'Workshop/FDP/Training'
+  'Research Papers',
+  'Patents',
+  'Conference Presentations',
+  'Books',
+  'Membership of Professional Bodies',
+  'Seed Money for APC',
+  'Award',
+  'EMR Sanction Project',
+  'Workshop/FDP/Training'
 ];
 
 const fileToDataUrl = (file: File): Promise<string> => {
@@ -272,7 +272,7 @@ export default function SettingsPage() {
       ifscCode: "",
     },
   })
-  
+
 
 
   const dummyForm = useForm(); // For the incentive approvers section
@@ -320,7 +320,7 @@ export default function SettingsPage() {
     return () => unsubscribe()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  
+
   const selectedCampus = profileForm.watch('campus');
 
   useEffect(() => {
@@ -334,7 +334,7 @@ export default function SettingsPage() {
           // If current department is not in the new list, reset it
           const currentDepartment = profileForm.getValues('department');
           if (currentDepartment && !result.data.includes(currentDepartment)) {
-              profileForm.setValue('department', '');
+            profileForm.setValue('department', '');
           }
         }
       } catch (error) {
@@ -348,7 +348,7 @@ export default function SettingsPage() {
     const currentInstitute = profileForm.getValues('institute');
     const appropriateInstitutes = selectedCampus === 'Goa' ? goaInstitutes : [...new Set(institutes)];
     if (currentInstitute && !appropriateInstitutes.includes(currentInstitute)) {
-        profileForm.setValue('institute', '');
+      profileForm.setValue('institute', '');
     }
   }, [selectedCampus, profileForm]);
 
@@ -373,12 +373,12 @@ export default function SettingsPage() {
       if (data.misId && data.campus) {
         const misIdCheck = await checkMisIdExists(data.misId, user.uid, data.campus);
         if (misIdCheck.exists) {
-            profileForm.setError("misId", {
-                type: "manual",
-                message: "This MIS ID is already registered for this campus.",
-            });
-            setIsSubmittingProfile(false);
-            return;
+          profileForm.setError("misId", {
+            type: "manual",
+            message: "This MIS ID is already registered for this campus.",
+          });
+          setIsSubmittingProfile(false);
+          return;
         }
       }
 
@@ -386,7 +386,7 @@ export default function SettingsPage() {
       const { email, ...updateData } = data
       for (const key in updateData) {
         if ((updateData as any)[key] === undefined) {
-          ;(updateData as any)[key] = ""
+          ; (updateData as any)[key] = ""
         }
       }
       await updateDoc(userDocRef, updateData as any)
@@ -423,7 +423,7 @@ export default function SettingsPage() {
       setIsSubmittingBank(false)
     }
   }
-  
+
 
   async function onPasswordSubmit(data: PasswordFormValues) {
     setIsSubmittingPassword(true)
@@ -558,7 +558,7 @@ export default function SettingsPage() {
     const approvers = systemSettings.incentiveApprovers || [];
     const otherApprovers = approvers.filter(a => a.stage !== stage);
     const newApprovers: ApproverSetting[] = [...otherApprovers];
-    
+
     // Find the previous approver for this stage to remove their access
     const previousApproverEmail = approvers.find(a => a.stage === stage)?.email;
 
@@ -568,35 +568,35 @@ export default function SettingsPage() {
     newApprovers.sort((a, b) => a.stage - b.stage);
 
     await handleSystemSettingsSave({ ...systemSettings, incentiveApprovers: newApprovers });
-    
+
     // After saving, update user permissions
     const usersRef = collection(db, 'users');
 
     // Remove permissions from old approver
     if (previousApproverEmail) {
-        const oldApproverQuery = query(usersRef, where("email", "==", previousApproverEmail));
-        const oldApproverSnapshot = await getDocs(oldApproverQuery);
-        if (!oldApproverSnapshot.empty) {
-            const userDoc = oldApproverSnapshot.docs[0];
-            const userData = userDoc.data() as User;
-            const updatedModules = (userData.allowedModules || []).filter(m => !m.startsWith('incentive-approver-') && m !== 'incentive-approvals');
-            await updateDoc(userDoc.ref, { allowedModules: updatedModules });
-        }
+      const oldApproverQuery = query(usersRef, where("email", "==", previousApproverEmail));
+      const oldApproverSnapshot = await getDocs(oldApproverQuery);
+      if (!oldApproverSnapshot.empty) {
+        const userDoc = oldApproverSnapshot.docs[0];
+        const userData = userDoc.data() as User;
+        const updatedModules = (userData.allowedModules || []).filter(m => !m.startsWith('incentive-approver-') && m !== 'incentive-approvals');
+        await updateDoc(userDoc.ref, { allowedModules: updatedModules });
+      }
     }
 
     // Add permissions to new approver
     if (email) {
-        const newApproverQuery = query(usersRef, where("email", "==", email));
-        const newApproverSnapshot = await getDocs(newApproverQuery);
-        if (!newApproverSnapshot.empty) {
-            const userDoc = newApproverSnapshot.docs[0];
-            const userData = userDoc.data() as User;
-            const approverModule = `incentive-approver-${stage}`;
-            let updatedModules = userData.allowedModules || [];
-            if (!updatedModules.includes(approverModule)) updatedModules.push(approverModule);
-            if (!updatedModules.includes('incentive-approvals')) updatedModules.push('incentive-approvals');
-            await updateDoc(userDoc.ref, { allowedModules: updatedModules });
-        }
+      const newApproverQuery = query(usersRef, where("email", "==", email));
+      const newApproverSnapshot = await getDocs(newApproverQuery);
+      if (!newApproverSnapshot.empty) {
+        const userDoc = newApproverSnapshot.docs[0];
+        const userData = userDoc.data() as User;
+        const approverModule = `incentive-approver-${stage}`;
+        let updatedModules = userData.allowedModules || [];
+        if (!updatedModules.includes(approverModule)) updatedModules.push(approverModule);
+        if (!updatedModules.includes('incentive-approvals')) updatedModules.push('incentive-approvals');
+        await updateDoc(userDoc.ref, { allowedModules: updatedModules });
+      }
     }
   };
 
@@ -614,15 +614,15 @@ export default function SettingsPage() {
 
     let newStages;
     if (isChecked) {
-        newStages = [...new Set([...currentStages, stage])].sort((a, b) => a - b);
+      newStages = [...new Set([...currentStages, stage])].sort((a, b) => a - b);
     } else {
-        newStages = currentStages.filter(s => s !== stage);
+      newStages = currentStages.filter(s => s !== stage);
     }
-    
+
     const newWorkflows = { ...currentWorkflows, [claimType]: newStages };
     await handleSystemSettingsSave({ ...systemSettings, incentiveApprovalWorkflows: newWorkflows });
   };
-  
+
   const handleImrMidTermReviewChange = async (months: number) => {
     if (!systemSettings) return;
     await handleSystemSettingsSave({ ...systemSettings, imrMidTermReviewMonths: months });
@@ -632,8 +632,8 @@ export default function SettingsPage() {
     if (!systemSettings) return;
     await handleSystemSettingsSave({ ...systemSettings, imrEvaluationDays: days });
   };
-  
-   const handleTemplateUrlChange = async (templateKey: keyof NonNullable<SystemSettings['templateUrls']>, url: string) => {
+
+  const handleTemplateUrlChange = async (templateKey: keyof NonNullable<SystemSettings['templateUrls']>, url: string) => {
     if (!systemSettings) return;
     const newTemplateUrls = { ...systemSettings.templateUrls, [templateKey]: url };
     await handleSystemSettingsSave({ ...systemSettings, templateUrls: newTemplateUrls });
@@ -709,58 +709,58 @@ export default function SettingsPage() {
               <CardDescription>Global settings for the application. Changes affect all users.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                <div className="space-y-4">
-                    <div className="flex items-center gap-2"><Bot className="h-5 w-5" /><Label className="text-base">API Integrations</Label></div>
-                    <p className="text-sm text-muted-foreground">Enable or disable external data fetching services.</p>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="scopus-toggle">Scopus</Label><Switch id="scopus-toggle" checked={systemSettings.apiIntegrations?.scopus !== false} onCheckedChange={(c) => handleApiIntegrationToggle('scopus', c)} disabled={isSavingSettings} /></div>
-                        <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="wos-toggle">Web of Science</Label><Switch id="wos-toggle" checked={systemSettings.apiIntegrations?.wos !== false} onCheckedChange={(c) => handleApiIntegrationToggle('wos', c)} disabled={isSavingSettings} /></div>
-                        <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="sci-toggle">ScienceDirect</Label><Switch id="sci-toggle" checked={systemSettings.apiIntegrations?.sci !== false} onCheckedChange={(c) => handleApiIntegrationToggle('sci', c)} disabled={isSavingSettings} /></div>
-                    </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2"><Bot className="h-5 w-5" /><Label className="text-base">API Integrations</Label></div>
+                <p className="text-sm text-muted-foreground">Enable or disable external data fetching services.</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="scopus-toggle">Scopus</Label><Switch id="scopus-toggle" checked={systemSettings.apiIntegrations?.scopus !== false} onCheckedChange={(c) => handleApiIntegrationToggle('scopus', c)} disabled={isSavingSettings} /></div>
+                  <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="wos-toggle">Web of Science</Label><Switch id="wos-toggle" checked={systemSettings.apiIntegrations?.wos !== false} onCheckedChange={(c) => handleApiIntegrationToggle('wos', c)} disabled={isSavingSettings} /></div>
+                  <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="sci-toggle">ScienceDirect</Label><Switch id="sci-toggle" checked={systemSettings.apiIntegrations?.sci !== false} onCheckedChange={(c) => handleApiIntegrationToggle('sci', c)} disabled={isSavingSettings} /></div>
                 </div>
-                <Separator />
-                <div className="space-y-4">
-                    <div className="flex items-center gap-2"><FileText className="h-5 w-5" /><Label className="text-base">Template Management</Label></div>
-                    <p className="text-sm text-muted-foreground">Provide the direct download URLs for the DOCX templates used to generate office notings and other documents.</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                        {templateFields.map(({ key, label }) => (<div key={key} className="space-y-1"><Label htmlFor={`template-${key}`} className="text-sm">{label}</Label><Input id={`template-${key}`} placeholder="https://..." value={systemSettings?.templateUrls?.[key] || ''} onChange={(e) => handleTemplateUrlChange(key, e.target.value)} disabled={isSavingSettings} /></div>))}
-                    </div>
+              </div>
+              <Separator />
+              <div className="space-y-4">
+                <div className="flex items-center gap-2"><FileText className="h-5 w-5" /><Label className="text-base">Template Management</Label></div>
+                <p className="text-sm text-muted-foreground">Provide the direct download URLs for the DOCX templates used to generate office notings and other documents.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                  {templateFields.map(({ key, label }) => (<div key={key} className="space-y-1"><Label htmlFor={`template-${key}`} className="text-sm">{label}</Label><Input id={`template-${key}`} placeholder="https://..." value={systemSettings?.templateUrls?.[key] || ''} onChange={(e) => handleTemplateUrlChange(key, e.target.value)} disabled={isSavingSettings} /></div>))}
                 </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                    <div className="space-y-0.5"><Label className="text-base">Two-Factor Authentication (2FA)</Label><p className="text-sm text-muted-foreground">{systemSettings.is2faEnabled ? "Enabled" : "Disabled"} - Require users to verify their identity with an email OTP upon login.</p></div>
-                    <Switch checked={systemSettings.is2faEnabled} onCheckedChange={handle2faToggle} disabled={isSavingSettings}/>
-                </div>
-                <Separator />
-                <div className="space-y-4"><div className="flex items-center gap-2"><Clock className="h-5 w-5" /><Label className="text-base">IMR Mid-term Review Window</Label></div><p className="text-sm text-muted-foreground">Set the number of months after a grant is awarded that a project becomes eligible for a mid-term review.</p><div className="flex items-center gap-2"><Input type="number" className="w-24" value={systemSettings?.imrMidTermReviewMonths || 6} onChange={(e) => handleImrMidTermReviewChange(parseInt(e.target.value, 10) || 6)} disabled={isSavingSettings} min="1" /><span className="text-sm text-muted-foreground">months</span></div></div>
-                <Separator />
-                <div className="space-y-4"><div className="flex items-center gap-2"><CalendarIcon className="h-5 w-5" /><Label className="text-base">IMR Evaluation Window</Label></div><p className="text-sm text-muted-foreground">Set the number of days evaluators have to submit their feedback after the scheduled meeting date. Set to 0 to only allow same-day evaluations.</p><div className="flex items-center gap-2"><Input type="number" className="w-24" value={systemSettings?.imrEvaluationDays || 0} onChange={(e) => handleImrEvaluationDaysChange(parseInt(e.target.value, 10) || 0)} disabled={isSavingSettings} min="0" /><span className="text-sm text-muted-foreground">days</span></div></div>
-                <Separator />
-                <div className="space-y-4"><div className="flex items-center gap-2"><Award className="h-5 w-5" /><Label className="text-base">Incentive Claim Management</Label></div><p className="text-sm text-muted-foreground">Enable or disable specific types of incentive claims for all users.</p><div className="grid grid-cols-2 md:grid-cols-3 gap-4">{incentiveClaimTypes.map(type => (<div key={type} className="flex items-center space-x-2"><Switch id={`incentive-${type.replace(/\s+/g, '-')}`} checked={systemSettings.enabledIncentiveTypes?.[type] !== false} onCheckedChange={(checked) => handleIncentiveTypeToggle(type, checked)} disabled={isSavingSettings} /><Label htmlFor={`incentive-${type.replace(/\s+/g, '-')}`}>{type}</Label></div>))}</div></div>
-                <Separator />
-                <div className="space-y-4"><div className="flex items-center gap-2"><Award className="h-5 w-5" /><Label className="text-base">Incentive Approval Workflow</Label></div><p className="text-sm text-muted-foreground">Select which approval stages are required for each claim type. The first selected stage will be the starting point.</p><Table><TableHeader><TableRow><TableHead>Claim Type</TableHead><TableHead className="text-center">Stage 1</TableHead><TableHead className="text-center">Stage 2</TableHead><TableHead className="text-center">Stage 3</TableHead><TableHead className="text-center">Stage 4</TableHead></TableRow></TableHeader><TableBody>{incentiveClaimTypes.map(type => { const workflow = systemSettings.incentiveApprovalWorkflows?.[type] || [1, 2, 3, 4]; return (<TableRow key={type}><TableCell className="font-medium">{type}</TableCell>{[1, 2, 3, 4].map(stage => (<TableCell key={stage} className="text-center"><Checkbox checked={workflow.includes(stage)} onCheckedChange={(checked) => handleWorkflowChange(type, stage, !!checked)} disabled={isSavingSettings} /></TableCell>))}</TableRow>);})}</TableBody></Table></div>
-                <Separator />
-                <div className="space-y-4"><div className="flex items-center gap-2"><Mail className="h-5 w-5" /><Label className="text-base">Do Not Disturb (DND) Email</Label></div><p className="text-sm text-muted-foreground">The email address entered here will be excluded from all automated system email notifications.</p><Input placeholder="dnd.user@paruluniversity.ac.in" value={systemSettings.dndEmail || ''} onChange={(e) => setSystemSettings(prev => prev ? { ...prev, dndEmail: e.target.value } : null)} onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, dndEmail: e.target.value })} disabled={isSavingSettings} /></div>
-                <Separator />
-                <div className="space-y-4"><Label className="text-base">Allowed Email Domains</Label><p className="text-sm text-muted-foreground">Users with these email domains can register and access the portal.</p><div className="flex gap-2"><Input placeholder="@newcampus.paruluniversity.ac.in" value={newAllowedDomain} onChange={(e) => setNewAllowedDomain(e.target.value)} /><Button onClick={addAllowedDomain} disabled={isSavingSettings || !newAllowedDomain.trim()}><Plus className="h-4 w-4" /></Button></div><div className="flex flex-wrap gap-2">{(systemSettings.allowedDomains || []).map((domain) => (<Badge key={domain} variant="secondary" className="flex items-center gap-1">{domain}<Button variant="ghost" size="icon" className="h-4 w-4 hover:bg-destructive hover:text-destructive-foreground" onClick={() => removeAllowedDomain(domain)} disabled={isSavingSettings}><X className="h-3 w-3" /></Button></Badge>))}</div></div>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5"><Label className="text-base">Two-Factor Authentication (2FA)</Label><p className="text-sm text-muted-foreground">{systemSettings.is2faEnabled ? "Enabled" : "Disabled"} - Require users to verify their identity with an email OTP upon login.</p></div>
+                <Switch checked={systemSettings.is2faEnabled} onCheckedChange={handle2faToggle} disabled={isSavingSettings} />
+              </div>
+              <Separator />
+              <div className="space-y-4"><div className="flex items-center gap-2"><Clock className="h-5 w-5" /><Label className="text-base">IMR Mid-term Review Window</Label></div><p className="text-sm text-muted-foreground">Set the number of months after a grant is awarded that a project becomes eligible for a mid-term review.</p><div className="flex items-center gap-2"><Input type="number" className="w-24" value={systemSettings?.imrMidTermReviewMonths || 6} onChange={(e) => handleImrMidTermReviewChange(parseInt(e.target.value, 10) || 6)} disabled={isSavingSettings} min="1" /><span className="text-sm text-muted-foreground">months</span></div></div>
+              <Separator />
+              <div className="space-y-4"><div className="flex items-center gap-2"><CalendarIcon className="h-5 w-5" /><Label className="text-base">IMR Evaluation Window</Label></div><p className="text-sm text-muted-foreground">Set the number of days evaluators have to submit their feedback after the scheduled meeting date. Set to 0 to only allow same-day evaluations.</p><div className="flex items-center gap-2"><Input type="number" className="w-24" value={systemSettings?.imrEvaluationDays || 0} onChange={(e) => handleImrEvaluationDaysChange(parseInt(e.target.value, 10) || 0)} disabled={isSavingSettings} min="0" /><span className="text-sm text-muted-foreground">days</span></div></div>
+              <Separator />
+              <div className="space-y-4"><div className="flex items-center gap-2"><Award className="h-5 w-5" /><Label className="text-base">Incentive Claim Management</Label></div><p className="text-sm text-muted-foreground">Enable or disable specific types of incentive claims for all users.</p><div className="grid grid-cols-2 md:grid-cols-3 gap-4">{incentiveClaimTypes.map(type => (<div key={type} className="flex items-center space-x-2"><Switch id={`incentive-${type.replace(/\s+/g, '-')}`} checked={systemSettings.enabledIncentiveTypes?.[type] !== false} onCheckedChange={(checked) => handleIncentiveTypeToggle(type, checked)} disabled={isSavingSettings} /><Label htmlFor={`incentive-${type.replace(/\s+/g, '-')}`}>{type}</Label></div>))}</div></div>
+              <Separator />
+              <div className="space-y-4"><div className="flex items-center gap-2"><Award className="h-5 w-5" /><Label className="text-base">Incentive Approval Workflow</Label></div><p className="text-sm text-muted-foreground">Select which approval stages are required for each claim type. The first selected stage will be the starting point.</p><Table><TableHeader><TableRow><TableHead>Claim Type</TableHead><TableHead className="text-center">Stage 1</TableHead><TableHead className="text-center">Stage 2</TableHead><TableHead className="text-center">Stage 3</TableHead><TableHead className="text-center">Stage 4</TableHead></TableRow></TableHeader><TableBody>{incentiveClaimTypes.map(type => { const workflow = systemSettings.incentiveApprovalWorkflows?.[type] || [1, 2, 3, 4]; return (<TableRow key={type}><TableCell className="font-medium">{type}</TableCell>{[1, 2, 3, 4].map(stage => (<TableCell key={stage} className="text-center"><Checkbox checked={workflow.includes(stage)} onCheckedChange={(checked) => handleWorkflowChange(type, stage, !!checked)} disabled={isSavingSettings} /></TableCell>))}</TableRow>); })}</TableBody></Table></div>
+              <Separator />
+              <div className="space-y-4"><div className="flex items-center gap-2"><Mail className="h-5 w-5" /><Label className="text-base">Do Not Disturb (DND) Email</Label></div><p className="text-sm text-muted-foreground">The email address entered here will be excluded from all automated system email notifications.</p><Input placeholder="dnd.user@paruluniversity.ac.in" value={systemSettings.dndEmail || ''} onChange={(e) => setSystemSettings(prev => prev ? { ...prev, dndEmail: e.target.value } : null)} onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, dndEmail: e.target.value })} disabled={isSavingSettings} /></div>
+              <Separator />
+              <div className="space-y-4"><Label className="text-base">Allowed Email Domains</Label><p className="text-sm text-muted-foreground">Users with these email domains can register and access the portal.</p><div className="flex gap-2"><Input placeholder="@newcampus.paruluniversity.ac.in" value={newAllowedDomain} onChange={(e) => setNewAllowedDomain(e.target.value)} /><Button onClick={addAllowedDomain} disabled={isSavingSettings || !newAllowedDomain.trim()}><Plus className="h-4 w-4" /></Button></div><div className="flex flex-wrap gap-2">{(systemSettings.allowedDomains || []).map((domain) => (<Badge key={domain} variant="secondary" className="flex items-center gap-1">{domain}<Button variant="ghost" size="icon" className="h-4 w-4 hover:bg-destructive hover:text-destructive-foreground" onClick={() => removeAllowedDomain(domain)} disabled={isSavingSettings}><X className="h-3 w-3" /></Button></Badge>))}</div></div>
 
-                <Separator />
-                <div className="space-y-4"><div className="flex items-center gap-2"><Mail className="h-5 w-5" /><Label className="text-base">Utilization Report Email Recipient</Label></div><p className="text-sm text-muted-foreground">The email address that will receive a notification when a PI submits a utilization report and requests the next grant phase.</p><Input placeholder="finance.rdc@paruluniversity.ac.in" value={systemSettings?.utilizationNotificationEmail || ''} onChange={(e) => handleSystemSettingsSave({ ...systemSettings, utilizationNotificationEmail: e.target.value })} disabled={isSavingSettings} /></div>
-                <Separator />
-                <div className="space-y-4"><Label className="text-base">IQAC Email Address</Label><p className="text-sm text-muted-foreground">The user who signs up with this email will be automatically assigned the IQAC role.</p><Input placeholder="iqac@paruluniversity.ac.in" value={systemSettings?.iqacEmail || ''} onChange={(e) => handleSystemSettingsSave({ ...systemSettings, iqacEmail: e.target.value })} disabled={isSavingSettings} /></div>
-                <Separator />
-                <div className="space-y-4">
-                  <Form {...dummyForm}>
-                    <Label className="text-base">Incentive Approval Workflow</Label>
-                    <p className="text-sm text-muted-foreground">Define the email addresses for the four stages of incentive claim approval.</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {[1, 2, 3, 4].map(stage => {
-                            const approver = systemSettings?.incentiveApprovers?.find(a => a.stage === stage);
-                            return (<div key={stage} className="p-4 border rounded-lg space-y-3"><FormItem><FormLabel>Stage {stage} Approver Email</FormLabel><Input type="email" placeholder={`approver.stage${stage}@paruluniversity.ac.in`} value={approver?.email || ''} onChange={(e) => handleApproverChange(stage as 1 | 2 | 3 | 4, e.target.value)} disabled={isSavingSettings} /></FormItem></div>);
-                        })}
-                    </div>
-                  </Form>
-                </div>
+              <Separator />
+              <div className="space-y-4"><div className="flex items-center gap-2"><Mail className="h-5 w-5" /><Label className="text-base">Utilization Report Email Recipient</Label></div><p className="text-sm text-muted-foreground">The email address that will receive a notification when a PI submits a utilization report and requests the next grant phase.</p><Input placeholder="finance.rdc@paruluniversity.ac.in" value={systemSettings?.utilizationNotificationEmail || ''} onChange={(e) => handleSystemSettingsSave({ ...systemSettings, utilizationNotificationEmail: e.target.value })} disabled={isSavingSettings} /></div>
+              <Separator />
+              <div className="space-y-4"><Label className="text-base">IQAC Email Address</Label><p className="text-sm text-muted-foreground">The user who signs up with this email will be automatically assigned the IQAC role.</p><Input placeholder="iqac@paruluniversity.ac.in" value={systemSettings?.iqacEmail || ''} onChange={(e) => handleSystemSettingsSave({ ...systemSettings, iqacEmail: e.target.value })} disabled={isSavingSettings} /></div>
+              <Separator />
+              <div className="space-y-4">
+                <Form {...dummyForm}>
+                  <Label className="text-base">Incentive Approval Workflow</Label>
+                  <p className="text-sm text-muted-foreground">Define the email addresses for the four stages of incentive claim approval.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {[1, 2, 3, 4].map(stage => {
+                      const approver = systemSettings?.incentiveApprovers?.find(a => a.stage === stage);
+                      return (<div key={stage} className="p-4 border rounded-lg space-y-3"><FormItem><FormLabel>Stage {stage} Approver Email</FormLabel><Input type="email" placeholder={`approver.stage${stage}@paruluniversity.ac.in`} value={approver?.email || ''} onChange={(e) => handleApproverChange(stage as 1 | 2 | 3 | 4, e.target.value)} disabled={isSavingSettings} /></FormItem></div>);
+                    })}
+                  </div>
+                </Form>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -828,16 +828,16 @@ export default function SettingsPage() {
                     )}
                   />
                 </div>
-                 <FormField name="campus" control={profileForm.control} render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Campus</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={user?.email?.endsWith('@goa.paruluniversity.ac.in')}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select your campus" /></SelectTrigger></FormControl>
-                            <SelectContent>{campuses.map(campus => (<SelectItem key={campus} value={campus}>{campus}</SelectItem>))}</SelectContent>
-                        </Select>
-                        <FormMessage />
-                    </FormItem>
-                 )} />
+                <FormField name="campus" control={profileForm.control} render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Campus</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={user?.email?.endsWith('@goa.paruluniversity.ac.in')}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select your campus" /></SelectTrigger></FormControl>
+                      <SelectContent>{campuses.map(campus => (<SelectItem key={campus} value={campus}>{campus}</SelectItem>))}</SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 <FormField
                   name="faculty"
                   control={profileForm.control}
@@ -954,9 +954,9 @@ export default function SettingsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>ORCID iD</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
-                          </FormControl>
+                        <FormControl>
+                          <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -1020,8 +1020,7 @@ export default function SettingsPage() {
                   <CardTitle>Salary Bank Account Details</CardTitle>
                 </div>
                 <CardDescription>
-                  This information is required for grant disbursal. These details would be only visible to admin if your
-                  project is approved.
+                  This information is required for monetary disbursals. These details would be only visible to RDC Admin Office.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
