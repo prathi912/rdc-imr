@@ -153,7 +153,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
         }
     };
 
-    const breakdown = isAmountUnchanged ? calculateIncentiveBreakdown() : null;
+    const breakdown = calculateIncentiveBreakdown();
     
     const handleDownloadNoting = async () => {
         if (!claim || !isEligibleForFinancialDisbursement(claim)) {
@@ -248,6 +248,31 @@ a.href = url;
         );
     };
     
+    const ensureSecureUrl = (url: string) => {
+      if (!url) return url;
+      if (url.includes('firebasestorage.googleapis.com') || url.includes('storage.googleapis.com')) {
+          try {
+              const urlObj = new URL(url);
+              let path = "";
+              if (url.includes('firebasestorage')) {
+                  const parts = urlObj.pathname.split('/o/');
+                  if (parts.length > 1) {
+                      path = decodeURIComponent(parts[1].split('?')[0]);
+                  }
+              } else {
+                  const parts = urlObj.pathname.split('/');
+                  if (parts.length > 2) {
+                      path = parts.slice(2).join('/');
+                  }
+              }
+              if (path) return `/api/documents/${path}`;
+          } catch (e) {
+              console.error("Failed to rewrite storage URL:", e);
+          }
+      }
+      return url;
+    };
+
     const renderLinkDetail = (label: string, value?: string | string[]) => {
       if (!value || value.length === 0) return null;
       const urls = Array.isArray(value) ? value : [value];
@@ -256,13 +281,16 @@ a.href = url;
           <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
           <dd className="col-span-2">
             <div className="flex flex-col gap-1">
-                {urls.map((url, index) => (
-                  <Button key={index} variant="link" asChild className="p-0 h-auto justify-start">
-                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
-                        View Document {urls.length > 1 ? index + 1 : ''}
-                    </a>
-                  </Button>
-                ))}
+                {urls.map((url, index) => {
+                  const secureUrl = ensureSecureUrl(url);
+                  return (
+                    <Button key={index} variant="link" asChild className="p-0 h-auto justify-start">
+                      <a href={secureUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
+                          View Document {urls.length > 1 ? index + 1 : ''}
+                      </a>
+                    </Button>
+                  );
+                })}
             </div>
           </dd>
         </div>
@@ -275,8 +303,9 @@ a.href = url;
 
     const isFullAdmin = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
     const isApprover = currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
-    const canSeeCalculation = isFullAdmin || isApprover;
-    const canTakeAction = currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-')) && onTakeAction;
+    const isOwner = currentUser?.uid === claim.uid;
+    const canSeeCalculation = isFullAdmin || isApprover || isOwner;
+    const canTakeAction = isApprover && onTakeAction;
     const isPendingForBank = ['Accepted', 'Submitted to Accounts'].includes(claim.status);
     const canGenerateNoting = isEligibleForFinancialDisbursement(claim);
 
@@ -588,6 +617,14 @@ a.href = url;
                             
                             {breakdown && (
                                 <div className="space-y-2 mt-4 bg-blue-50 dark:bg-blue-950 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+                                    {!isAmountUnchanged && claim.finalApprovedAmount > 0 && (
+                                        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-2 rounded mb-2 flex items-start gap-2">
+                                            <Bot className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                                            <p className="text-[10px] text-amber-800 dark:text-amber-200 leading-tight">
+                                                Note: The final approved amount was manually adjusted by the RDC team during the approval process.
+                                            </p>
+                                        </div>
+                                    )}
                                     <h5 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Incentive Calculation Breakdown</h5>
                                     <div className="space-y-1.5 text-xs">
                                         <div className="grid grid-cols-2 gap-2">

@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import type { User, IncentiveClaim, Author, SystemSettings } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { db } from '@/lib/config';
-import { collection, query, where, getDocs, orderBy, addDoc, updateDoc, doc, arrayUnion, or } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, doc, arrayUnion, or } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { ArrowRight, Book, Award, Presentation, FileText, UserPlus, Banknote, Users, CheckSquare, Loader2, Edit, Eye, Info, Trash2 } from 'lucide-react';

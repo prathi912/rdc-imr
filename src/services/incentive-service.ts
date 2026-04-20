@@ -13,6 +13,7 @@ import { getDefaultModulesForRole } from "@/lib/modules"
 import { format } from "date-fns"
 import ExcelJS from "exceljs"
 import { checkAuth } from "@/lib/check-auth"
+import { getIncentiveClaimByIdCombined, getAllClaimsCombinedAdmin } from "@/lib/incentive-data-admin"
 
 export async function checkPatentUniqueness(title: string, applicationNumber: string, currentClaimId?: string): Promise<{ isUnique: boolean; message?: string }> {
   try {
@@ -21,17 +22,29 @@ export async function checkPatentUniqueness(title: string, applicationNumber: st
     const titleQuery = claimsRef.where('patentTitle', '==', title);
     const appNumberQuery = claimsRef.where('patentApplicationNumber', '==', applicationNumber);
 
-    const [titleSnapshot, appNumberSnapshot] = await Promise.all([
+    const [titleSnapshot, appNumberSnapshot, rtdbSnap] = await Promise.all([
       titleQuery.get(),
-      appNumberQuery.get()
+      appNumberQuery.get(),
+      adminRtdb.ref('incentiveClaims').get()
     ]);
 
-    const conflictingTitle = titleSnapshot.docs.find((doc: any) => doc.id !== currentClaimId);
+    let conflictingTitle = titleSnapshot.docs.find((doc: any) => doc.id !== currentClaimId);
+    let conflictingAppNumber = appNumberSnapshot.docs.find((doc: any) => doc.id !== currentClaimId);
+
+    if (!conflictingTitle && !conflictingAppNumber && rtdbSnap.exists()) {
+        const rtdbData = rtdbSnap.val();
+        for (const id in rtdbData) {
+            if (id === currentClaimId) continue;
+            const claim = rtdbData[id];
+            if (claim.patentTitle === title) conflictingTitle = { id } as any;
+            if (claim.patentApplicationNumber === applicationNumber) conflictingAppNumber = { id } as any;
+        }
+    }
+
     if (conflictingTitle) {
       return { isUnique: false, message: `A claim with the title "${title}" already exists.` };
     }
 
-    const conflictingAppNumber = appNumberSnapshot.docs.find((doc: any) => doc.id !== currentClaimId);
     if (conflictingAppNumber) {
       return { isUnique: false, message: `A claim with the application number "${applicationNumber}" already exists.` };
     }
@@ -46,17 +59,13 @@ export async function checkPatentUniqueness(title: string, applicationNumber: st
 
 export async function updateIncentiveClaimStatus(claimId: string, newStatus: IncentiveClaim["status"]) {
   try {
-    const claimRef = adminDb.collection("incentiveClaims").doc(claimId)
-    const claimSnap = await claimRef.get()
+    const claim = await getIncentiveClaimByIdCombined(claimId);
 
-    if (!claimSnap.exists) {
+    if (!claim) {
       return { success: false, error: "Incentive claim not found." }
     }
-    const claim = claimSnap.data() as IncentiveClaim
 
-    /*
-    await claimRef.update({ status: newStatus })
-    */
+    // Legacy Firestore write has been completely purged to strictly enforce the RTDB-only pipeline.
 
     try {
       const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
@@ -324,9 +333,7 @@ export async function submitIncentiveClaim(
           if (!paperSnap.empty) finalClaimData.paperId = paperSnap.docs[0].id;
       }
 
-      /*
-      await newClaimRef.set(finalClaimData, { merge: true });
-      */
+      // Legacy Firestore write has been completely purged to strictly enforce the RTDB-only pipeline.
 
       // If this is a co-author application, update the original claim's author status
       if (claimData.originalClaimId) {
@@ -342,9 +349,7 @@ export async function submitIncentiveClaim(
                                            (author.email && author.email.toLowerCase() === (session.user?.email || claimData.userEmail || '').toLowerCase());
                       return isCurrentUser ? { ...author, status: 'Applied' } : author;
                   }) || [];
-                  /*
-                  await originalClaimRef.update({ authors: updatedAuthors });
-                  */
+                  // Legacy Firestore write has been completely purged to strictly enforce the RTDB-only pipeline.
               } else {
                   // If not in Firestore, check RTDB
                   const rtdbSnap = await adminRtdb.ref(`incentiveClaims/${claimData.originalClaimId}`).get();
@@ -406,57 +411,58 @@ export async function submitIncentiveClaim(
 
                       if (coAuthor.email) {
                           const claimTitle = getClaimTitle(finalClaimData);
-                          const isConf = finalClaimData.publicationType === 'Scopus Indexed Conference Proceedings';
+                          const isConf = finalClaimData.claimType === 'Conference Presentations' || finalClaimData.publicationType === 'Scopus Indexed Conference Proceedings';
                           const isEmr = finalClaimData.claimType === 'EMR Sanction Project';
                           const isEligible = !isEmr && (!isConf || (coAuthor.role === 'Presenting Author' || coAuthor.role === 'First & Presenting Author'));
 
-                          const ctaUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/incentive-claim?tab=co-author`;
+                          const ctaUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://rdc.paruluniversity.ac.in'}/dashboard/incentive-claim?tab=co-author`;
                           
                           let subMessage = "";
                           if (isEligible) {
-                            subMessage = `<p style="color:#e0e0e0;">Since you are listed as a <strong>${coAuthor.role}</strong>, you are eligible to apply for your individual share of the incentive for this work.</p>`;
+                            subMessage = `Since you are listed as a <strong>${coAuthor.role}</strong>, you are eligible to apply for your individual share in the portal.`;
                           } else if (isEmr) {
-                            subMessage = `<p style="color:#e0e0e0;">This notification is for your records as an internal team member on this sanctioned project.</p>`;
+                            subMessage = `This notification is for your records as an internal team member on this sanctioned project.`;
                           } else if (isConf) {
-                            subMessage = `<p style="color:#e0e0e0;">Note: For conference proceedings, only the Presenting Author is eligible to file a monetary claim. This notification is for your citation records.</p>`;
+                            subMessage = `Note: For conference proceedings, only the Presenting Author is eligible to file a monetary claim. This notification is for your citation records.`;
                           }
 
                           await sendEmailUtility({
                               to: coAuthor.email,
-                              subject: `[${standardizedClaimId}] Co-author Notification: ${claimTitle.substring(0, 50)}...`,
+                              subject: `[Co-author] Action Required: ${claimTitle.substring(0, 50)}...`,
                               from: 'default',
                               category: 'Incentive',
                               html: `
                                 <div ${EMAIL_STYLES.background}>
                                     ${EMAIL_STYLES.logo}
-                                    <h2 style="color: #64b5f6; border-bottom: 2px solid #64b5f6; padding-bottom: 10px; margin-bottom: 20px;">Co-author Notification</h2>
-                                    <p style="color:#ffffff; font-size: 1.1em;">Dear ${coAuthor.name},</p>
-                                    <p style="color:#e0e0e0;">
-                                        <strong>${claimData.userName}</strong> has submitted an incentive claim for the following ${finalClaimData.claimType.toLowerCase() === 'research papers' ? 'publication' : 'work'}:
+                                    <h2 style="color: #64b5f6; border-bottom: 2px solid #64b5f6; padding-bottom: 10px; margin-bottom: 20px;">Co-author Incentive Application</h2>
+                                    <p style="color:#e0e0e0; line-height: 1.6;">
+                                        <strong>${claimData.userName}</strong> has submitted an incentive claim for <strong>${finalClaimData.claimType}</strong>:
                                     </p>
                                     
-                                    <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; border-left: 4px solid #64b5f6; margin: 20px 0;">
-                                        <p style="color:#ffffff; margin: 0 0 10px 0; font-weight: bold; font-size: 1.1em;">"${claimTitle}"</p>
-                                        <p style="color:#e0e0e0; margin: 0; font-size: 0.9em;">
-                                            <strong>Your Listed Role:</strong> ${coAuthor.role}
+                                    <div style="background: rgba(255,255,255,0.05); padding: 25px; border-radius: 12px; border-left: 5px solid #00e676; margin: 25px 0;">
+                                        <p style="color:#ffffff; margin: 0 0 12px 0; font-weight: bold; font-size: 1.2em; line-height: 1.4;">"${claimTitle}"</p>
+                                        <p style="color:#e0e0e0; margin: 0; font-size: 0.95em;">
+                                            <strong>Listed Role:</strong> ${coAuthor.role} ${finalClaimData.authorPosition ? `| <strong>Position:</strong> ${finalClaimData.authorPosition}` : ''}
                                         </p>
                                     </div>
 
-                                    ${subMessage}
+                                    <p style="color:#ffffff; font-weight: bold; margin-bottom: 20px;">
+                                        ${subMessage}
+                                    </p>
 
                                     ${isEligible ? `
-                                    <div style="text-align: center; margin: 30px 0;">
-                                        <a href="${ctaUrl}" style="background-color: #00e676; color: #000; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; display: inline-block; box-shadow: 0 4px 15px rgba(0,230,118,0.3);">
-                                            View & Apply for Claim
+                                    <div style="text-align: center; margin: 40px 0;">
+                                        <a href="${ctaUrl}" style="background-color: #00e676; color: #000; padding: 18px 36px; text-decoration: none; border-radius: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; display: inline-block; box-shadow: 0 4px 20px rgba(0,230,118,0.4); font-size: 1em;">
+                                            View & Apply for Share
                                         </a>
                                     </div>
-                                    <p style="color:#b0bec5; font-size: 0.85em; text-align: center;">
-                                        Click the button above to go directly to your "Co-author Claims" tab.
+                                    <p style="color:#b0bec5; font-size: 0.85em; text-align: center; margin-top: -20px;">
+                                        (Go directly to your Co-author Claims tab)
                                     </p>
                                     ` : ''}
 
-                                    <p style="color:#e0e0e0; margin-top: 25px;">
-                                        You can also access this claim anytime by navigating to <strong>Incentive Claims &gt; Co-author Claims</strong> in the RDC portal.
+                                    <p style="color:#e0e0e0; margin-top: 30px; font-size: 0.9em; border-top: 1px solid rgba(255,255,255,0.1); pt-20">
+                                        You can also access this claim anytime by navigating to <strong>Incentive Claims &gt; Co-author Claims</strong> dashboard.
                                     </p>
                                     
                                     ${EMAIL_STYLES.footer}
@@ -494,9 +500,7 @@ export async function deleteIncentiveClaim(claimId: string, userId: string): Pro
       if (claim.uid !== userId) return { success: false, error: "Unauthorized." };
       if (claim.status !== 'Draft') return { success: false, error: "Only drafts can be deleted." };
 
-      /*
-      await claimRef.delete();
-      */
+      // Legacy Firestore write has been completely purged to strictly enforce the RTDB-only pipeline.
       try { await adminRtdb.ref(`incentiveClaims/${claimId}`).remove(); } catch (e) {
           console.error("RTDB Remove Error (deleteIncentiveClaim):", e);
           return { success: false, error: "Failed to delete from Realtime Database." };
@@ -551,10 +555,8 @@ export async function processIncentiveClaimAction(
   data: { amount?: number; comments?: string, verifiedFields?: { [key: string]: boolean }, suggestions?: { [key: string]: string } }
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
-    const claimSnap = await claimRef.get();
-    if (!claimSnap.exists) return { success: false, error: 'Not found.' };
-    const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
+    const claim = await getIncentiveClaimByIdCombined(claimId);
+    if (!claim) return { success: false, error: 'Not found.' };
     const effectiveApprovedAmount = isEligibleForFinancialDisbursement(claim) ? (data.amount || 0) : 0;
     const settings = await getSystemSettings();
     
@@ -581,9 +583,7 @@ export async function processIncentiveClaimAction(
     const updateData: any = { approvals, status: newStatus };
     if (stageIndex >= 1 && (action === 'approve' || action === 'verify')) updateData.finalApprovedAmount = effectiveApprovedAmount;
 
-    /*
-    await claimRef.update(updateData);
-    */
+    // Legacy Firestore write has been completely purged to strictly enforce the RTDB-only pipeline.
     try {
         const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
         await adminRtdb.ref(`incentiveClaims/${claimId}`).update(sanitizeForRtdb({ ...updateData, lastSyncedAt: new Date().toISOString() }));
@@ -601,6 +601,34 @@ export async function processIncentiveClaimAction(
         await sendEmailUtility({ to: claim.userEmail, subject: `Claim Approved: ${getClaimTitle(claim)}`, from: 'default', category: 'Incentive', html: `<div ${EMAIL_STYLES.background}>${EMAIL_STYLES.logo}<p>Approved! Amount: ₹${effectiveApprovedAmount}</p>${EMAIL_STYLES.footer}</div>` });
         if (claim.claimType === 'Research Papers') await addPaperFromApprovedClaim(claim);
         else if (claim.claimType === 'EMR Sanction Project') await addEmrProjectFromApprovedClaim(claim);
+    } else if (newStatus === 'Rejected' && claim.userEmail) {
+        await sendEmailUtility({
+            to: claim.userEmail,
+            subject: `Update on your Incentive Claim: ${getClaimTitle(claim)}`,
+            from: 'default',
+            category: 'Incentive',
+            html: `
+                <div ${EMAIL_STYLES.background}>
+                    ${EMAIL_STYLES.logo}
+                    <p style="color:#ffffff;">Dear ${claim.userName},</p>
+                    <p style="color:#e0e0e0;">
+                      We are writing to inform you that your incentive claim for 
+                      "<strong style="color:#ffffff;">${getClaimTitle(claim)}</strong>" has been 
+                      <strong style="color:#ff5252;">Rejected</strong>.
+                    </p>
+                    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 4px solid #ff5252; margin: 20px 0;">
+                      <p style="color:#e0e0e0; margin: 0;">
+                        <strong>Approver's Comments:</strong><br/>
+                        ${data.comments || 'No specific comments provided.'}
+                      </p>
+                    </div>
+                     <p style="color:#e0e0e0;">
+                      If you have questions, please contact the RDC team.
+                    </p>
+                    ${EMAIL_STYLES.footer}
+                </div>
+            `
+        });
     }
 
     await logActivity('INFO', `Incentive claim action processed`, { claimId, action, stage: stageIndex + 1 });
@@ -621,9 +649,7 @@ export async function markPaymentsCompleted(claimIds: string[]): Promise<{ succe
         const claim = doc.data() as IncentiveClaim;
         if (!isEligibleForFinancialDisbursement(claim) || claim.status !== 'Submitted to Accounts') continue;
   
-        /*
-        batch.update(doc.ref, { status: 'Payment Completed' });
-        */
+        // Legacy Firestore write has been completely purged to strictly enforce the RTDB-only pipeline.
         try {
             const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
             await adminRtdb.ref(`incentiveClaims/${doc.id}`).update(sanitizeForRtdb({ status: 'Payment Completed', lastSyncedAt: new Date().toISOString() }));
@@ -658,9 +684,7 @@ export async function submitToAccounts(claimIds: string[]): Promise<{ success: b
       for (const doc of claimsQuery.docs) {
           const claim = doc.data() as IncentiveClaim;
           if (claim.status === 'Accepted' && claim.paymentSheetRef) {
-              /*
-              batch.update(doc.ref, { status: 'Submitted to Accounts' });
-              */
+              // Legacy Firestore write has been completely purged to strictly enforce the RTDB-only pipeline.
               try {
                   const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
                   await adminRtdb.ref(`incentiveClaims/${doc.id}`).update(sanitizeForRtdb({ status: 'Submitted to Accounts', lastSyncedAt: new Date().toISOString() }));
@@ -680,9 +704,8 @@ export async function submitToAccounts(claimIds: string[]): Promise<{ success: b
 
 export async function generateIncentivePaymentSheet(claimIds: string[], remarks: Record<string, string>, referenceNumber: string) {
     try {
-      const claimsRef = adminDb.collection('incentiveClaims');
-      const claimsSnap = await claimsRef.where(FieldPath.documentId(), 'in', claimIds).get();
-      const payableClaims = claimsSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as IncentiveClaim)).filter(isEligibleForFinancialDisbursement);
+      const allClaims = await getAllClaimsCombinedAdmin();
+      const payableClaims = allClaims.filter(c => claimIds.includes(c.id) && isEligibleForFinancialDisbursement(c));
       if (payableClaims.length === 0) return { success: false, error: "No valid claims." };
 
       const settings = await getSystemSettings();
@@ -697,9 +720,7 @@ export async function generateIncentivePaymentSheet(claimIds: string[], remarks:
 
       const batch = adminDb.batch();
       for (const claim of payableClaims) {
-          /*
-          batch.update(adminDb.collection('incentiveClaims').doc(claim.id), { paymentSheetRef: referenceNumber, paymentSheetRemarks: remarks[claim.id] || '' });
-          */
+          // Legacy Firestore write has been completely purged to strictly enforce the RTDB-only pipeline.
           try {
               const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
               await adminRtdb.ref(`incentiveClaims/${claim.id}`).update(sanitizeForRtdb({ 

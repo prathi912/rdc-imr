@@ -20,7 +20,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { db } from '@/lib/config'
-import { collection, doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore'
 import type { User, IncentiveClaim, Author, SystemSettings } from '@/types'
 import { uploadFileToApi } from '@/lib/upload-client'
 import { getSystemSettings } from "@/app/actions";
@@ -158,6 +158,15 @@ const researchPaperSchema = z
       return true;
     },
     { message: 'Web of Science URL is required when WoS or Both is selected.', path: ['wosLink'] }
+  )
+  .refine(
+    (data) => {
+      if (data.indexType === 'wos' || data.indexType === 'both') {
+        return !!data.wosAccessionNumber && data.wosAccessionNumber.length > 0;
+      }
+      return true;
+    },
+    { message: 'Web of Science Accession Number is required when WoS or Both is selected.', path: ['wosAccessionNumber'] }
   )
   .refine(
     (data) => {
@@ -929,7 +938,7 @@ export function ResearchPaperForm() {
         authorType: data.authors.find(a => a.email.toLowerCase() === user.email.toLowerCase())?.role || 'Co-Author',
       };
 
-      const result = await submitIncentiveClaimViaApi(claimData);
+      const result = await submitIncentiveClaimViaApi(claimData, claimId || undefined);
 
       if (!result.success) {
         throw new Error(result.error)
@@ -1180,16 +1189,16 @@ export function ResearchPaperForm() {
                         name="wosAccessionNumber"
                         render={({ field }) => (
                           <FormItem className="animate-in slide-in-from-top-2">
-                            <FormLabel className="text-base font-semibold">WoS Accession Number</FormLabel>
+                            <FormLabel className="text-base font-semibold text-primary">WoS Accession Number (Mandatory)</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="e.g. WOS:000123456700001"
                                 {...field}
                                 disabled={isSubmitting || isFetching}
-                                className="h-12 shadow-sm border-primary/20 focus-visible:ring-primary rounded-xl"
+                                className="h-12 shadow-sm border-primary/30 focus-visible:ring-primary rounded-xl"
                               />
                             </FormControl>
-                            <FormDescription className="text-xs">Required if DOI is not available for Web of Science papers.</FormDescription>
+                            <FormDescription className="text-xs">Unique identifier for your paper in the Web of Science Core Collection.</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}

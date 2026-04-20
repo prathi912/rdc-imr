@@ -17,7 +17,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToApi } from '@/lib/upload-client';
 import { Loader2, AlertCircle, Edit, FileText, CheckCircle2, Info, Award, ChevronDown } from 'lucide-react';

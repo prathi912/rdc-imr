@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { db, db_rtdb } from '@/lib/config';
-import { collection, getDocs, doc, updateDoc, orderBy, query } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { ref, update } from 'firebase/database';
 import type { IncentiveClaim } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -50,8 +50,8 @@ export function IncentiveClaimsList() {
 
   const handleStatusChange = useCallback(async (id: string, newStatus: IncentiveClaim['status']) => {
     try {
-      const claimDoc = doc(db, 'incentiveClaims', id);
-      await updateDoc(claimDoc, { status: newStatus });
+      // Legacy Firestore write has been completely purged to strictly enforce the RTDB-only pipeline.
+      console.warn("LEGACY: Direct Firestore update in IncentiveClaimsList is disabled. Use the API instead.");
 
       // Sync to Realtime Database
       try {

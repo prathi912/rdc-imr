@@ -54,6 +54,7 @@ const apcSchema = z.object({
   apcIndexingStatus: z.array(z.string()).refine(value => value.some(item => item), { message: "You have to select at least one indexing status." }),
   apcQRating: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
   doi: z.string().optional(),
+  apcWosAccessionNumber: z.string().optional().or(z.literal('')),
   apcPaperTitle: z.string().min(5, 'Paper title is required.'),
   authors: z.array(authorSchema).min(1, 'At least one author is required.')
     .refine(data => {
@@ -82,6 +83,14 @@ const apcSchema = z.object({
 }).refine(data => data.apcTypeOfArticle !== 'Other' || (!!data.apcOtherArticleType && data.apcOtherArticleType.length > 0), {
   message: 'Please specify the article type.',
   path: ['apcOtherArticleType'],
+}).refine(data => {
+  if (data.apcIndexingStatus.some(s => s.toLowerCase().includes('web of science'))) {
+    return !!data.apcWosAccessionNumber && data.apcWosAccessionNumber.length > 0;
+  }
+  return true;
+}, {
+  message: 'Web of Science Accession Number is required when Web of Science is selected.',
+  path: ['apcWosAccessionNumber'],
 });
 
 type ApcFormValues = z.infer<typeof apcSchema>;
@@ -617,6 +626,17 @@ export function ApcForm({ user }: { user: User }) {
                   </div>
                 </FormItem>
               )} />
+
+              {apcIndexingStatus.some(s => s.toLowerCase().includes('web of science')) && (
+                <FormField control={form.control} name="apcWosAccessionNumber" render={({ field }) => (
+                  <FormItem className="space-y-2 animate-in slide-in-from-top-2">
+                    <FormLabel className="text-base font-semibold text-primary">WoS Accession Number (Mandatory)</FormLabel>
+                    <FormControl><Input placeholder="e.g. WOS:000123456700001" {...field} className="h-12 shadow-sm border-primary/30 focus-visible:ring-primary rounded-xl" /></FormControl>
+                    <FormDescription className="text-xs">Unique identifier for your paper in the Web of Science Core Collection.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              )}
 
               <FormField name="apcPaperTitle" control={form.control} render={({ field }) => (
                 <FormItem className="space-y-2">

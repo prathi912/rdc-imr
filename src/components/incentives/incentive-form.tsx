@@ -39,7 +39,7 @@ import { Separator } from '@/components/ui/separator';
 import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { collection, addDoc } from 'firebase/firestore';
+// Legacy Firestore imports removed
 import type { User, IncentiveClaim } from '@/types';
 import { fetchScopusDataByUrl, getJournalWebsite, fetchWosDataByUrl } from '@/app/actions';
 import { uploadFileToApi } from '@/lib/upload-client';
@@ -651,7 +651,9 @@ export function IncentiveForm() {
             bankDetails: user.bankDetails,
         };
 
-        await addDoc(collection(db, 'incentiveClaims'), claimData);
+        // Legacy Firestore write has been completely purged to strictly enforce the RTDB-only pipeline.
+        toast({ variant: 'destructive', title: 'System Migrated', description: 'This legacy form is no longer active. Please use the new dedicated forms.' });
+        console.error("LEGACY: Direct Firestore submission in IncentiveForm is disabled. Use the new forms.");
         toast({ title: 'Success', description: 'Your incentive claim has been submitted.' });
         form.reset();
     } catch (error: any) {
