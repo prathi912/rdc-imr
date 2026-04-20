@@ -29,12 +29,12 @@ import {
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { fetchAllClaimsAction } from '@/app/actions';
+import { getSystemSettings, deleteIncentiveClaim } from '@/app/actions';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
-import { getSystemSettings } from '@/app/actions';
-import { deleteIncentiveClaim } from '@/app/actions';
 import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
 import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -367,6 +367,7 @@ function UserClaimsList({
 
 const coAuthorApplySchema = z.object({
     publicationOrderInYear: z.enum(['First', 'Second', 'Third']).optional(),
+    authorPosition: z.string().min(1, "Author position is required"),
 });
 
 type CoAuthorApplyValues = z.infer<typeof coAuthorApplySchema>;
@@ -400,91 +401,84 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
         return labels[position];
     };
 
-    const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
+    const handleOpenDialog = useCallback((claim: IncentiveClaim) => {
         if (!currentUser) return;
         setClaimToApply(claim);
-        setIsCalculating(true);
         setCalculatedAmount(undefined);
+        setCalculationBreakdown(null);
+        
+        const detectedPos = toAuthorPositionLabel((claim.authors || []).findIndex(a => a.email.toLowerCase() === currentUser.email.toLowerCase()) + 1);
+        form.reset({
+            authorPosition: detectedPos || '',
+            publicationOrderInYear: 'First'
+        });
+    }, [currentUser, form, toAuthorPositionLabel]);
 
-        try {
-            let result;
-            const myAuthorDetails = claim.authors?.find(
-                a => a.email.toLowerCase() === currentUser.email.toLowerCase()
-            );
+    // Handle recalculation when author position changes
+    const watchedPosition = form.watch('authorPosition');
+    const watchedOrder = form.watch('publicationOrderInYear');
 
-            if (!myAuthorDetails) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Error',
-                    description: 'Your details not found in the author list.'
-                });
+    useEffect(() => {
+        if (!claimToApply || !currentUser || !watchedPosition) return;
+
+        const calculate = async () => {
+            setIsCalculating(true);
+            try {
+                let result;
+                const myAuthorDetails = claimToApply.authors?.find(
+                    a => a.email.toLowerCase() === currentUser.email.toLowerCase()
+                );
+
+                if (!myAuthorDetails) return;
+
+                const SPECIAL_POLICY_FACULTIES = [
+                    "Faculty of Applied Sciences", "Faculty of Medicine", "Faculty of Homoeopathy",
+                    "Faculty of Ayurved", "Faculty of Nursing", "Faculty of Pharmacy",
+                    "Faculty of Physiotherapy", "Faculty of Public Health", "Faculty of Engineering & Technology"
+                ];
+                const isSpecialFaculty = SPECIAL_POLICY_FACULTIES.includes(currentUser.faculty || '');
+
+                const claimDataForCalc: Partial<IncentiveClaim> = {
+                    ...claimToApply,
+                    authors: claimToApply.authors?.map(author => {
+                        if (author.email.toLowerCase() === currentUser.email.toLowerCase()) {
+                            return { ...author, role: myAuthorDetails.role };
+                        }
+                        return author;
+                    }),
+                    userEmail: currentUser.email,
+                    authorType: myAuthorDetails.role,
+                    authorPosition: watchedPosition as any,
+                    publicationOrderInYear: watchedOrder as any
+                };
+
+                if (claimToApply.claimType === 'Research Papers') {
+                    result = await calculateResearchPaperIncentive(claimDataForCalc, currentUser.faculty || '', currentUser.designation);
+                } else if (claimToApply.claimType === 'Books') {
+                    result = await calculateBookIncentive(claimDataForCalc);
+                } else if (claimToApply.claimType === 'Seed Money for APC') {
+                    result = await calculateApcIncentive(claimDataForCalc, isSpecialFaculty);
+                } else if (claimToApply.claimType === 'EMR Sanction Project') {
+                    result = await calculateEmrSanctionIncentive(claimDataForCalc);
+                } else if (claimToApply.claimType === 'Conference Presentations') {
+                    result = await calculateConferenceIncentive(claimDataForCalc);
+                } else {
+                    result = { success: true, amount: 0 };
+                }
+
+                if (result.success) {
+                    setCalculatedAmount(result.amount ?? 0);
+                    setCalculationBreakdown(result.breakdown);
+                }
+            } catch (e) {
+                console.error('Calculation error:', e);
+            } finally {
                 setIsCalculating(false);
-                return;
             }
+        };
 
-            const SPECIAL_POLICY_FACULTIES = [
-                "Faculty of Applied Sciences",
-                "Faculty of Medicine",
-                "Faculty of Homoeopathy",
-                "Faculty of Ayurved",
-                "Faculty of Nursing",
-                "Faculty of Pharmacy",
-                "Faculty of Physiotherapy",
-                "Faculty of Public Health",
-                "Faculty of Engineering & Technology"
-            ];
-            const isSpecialFaculty = SPECIAL_POLICY_FACULTIES.includes(currentUser.faculty || '');
-
-            const claimDataForCalc: Partial<IncentiveClaim> = {
-                ...claim,
-                authors: claim.authors?.map(author => {
-                    // For calculation, treat the current applicant as the primary one for role-based logic
-                    if (author.email.toLowerCase() === currentUser.email.toLowerCase()) {
-                        return { ...author, role: myAuthorDetails.role };
-                    }
-                    return author;
-                }),
-                userEmail: currentUser.email,
-                authorType: myAuthorDetails.role,
-                authorPosition: toAuthorPositionLabel((claim.authors || []).findIndex(a => a.email.toLowerCase() === currentUser.email.toLowerCase()) + 1),
-            };
-
-            if (claim.claimType === 'Research Papers') {
-                result = await calculateResearchPaperIncentive(claimDataForCalc, currentUser.faculty || '', currentUser.designation);
-            } else if (claim.claimType === 'Books') {
-                result = await calculateBookIncentive(claimDataForCalc);
-            } else if (claim.claimType === 'Seed Money for APC') {
-                result = await calculateApcIncentive(claimDataForCalc, isSpecialFaculty);
-            } else if (claim.claimType === 'EMR Sanction Project') {
-                result = await calculateEmrSanctionIncentive(claimDataForCalc);
-            } else if (claim.claimType === 'Conference Presentations') {
-                result = await calculateConferenceIncentive(claimDataForCalc);
-            }
-            else {
-                result = { success: true, amount: 0 };
-            }
-
-            if (result.success) {
-                setCalculatedAmount(result.amount ?? 0);
-                setCalculationBreakdown(result.breakdown);
-            } else {
-                toast({
-                    variant: 'destructive',
-                    title: 'Calculation Error',
-                    description: result.error
-                });
-            }
-        } catch (e: any) {
-            console.error('Calculation error:', e);
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: e.message || 'Could not calculate incentive amount.'
-            });
-        } finally {
-            setIsCalculating(false);
-        }
-    }, [currentUser, toast]);
+        calculate();
+    }, [watchedPosition, watchedOrder, claimToApply, currentUser]);
 
     const handleApply = async (values: CoAuthorApplyValues) => {
         if (!claimToApply || !currentUser) {
@@ -514,7 +508,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                 faculty: currentUser.faculty || '',
                 calculatedIncentive: calculatedAmount, // Store the calculated amount
                 authorType: claimToApply.authors?.find(a => a.email.toLowerCase() === currentUser.email.toLowerCase())?.role || originalClaimData.authorType,
-                authorPosition: toAuthorPositionLabel((claimToApply.authors || []).findIndex(a => a.email.toLowerCase() === currentUser.email.toLowerCase()) + 1) || originalClaimData.authorPosition,
+                authorPosition: (values.authorPosition as any) || originalClaimData.authorPosition,
             };
 
             await submitIncentiveClaimViaApi(newClaim as Omit<IncentiveClaim, 'id' | 'claimId'>);
@@ -768,28 +762,32 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                             )}
 
                             {/* Incentive Calculation Breakdown */}
-                            <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-md">
-                                <p className="text-sm font-semibold">Incentive Calculation Breakdown</p>
-                                <div className="space-y-1 text-sm">
-                                    <div className="flex justify-between">
-                                        <span><strong>1. Base Amount (Q-Rating):</strong></span>
-                                        <span>₹{calculationBreakdown?.baseAmount?.toLocaleString('en-IN') || '---'}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span><strong>2. Publication Type Adjustment:</strong></span>
-                                        <span>×{calculationBreakdown?.publicationTypeAdjustment || '1.0'}×</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span><strong>3. After Adjustment:</strong></span>
-                                        <span>₹{calculationBreakdown?.adjustedAmount?.toLocaleString('en-IN') || '---'}</span>
-                                    </div>
-                                    {calculationBreakdown?.deductions?.length > 0 && (
-                                        <div className="flex justify-between text-destructive">
-                                            <span><strong>4. University Deductions ({calculationBreakdown.deductions.join(', ')}):</strong></span>
-                                            <span>₹{calculationBreakdown.deductedAmount?.toLocaleString('en-IN')}</span>
-                                        </div>
-                                    )}
+                            <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800">
+                                <div className="flex justify-between items-center">
+                                    <p className="text-sm font-semibold">Estimated Incentive Amount</p>
+                                    {isCalculating && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
                                 </div>
+                                
+                                {calculatedAmount !== undefined ? (
+                                    <div className="space-y-1 text-sm pt-2">
+                                        <div className="flex justify-between items-center py-1">
+                                            <span className="text-muted-foreground font-medium">Calculated Share:</span>
+                                            <span className="text-lg font-bold text-primary">₹{calculatedAmount.toLocaleString('en-IN')}</span>
+                                        </div>
+                                        {calculationBreakdown?.baseAmount && (
+                                            <div className="flex justify-between text-[10px] text-muted-foreground pt-1 border-t border-slate-200 dark:border-slate-800">
+                                                <span>Base: ₹{calculationBreakdown.baseAmount.toLocaleString('en-IN')}</span>
+                                                <span>Role Factor: ×{calculationBreakdown.publicationTypeAdjustment || '1.0'}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="py-4 text-center">
+                                        <p className="text-xs text-muted-foreground italic">
+                                            {watchedPosition ? 'Calculating your share...' : 'Please select your author position to see estimated incentive.'}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Author Distribution */}
@@ -852,30 +850,54 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
 
                         <Form {...form}>
                             <form id="co-author-apply-form" onSubmit={form.handleSubmit(handleApply)} className="space-y-4">
-                                {claimToApply.claimType === 'Books' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="authorPosition"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Your Author Position</FormLabel>
+                                                <Select onValueChange={field.onChange} value={field.value}>
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select position" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        {['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'].map(pos => (
+                                                            <SelectItem key={pos} value={pos}>{pos} Author</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <p className="text-[10px] text-muted-foreground mt-1">Detected automatically from author list.</p>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
                                     <FormField
                                         control={form.control}
                                         name="publicationOrderInYear"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Is this your First/Second/Third Chapter/Book in the calendar year?</FormLabel>
+                                                <FormLabel>Publication Order (This Year)</FormLabel>
                                                 <Select onValueChange={field.onChange} value={field.value}>
                                                     <FormControl>
                                                         <SelectTrigger>
-                                                            <SelectValue placeholder="Select publication order" />
+                                                            <SelectValue placeholder="Select order" />
                                                         </SelectTrigger>
                                                     </FormControl>
                                                     <SelectContent>
-                                                        <SelectItem value="First">First</SelectItem>
-                                                        <SelectItem value="Second">Second</SelectItem>
-                                                        <SelectItem value="Third">Third</SelectItem>
+                                                        <SelectItem value="First">1st Paper of the Year</SelectItem>
+                                                        <SelectItem value="Second">2nd Paper of the Year</SelectItem>
+                                                        <SelectItem value="Third">3rd Paper or more</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
                                     />
-                                )}
+                                </div>
                             </form>
                         </Form>
                         <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-md border border-blue-200 dark:border-blue-800">
@@ -919,15 +941,15 @@ export default function IncentiveClaimPage() {
     const fetchAllData = useCallback(async (uid: string, email: string) => {
         setLoading(true);
         try {
-            const claimsCollection = collection(db, 'incentiveClaims');
+            const combinedClaims = await fetchAllClaimsAction({ uid, email, role: 'faculty' } as User);
 
-            const userClaimsQuery = query(claimsCollection, where('uid', '==', uid), orderBy('submissionDate', 'desc'));
-            const userClaimSnapshot = await getDocs(userClaimsQuery);
-            const userClaimList = userClaimSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
-            setUserClaims(userClaimList);
+            // 1. My Claims (where user is primary author)
+            const ownedClaims = combinedClaims.filter(c => c.uid === uid);
+            setUserClaims(ownedClaims);
 
+            // 2. Membership Eligibility check (using owned claims)
             const currentYear = new Date().getFullYear();
-            const claimInCurrentYear = userClaimList.find(c => 
+            const claimInCurrentYear = ownedClaims.find(c => 
                 c.claimType === 'Membership of Professional Bodies' && 
                 c.status !== 'Draft' && 
                 c.status !== 'Rejected' &&
@@ -936,47 +958,22 @@ export default function IncentiveClaimPage() {
 
             if (claimInCurrentYear) {
                 const nextYear = currentYear + 1;
-                const nextDate = new Date(nextYear, 0, 1); // January 1st of next year
-                setMembershipClaimInfo({
-                    canClaim: false,
-                    nextAvailableDate: format(nextDate, 'PPP')
-                });
+                const nextDate = new Date(nextYear, 0, 1);
+                setMembershipClaimInfo({ canClaim: false, nextAvailableDate: format(nextDate, 'PPP') });
             } else {
-                setMembershipClaimInfo({
-                    canClaim: true
-                });
+                setMembershipClaimInfo({ canClaim: true });
             }
 
-            // Query by authorUids and authorEmails arrays (for newer claims)
-            const coAuthorByUidQuery = query(claimsCollection, where('authorUids', 'array-contains', uid));
-            const coAuthorByEmailQuery = query(claimsCollection, where('authorEmails', 'array-contains', email.toLowerCase()));
+            // 3. Co-author Claims
+            // Filter claims where user is listed as co-author but not primary author, 
+            // and exclude co-author-derived claims (originalClaimId check).
+            const coAuthorList = combinedClaims.filter(c => 
+                c.uid !== uid && 
+                !c.originalClaimId && 
+                (c.authorUids?.includes(uid) || (c.authorEmails?.includes(email.toLowerCase())))
+            );
 
-            const [coAuthorByUidSnap, coAuthorByEmailSnap] = await Promise.all([
-                getDocs(coAuthorByUidQuery),
-                getDocs(coAuthorByEmailQuery),
-            ]);
-
-            const allCoAuthorClaims = new Map<string, IncentiveClaim>();
-
-            coAuthorByUidSnap.forEach(doc => {
-                allCoAuthorClaims.set(doc.id, { ...doc.data(), id: doc.id } as IncentiveClaim);
-            });
-            coAuthorByEmailSnap.forEach(doc => {
-                if (!allCoAuthorClaims.has(doc.id)) {
-                    allCoAuthorClaims.set(doc.id, { ...doc.data(), id: doc.id } as IncentiveClaim);
-                }
-            });
-
-
-            // Filter out claims where the current user is the primary author (uid)
-            // and exclude co-author-derived claims to avoid duplicate listings and re-application.
-            const coAuthorClaimList = Array.from(allCoAuthorClaims.values())
-                .filter(claim => {
-                    if (claim.uid === uid || claim.originalClaimId) return false;
-                    return true;
-                });
-
-            setCoAuthorClaims(coAuthorClaimList);
+            setCoAuthorClaims(coAuthorList);
 
             const settings = await getSystemSettings();
             setSystemSettings(settings);

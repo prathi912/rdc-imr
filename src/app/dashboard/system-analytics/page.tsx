@@ -21,8 +21,9 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { db } from '@/lib/config'
+import { db, db_rtdb } from '@/lib/config'
 import type { Project, EmrInterest, IncentiveClaim, User } from '@/types'
+import { fetchAllClaimsAction } from '@/app/actions'
 
 const COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
 
@@ -63,12 +64,17 @@ export default function SystemAnalyticsPage() {
     unsubscribes.push(onSnapshot(collection(db, 'emrInterests'), (snapshot) => {
       setEmrInterests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest)))
     }))
-    unsubscribes.push(onSnapshot(collection(db, 'incentiveClaims'), (snapshot) => {
-      setIncentiveClaims(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim)))
-    }))
     unsubscribes.push(onSnapshot(collection(db, 'users'), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User)))
     }))
+
+    // Fetch incentive claims via server action
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}') as User;
+    if (currentUser.uid) {
+      fetchAllClaimsAction(currentUser).then(claims => {
+        setIncentiveClaims(claims);
+      }).catch(err => console.error("Error fetching claims in system analytics:", err));
+    }
 
     const logsQuery = query(collection(db, 'logs'), where('timestamp', '>=', thresholdIso), orderBy('timestamp', 'asc'))
     unsubscribes.push(onSnapshot(logsQuery, (snapshot) => {

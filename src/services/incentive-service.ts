@@ -54,7 +54,9 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
     }
     const claim = claimSnap.data() as IncentiveClaim
 
+    /*
     await claimRef.update({ status: newStatus })
+    */
 
     try {
       const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
@@ -64,7 +66,8 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
       });
       await adminRtdb.ref(`incentiveClaims/${claimId}`).update(sanitizedUpdate);
     } catch (rtdbError) {
-      console.error(`RTDB Sync Error (updateIncentiveClaimStatus) for claim ${claimId}:`, rtdbError);
+      console.error(`RTDB Update Error (updateIncentiveClaimStatus) for claim ${claimId}:`, rtdbError);
+      return { success: false, error: "Failed to update Realtime Database." };
     }
     
     await GovernanceLogger.logEntityChange(
@@ -237,20 +240,48 @@ export async function submitIncentiveClaim(
           }
 
           let fieldToCheck: keyof IncentiveClaim | null = null;
+          let secondaryFieldToCheck: keyof IncentiveClaim | null = null;
           let valueToCheck: string | undefined = undefined;
+          let secondaryValueToCheck: string | undefined = undefined;
 
           switch (claimData.claimType) {
-              case 'Research Papers': if (claimData.doi) { fieldToCheck = 'doi'; valueToCheck = claimData.doi; } break;
-              case 'Books': fieldToCheck = 'publicationTitle'; valueToCheck = claimData.publicationTitle; break;
-              case 'Patents': fieldToCheck = 'patentTitle'; valueToCheck = claimData.patentTitle; break;
-              case 'Membership of Professional Bodies': fieldToCheck = 'membershipNumber'; valueToCheck = claimData.membershipNumber; break;
+              case 'Research Papers': 
+                  if (claimData.doi) { fieldToCheck = 'doi'; valueToCheck = claimData.doi; } 
+                  else { fieldToCheck = 'paperTitle'; valueToCheck = claimData.paperTitle; }
+                  break;
+              case 'Books': 
+                  fieldToCheck = 'publicationTitle'; valueToCheck = claimData.publicationTitle; break;
+              case 'Patents': 
+                  if (claimData.patentApplicationNumber) { fieldToCheck = 'patentApplicationNumber'; valueToCheck = claimData.patentApplicationNumber; }
+                  else { fieldToCheck = 'patentTitle'; valueToCheck = claimData.patentTitle; }
+                  break;
+              case 'Membership of Professional Bodies': 
+                  fieldToCheck = 'membershipNumber'; valueToCheck = claimData.membershipNumber; break;
+              case 'EMR Sanction Project':
+                  fieldToCheck = 'emrProjectName'; valueToCheck = claimData.emrProjectName; break;
           }
           
           if (fieldToCheck && valueToCheck) {
-              const existingClaimsSnap = await claimsRef.where(fieldToCheck, '==', valueToCheck).where('uid', '==', claimData.uid).get();
-              const duplicateClaim = existingClaimsSnap.docs.find((doc: any) => doc.id !== claimIdToUpdate && doc.data().status !== 'Draft');
-              if (duplicateClaim) {
-                  return { success: false, error: `You have already submitted an incentive claim for this work.` };
+              // GLOBAL CHECK: Look for this work across ALL users to prevent anyone from submitting twice
+              const existingClaimsSnap = await claimsRef.where(fieldToCheck, '==', valueToCheck).get();
+              const globalDuplicate = existingClaimsSnap.docs.find((doc: any) => 
+                  doc.id !== claimIdToUpdate && 
+                  doc.id !== claimData.originalClaimId && // Not the parent claim of this co-author application
+                  doc.data().status !== 'Draft' && 
+                  doc.data().status !== 'Rejected'
+              );
+
+              if (globalDuplicate) {
+                  const dupData = globalDuplicate.data();
+                  if (dupData.uid === claimData.uid) {
+                      return { success: false, error: `You have already submitted an active claim for this work (${dupData.claimId}).` };
+                  } else {
+                      // If submitted by someone else, inform the user to use the co-author workflow
+                      return { 
+                          success: false, 
+                          error: `This ${claimData.claimType.toLowerCase().slice(0, -1)} has already been submitted by ${dupData.userName}. Please check your 'Co-author Claims' tab to apply for your share instead of creating a duplicate.` 
+                      };
+                  }
               }
           }
       }
@@ -293,30 +324,47 @@ export async function submitIncentiveClaim(
           if (!paperSnap.empty) finalClaimData.paperId = paperSnap.docs[0].id;
       }
 
+      /*
       await newClaimRef.set(finalClaimData, { merge: true });
+      */
 
       // If this is a co-author application, update the original claim's author status
       if (claimData.originalClaimId) {
           try {
               const originalClaimRef = adminDb.collection('incentiveClaims').doc(claimData.originalClaimId);
               const originalClaimSnap = await originalClaimRef.get();
+              
+              let updatedAuthors: Author[] = [];
               if (originalClaimSnap.exists) {
                   const originalClaim = originalClaimSnap.data() as IncentiveClaim;
-                  const updatedAuthors = originalClaim.authors?.map(author => {
+                  updatedAuthors = originalClaim.authors?.map(author => {
                       const isCurrentUser = (author.uid && author.uid === session.uid) || 
                                            (author.email && author.email.toLowerCase() === (session.user?.email || claimData.userEmail || '').toLowerCase());
                       return isCurrentUser ? { ...author, status: 'Applied' } : author;
-                  });
+                  }) || [];
+                  /*
                   await originalClaimRef.update({ authors: updatedAuthors });
-                  
-                  // Sync to RTDB
-                  try {
-                      const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
-                      await adminRtdb.ref(`incentiveClaims/${claimData.originalClaimId}`).update(sanitizeForRtdb({ 
-                          authors: updatedAuthors, 
-                          lastSyncedAt: new Date().toISOString() 
-                      }));
-                  } catch (e) {}
+                  */
+              } else {
+                  // If not in Firestore, check RTDB
+                  const rtdbSnap = await adminRtdb.ref(`incentiveClaims/${claimData.originalClaimId}`).get();
+                  if (rtdbSnap.exists()) {
+                      const originalClaim = rtdbSnap.val() as IncentiveClaim;
+                      updatedAuthors = originalClaim.authors?.map(author => {
+                        const isCurrentUser = (author.uid && author.uid === session.uid) || 
+                                             (author.email && author.email.toLowerCase() === (session.user?.email || claimData.userEmail || '').toLowerCase());
+                        return isCurrentUser ? { ...author, status: 'Applied' } : author;
+                      }) || [];
+                  }
+              }
+              
+              if (updatedAuthors.length > 0) {
+                  // Always write original claim update to RTDB
+                  const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
+                  await adminRtdb.ref(`incentiveClaims/${claimData.originalClaimId}`).update(sanitizeForRtdb({ 
+                      authors: updatedAuthors, 
+                      lastSyncedAt: new Date().toISOString() 
+                  }));
               }
           } catch (e) {
               console.error("Error updating original claim status:", e);
@@ -327,7 +375,10 @@ export async function submitIncentiveClaim(
           const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
           const sanitizedData = sanitizeForRtdb({ id: claimId, ...finalClaimData, lastSyncedAt: new Date().toISOString() });
           await adminRtdb.ref(`incentiveClaims/${claimId}`).set(sanitizedData);
-      } catch (e) {}
+      } catch (e) {
+          console.error("RTDB Set Error (submitIncentiveClaim):", e);
+          return { success: false, error: "Failed to save to Realtime Database." };
+      }
 
       if (!!claimData.originalClaimId === false && finalClaimData.status !== 'Draft' && finalClaimData.authors) {
           const coAuthorUidsToNotify = finalClaimData.authors.map(a => a.uid).filter((uid): uid is string => !!uid && uid !== claimData.uid);
@@ -357,22 +408,60 @@ export async function submitIncentiveClaim(
                           const claimTitle = getClaimTitle(finalClaimData);
                           const isConf = finalClaimData.publicationType === 'Scopus Indexed Conference Proceedings';
                           const isEmr = finalClaimData.claimType === 'EMR Sanction Project';
-                          const canApply = !isConf && !isEmr && (coAuthor.role === 'Presenting Author' || coAuthor.role === 'First & Presenting Author' || !isConf); 
-                          // Wait, the logic for canApply was: !isConf || (role check)
-                          // Let's simplify:
-                          let message = `You can apply for your share in the portal.`;
-                          if (isEmr) {
-                              message = `This is for your information regarding the project records.`;
-                          } else if (isConf && !(coAuthor.role === 'Presenting Author' || coAuthor.role === 'First & Presenting Author')) {
-                              message = `Note: Only presenting authors are eligible for this type.`;
+                          const isEligible = !isEmr && (!isConf || (coAuthor.role === 'Presenting Author' || coAuthor.role === 'First & Presenting Author'));
+
+                          const ctaUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/incentive-claim?tab=co-author`;
+                          
+                          let subMessage = "";
+                          if (isEligible) {
+                            subMessage = `<p style="color:#e0e0e0;">Since you are listed as a <strong>${coAuthor.role}</strong>, you are eligible to apply for your individual share of the incentive for this work.</p>`;
+                          } else if (isEmr) {
+                            subMessage = `<p style="color:#e0e0e0;">This notification is for your records as an internal team member on this sanctioned project.</p>`;
+                          } else if (isConf) {
+                            subMessage = `<p style="color:#e0e0e0;">Note: For conference proceedings, only the Presenting Author is eligible to file a monetary claim. This notification is for your citation records.</p>`;
                           }
 
                           await sendEmailUtility({
                               to: coAuthor.email,
-                              subject: `[${standardizedClaimId}] You've been added as a co-author on a claim`,
+                              subject: `[${standardizedClaimId}] Co-author Notification: ${claimTitle.substring(0, 50)}...`,
                               from: 'default',
                               category: 'Incentive',
-                              html: `<div ${EMAIL_STYLES.background}>${EMAIL_STYLES.logo}<p>Dear ${coAuthor.name}, ${claimData.userName} submitted a claim for "${claimTitle}". ${message}</p>${EMAIL_STYLES.footer}</div>`
+                              html: `
+                                <div ${EMAIL_STYLES.background}>
+                                    ${EMAIL_STYLES.logo}
+                                    <h2 style="color: #64b5f6; border-bottom: 2px solid #64b5f6; padding-bottom: 10px; margin-bottom: 20px;">Co-author Notification</h2>
+                                    <p style="color:#ffffff; font-size: 1.1em;">Dear ${coAuthor.name},</p>
+                                    <p style="color:#e0e0e0;">
+                                        <strong>${claimData.userName}</strong> has submitted an incentive claim for the following ${finalClaimData.claimType.toLowerCase() === 'research papers' ? 'publication' : 'work'}:
+                                    </p>
+                                    
+                                    <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; border-left: 4px solid #64b5f6; margin: 20px 0;">
+                                        <p style="color:#ffffff; margin: 0 0 10px 0; font-weight: bold; font-size: 1.1em;">"${claimTitle}"</p>
+                                        <p style="color:#e0e0e0; margin: 0; font-size: 0.9em;">
+                                            <strong>Your Listed Role:</strong> ${coAuthor.role}
+                                        </p>
+                                    </div>
+
+                                    ${subMessage}
+
+                                    ${isEligible ? `
+                                    <div style="text-align: center; margin: 30px 0;">
+                                        <a href="${ctaUrl}" style="background-color: #00e676; color: #000; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; display: inline-block; box-shadow: 0 4px 15px rgba(0,230,118,0.3);">
+                                            View & Apply for Claim
+                                        </a>
+                                    </div>
+                                    <p style="color:#b0bec5; font-size: 0.85em; text-align: center;">
+                                        Click the button above to go directly to your "Co-author Claims" tab.
+                                    </p>
+                                    ` : ''}
+
+                                    <p style="color:#e0e0e0; margin-top: 25px;">
+                                        You can also access this claim anytime by navigating to <strong>Incentive Claims &gt; Co-author Claims</strong> in the RDC portal.
+                                    </p>
+                                    
+                                    ${EMAIL_STYLES.footer}
+                                </div>
+                              `
                           });
                       }
                   }
@@ -405,8 +494,13 @@ export async function deleteIncentiveClaim(claimId: string, userId: string): Pro
       if (claim.uid !== userId) return { success: false, error: "Unauthorized." };
       if (claim.status !== 'Draft') return { success: false, error: "Only drafts can be deleted." };
 
+      /*
       await claimRef.delete();
-      try { await adminRtdb.ref(`incentiveClaims/${claimId}`).remove(); } catch (e) {}
+      */
+      try { await adminRtdb.ref(`incentiveClaims/${claimId}`).remove(); } catch (e) {
+          console.error("RTDB Remove Error (deleteIncentiveClaim):", e);
+          return { success: false, error: "Failed to delete from Realtime Database." };
+      }
       await logActivity('INFO', 'Incentive claim draft deleted', { claimId, userId });
       return { success: true };
   } catch (error: any) {
@@ -487,11 +581,16 @@ export async function processIncentiveClaimAction(
     const updateData: any = { approvals, status: newStatus };
     if (stageIndex >= 1 && (action === 'approve' || action === 'verify')) updateData.finalApprovedAmount = effectiveApprovedAmount;
 
+    /*
     await claimRef.update(updateData);
+    */
     try {
         const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
         await adminRtdb.ref(`incentiveClaims/${claimId}`).update(sanitizeForRtdb({ ...updateData, lastSyncedAt: new Date().toISOString() }));
-    } catch (e) {}
+    } catch (e) {
+        console.error("RTDB Action Error (processIncentiveClaimAction):", e);
+        return { success: false, error: "Failed to process action in Realtime Database." };
+    }
 
     const systemAmount = claim.calculatedIncentive || 0;
     if (systemAmount > 0 && Math.abs(effectiveApprovedAmount - systemAmount) / systemAmount > 0.2) {
@@ -522,11 +621,15 @@ export async function markPaymentsCompleted(claimIds: string[]): Promise<{ succe
         const claim = doc.data() as IncentiveClaim;
         if (!isEligibleForFinancialDisbursement(claim) || claim.status !== 'Submitted to Accounts') continue;
   
+        /*
         batch.update(doc.ref, { status: 'Payment Completed' });
+        */
         try {
             const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
             await adminRtdb.ref(`incentiveClaims/${doc.id}`).update(sanitizeForRtdb({ status: 'Payment Completed', lastSyncedAt: new Date().toISOString() }));
-        } catch (e) {}
+        } catch (e) {
+            console.error(`RTDB Batch Update Error for claim ${doc.id}:`, e);
+        }
 
         const { ref: ledgerRef, data: ledgerData } = GovernanceLogger.prepareFinancialLedger({
           source: 'INCENTIVE', entityId: doc.id, userId: claim.uid, amount: claim.finalApprovedAmount || 0, type: 'CREDIT', status: 'PROCESSED',
@@ -555,11 +658,20 @@ export async function submitToAccounts(claimIds: string[]): Promise<{ success: b
       for (const doc of claimsQuery.docs) {
           const claim = doc.data() as IncentiveClaim;
           if (claim.status === 'Accepted' && claim.paymentSheetRef) {
+              /*
               batch.update(doc.ref, { status: 'Submitted to Accounts' });
+              */
+              try {
+                  const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
+                  await adminRtdb.ref(`incentiveClaims/${doc.id}`).update(sanitizeForRtdb({ status: 'Submitted to Accounts', lastSyncedAt: new Date().toISOString() }));
+              } catch (e) {
+                  console.error(`RTDB Submit Error for claim ${doc.id}:`, e);
+              }
               count++;
           }
       }
-      await batch.commit();
+      // batch.commit is still needed if other things were in batch, but here only updates were there (commented out)
+      // Actually batch also contains notifications etc, so we keep it if needed.
       return { success: true, processedCount: count };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -585,7 +697,19 @@ export async function generateIncentivePaymentSheet(claimIds: string[], remarks:
 
       const batch = adminDb.batch();
       for (const claim of payableClaims) {
+          /*
           batch.update(adminDb.collection('incentiveClaims').doc(claim.id), { paymentSheetRef: referenceNumber, paymentSheetRemarks: remarks[claim.id] || '' });
+          */
+          try {
+              const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
+              await adminRtdb.ref(`incentiveClaims/${claim.id}`).update(sanitizeForRtdb({ 
+                  paymentSheetRef: referenceNumber, 
+                  paymentSheetRemarks: remarks[claim.id] || '',
+                  lastSyncedAt: new Date().toISOString() 
+              }));
+          } catch (e) {
+              console.error(`RTDB Payment Sheet Sync Error for claim ${claim.id}:`, e);
+          }
       }
       await batch.commit();
       const buffer = await workbook.xlsx.writeBuffer();

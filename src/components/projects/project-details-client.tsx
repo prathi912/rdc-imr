@@ -1248,7 +1248,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
               <div className="space-y-2 p-4 border rounded-lg bg-secondary/50">
                 <div className="flex justify-between items-start flex-wrap gap-2">
                   <h3 className="font-semibold text-lg">IMR Evaluation Meeting Details</h3>
-                   {isSuperAdmin && project.status === 'Under Review' && (
+                   {isAdmin && project.status === 'Under Review' && (
                     <Button variant="outline" size="sm" onClick={() => setIsAttendanceDialogOpen(true)}>
                         <UserCheck className="mr-2 h-4 w-4" /> Mark Attendance
                     </Button>
@@ -1657,7 +1657,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             </Form>
           </AlertDialogContent>
       </AlertDialog>
-       {isSuperAdmin && project.meetingDetails && (
+       {isAdmin && project.meetingDetails && (
         <AttendanceDialog
             isOpen={isAttendanceDialogOpen}
             onOpenChange={setIsAttendanceDialogOpen}

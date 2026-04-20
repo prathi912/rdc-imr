@@ -492,6 +492,90 @@ a.href = url;
                         </>
                     )}
 
+                    {claim.claimType === 'EMR Sanction Project' && (
+                        <>
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Project Details</h4>
+                            {renderDetail("Project Name", claim.emrProjectName)}
+                            {renderDetail("Sanctioned By (Agency)", claim.sanctionFrom)}
+                            {renderDetail("Routed via RDC?", claim.wasRoutedThroughRdc)}
+                            {renderDetail("Sanction Amount", claim.sanctionAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                            {renderDetail("Sanction Date", claim.sanctionDate ? new Date(claim.sanctionDate).toLocaleDateString() : 'N/A')}
+                            
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Co-Investigators</h4>
+                            {renderDetail("Internal Co-PIs", claim.authors)}
+                            {claim.externalCoPis && claim.externalCoPis.length > 0 && (
+                                <div className="grid grid-cols-3 gap-2 py-1">
+                                    <dt className="font-semibold text-muted-foreground col-span-1">External Co-PIs</dt>
+                                    <dd className="col-span-2">
+                                        <ul className="list-disc pl-5">
+                                            {claim.externalCoPis.map((pi: any, idx: number) => (
+                                                <li key={idx}><strong>{pi.name}</strong> - {pi.organization} {pi.email ? `(${pi.email})` : ''}</li>
+                                            ))}
+                                        </ul>
+                                    </dd>
+                                </div>
+                            )}
+
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Documentation</h4>
+                            {renderLinkDetail("Sanction Proof", claim.sanctionProofUrl)}
+                        </>
+                    )}
+
+                    {claim.claimType === 'Award' && (
+                        <>
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Award Details</h4>
+                            {renderDetail("Award Title", claim.awardTitle)}
+                            {renderDetail("Awarding Body", claim.awardingBody)}
+                            {renderDetail("Stature", claim.awardStature)}
+                            {renderDetail("Body Type", claim.awardBodyType)}
+                            {renderDetail("Locale", claim.awardLocale)}
+                            {renderDetail("Membership No.", claim.membershipNumber)}
+                            {renderDetail("Award Date", claim.awardDate ? new Date(claim.awardDate).toLocaleDateString() : 'N/A')}
+                            {renderDetail("Amount (if cash component)", claim.amountPaid?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                            {renderDetail("Self Declaration", claim.awardSelfDeclaration)}
+
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Documents</h4>
+                            {renderLinkDetail("Award Proof", claim.awardProofUrls)}
+                        </>
+                    )}
+
+                    {(claim.claimType === 'Workshop/Training/FDP' || claim.claimType === 'Workshop/FDP/Training') && (
+                        <>
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Workshop/Training/FDP Details</h4>
+                            {renderDetail("Event Type", claim.eventType)}
+                            {renderDetail("Workshop Name", claim.workshopName)}
+                            {renderDetail("Organizer", claim.organizerName)}
+                            {renderDetail("Level", claim.eventTypeLevel)}
+                            {renderDetail("Duration", `${claim.workshopStartDate ? new Date(claim.workshopStartDate).toLocaleDateString() : 'N/A'} to ${claim.workshopEndDate ? new Date(claim.workshopEndDate).toLocaleDateString() : 'N/A'}`)}
+                            {renderDetail("Attendance Mode", claim.attendanceMode)}
+                            {renderDetail("Authors/Participants", claim.authors)}
+                            
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Expenses & Travel</h4>
+                            {renderDetail("Registration Fee", claim.registrationFee?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                            {claim.attendanceMode === 'Offline' && (
+                                <>
+                                    {renderDetail("Place Visited", claim.travelPlaceVisited)}
+                                    {renderDetail("Travel Mode", claim.travelMode)}
+                                    {renderDetail("Travel Fare", claim.travelFare?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                                </>
+                            )}
+                            {renderDetail("Self Declaration", claim.workshopSelfDeclaration)}
+
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Documents</h4>
+                            {renderLinkDetail("Certificate", claim.workshopCertificateUrl)}
+                            {renderLinkDetail("Registration Fee Proof", claim.registrationFeeProofUrl)}
+                            {renderLinkDetail("Travel Receipts", claim.travelReceiptsUrl)}
+                        </>
+                    )}
+
                     {canSeeCalculation && (
                         <>
                             <hr className="my-2" />

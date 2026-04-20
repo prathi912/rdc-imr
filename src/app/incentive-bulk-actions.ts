@@ -156,7 +156,7 @@ export async function bulkUploadIncentiveClaims(
       };
       
       const newClaimRef = claimsRef.doc();
-      batch.set(newClaimRef, claimData);
+      // We skip batch.set to avoid writing to Firestore
       
       rtdbSyncTasks.push({ id: newClaimRef.id, data: claimData });
 
@@ -175,9 +175,7 @@ export async function bulkUploadIncentiveClaims(
   }
 
   try {
-      await batch.commit();
-
-      // Sync to Realtime Database after successful Firestore commit
+      // Sync to Realtime Database
       try {
           const { sanitizeForRtdb } = await import('@/lib/rtdb-utils');
           const syncPromises = rtdbSyncTasks.map(task => {

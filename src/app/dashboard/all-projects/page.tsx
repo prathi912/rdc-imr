@@ -525,7 +525,7 @@ export default function AllProjectsPage() {
 
         } catch (error) {
             console.error("Error fetching projects: ", error);
-            reportSystemError(error, user);
+            reportSystemError(error, user, "Fetching all projects and users for admin/CRO dashboard");
             toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch project data.' });
         } finally {
             setLoading(false);

@@ -313,11 +313,11 @@ function ReviewDetails({ data, onEdit, calculatedIncentive, user }: { data: Rese
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-primary/5 p-6 rounded-3xl border border-primary/10">
         <div className="space-y-1">
-           <h2 className="text-2xl font-black tracking-tight text-primary flex items-center gap-2">
-             <CheckCircle2 className="h-7 w-7" />
-             Review Application
-           </h2>
-           <p className="text-sm text-muted-foreground font-medium">Verify your research publication details before final submission.</p>
+          <h2 className="text-2xl font-black tracking-tight text-primary flex items-center gap-2">
+            <CheckCircle2 className="h-7 w-7" />
+            Review Application
+          </h2>
+          <p className="text-sm text-muted-foreground font-medium">Verify your research publication details before final submission.</p>
         </div>
         <Button variant="outline" onClick={onEdit} className="h-11 px-6 rounded-xl border-primary/20 hover:bg-primary/5 gap-2 font-bold transition-all hover:scale-105 active:scale-95">
           <Edit className="h-4 w-4" /> Edit Details
@@ -327,13 +327,13 @@ function ReviewDetails({ data, onEdit, calculatedIncentive, user }: { data: Rese
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 shadow-sm rounded-3xl border-muted/40 overflow-hidden">
           <CardHeader className="bg-muted/20 pb-4">
-             <CardTitle className="text-sm font-bold flex items-center gap-2 text-muted-foreground">
-               <FileText className="h-4 w-4" /> Publication Identity
-             </CardTitle>
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-muted-foreground">
+              <FileText className="h-4 w-4" /> Publication Identity
+            </CardTitle>
           </CardHeader>
           <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-2">
             <div className="md:col-span-2">
-               {renderItem("Paper Title", data.paperTitle)}
+              {renderItem("Paper Title", data.paperTitle)}
             </div>
             {renderItem("Type", data.publicationType)}
             {renderItem("Indexing", data.indexType?.toUpperCase())}
@@ -343,10 +343,10 @@ function ReviewDetails({ data, onEdit, calculatedIncentive, user }: { data: Rese
         </Card>
 
         <Card className="shadow-sm rounded-3xl border-muted/40 overflow-hidden">
-           <CardHeader className="bg-primary/5 pb-4">
-             <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
-               <Info className="h-4 w-4" /> Journal & Impact
-             </CardTitle>
+          <CardHeader className="bg-primary/5 pb-4">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
+              <Info className="h-4 w-4" /> Journal & Impact
+            </CardTitle>
           </CardHeader>
           <CardContent className="pt-6 space-y-2">
             {renderItem("Journal Name", data.journalName)}
@@ -359,10 +359,10 @@ function ReviewDetails({ data, onEdit, calculatedIncentive, user }: { data: Rese
 
       <Card className="shadow-sm rounded-3xl border-muted/40 overflow-hidden">
         <CardHeader className="bg-muted/20 pb-4 flex flex-row items-center justify-between">
-           <CardTitle className="text-sm font-bold flex items-center gap-2 text-muted-foreground">
-             <UserPlus className="h-4 w-4" /> Author Details
-           </CardTitle>
-           <Badge variant="outline" className="text-[10px] font-bold">{authors.length} Authors Listed</Badge>
+          <CardTitle className="text-sm font-bold flex items-center gap-2 text-muted-foreground">
+            <UserPlus className="h-4 w-4" /> Author Details
+          </CardTitle>
+          <Badge variant="outline" className="text-[10px] font-bold">{authors.length} Authors Listed</Badge>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -395,9 +395,9 @@ function ReviewDetails({ data, onEdit, calculatedIncentive, user }: { data: Rese
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="shadow-sm rounded-3xl border-muted/40 overflow-hidden">
           <CardHeader className="bg-muted/20 pb-4">
-             <CardTitle className="text-sm font-bold flex items-center gap-2 text-muted-foreground">
-               <FileText className="h-4 w-4" /> Submission Metadata
-             </CardTitle>
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-muted-foreground">
+              <FileText className="h-4 w-4" /> Submission Metadata
+            </CardTitle>
           </CardHeader>
           <CardContent className="pt-6 grid grid-cols-2 gap-2">
             {renderItem("Author Position", data.authorPosition)}
@@ -414,8 +414,8 @@ function ReviewDetails({ data, onEdit, calculatedIncentive, user }: { data: Rese
               <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-2">Estimated Incentive</p>
               <p className="text-[11px] opacity-70 mb-4 leading-tight font-medium">Based on the provided details, your tentative incentive claim will be:</p>
               <div className="flex items-baseline gap-2">
-                 <span className="text-4xl font-black tracking-tighter">₹{calculatedIncentive?.toLocaleString('en-IN') || '0'}</span>
-                 <span className="text-xs font-medium opacity-60">INR*</span>
+                <span className="text-4xl font-black tracking-tighter">₹{calculatedIncentive?.toLocaleString('en-IN') || '0'}</span>
+                <span className="text-xs font-medium opacity-60">INR*</span>
               </div>
               <p className="text-[10px] mt-4 font-medium opacity-70 italic">*Subject to final verification by the technical committee.</p>
             </div>
@@ -426,12 +426,12 @@ function ReviewDetails({ data, onEdit, calculatedIncentive, user }: { data: Rese
               <FileText className="h-6 w-6 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-               <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">Attachment</p>
-               <p className="text-sm font-bold truncate">
-                 {data.publicationProof && (data.publicationProof as FileList).length > 0 
-                   ? (data.publicationProof as FileList)[0].name
-                   : "Proof document uploaded"}
-               </p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">Attachment</p>
+              <p className="text-sm font-bold truncate">
+                {data.publicationProof && (data.publicationProof as FileList).length > 0
+                  ? (data.publicationProof as FileList)[0].name
+                  : "Proof document uploaded"}
+              </p>
             </div>
           </div>
         </div>
@@ -468,57 +468,57 @@ export function ResearchPaperForm() {
 
   const getPaperLogicBreakdown = (data: any) => {
     if (calculationBreakdown) {
-        const { baseAmount, adjustedAmount, publicationTypeAdjustment, deductions, deductedAmount, authorShare, finalAmount, poolAmount, poolPercentage, sharingAuthorsCount } = calculationBreakdown;
-        
-        const steps = [
-           { label: '1. Base Amount (by Q-Rating)', value: `₹${baseAmount.toLocaleString('en-IN')}` },
-           { label: `2. Adjusted Base (${publicationTypeAdjustment})`, value: `₹${Math.round(adjustedAmount).toLocaleString('en-IN')}` }
-        ];
+      const { baseAmount, adjustedAmount, publicationTypeAdjustment, deductions, deductedAmount, authorShare, finalAmount, poolAmount, poolPercentage, sharingAuthorsCount } = calculationBreakdown;
 
-        if (deductions.length > 0) {
-            steps.push({ label: `3. After PU Deductions`, value: `₹${Math.round(deductedAmount).toLocaleString('en-IN')}` });
-        } else {
-            steps.push({ label: `3. University Deductions`, value: 'None' });
+      const steps = [
+        { label: '1. Base Amount (by Q-Rating)', value: `₹${baseAmount.toLocaleString('en-IN')}` },
+        { label: `2. Adjusted Base (${publicationTypeAdjustment})`, value: `₹${Math.round(adjustedAmount).toLocaleString('en-IN')}` }
+      ];
+
+      if (deductions.length > 0) {
+        steps.push({ label: `3. After PU Deductions`, value: `₹${Math.round(deductedAmount).toLocaleString('en-IN')}` });
+      } else {
+        steps.push({ label: `3. University Deductions`, value: 'None' });
+      }
+
+      if (authorShare.includes('Ineligible')) {
+        steps.push({ label: '4. Eligibility Check', value: 'Ineligible' });
+        steps.push({ label: '5. Reason', value: authorShare.split(': ')[1] || authorShare });
+      } else {
+        // Mapping technical shorthand to friendly text
+        let friendlyShare = authorShare;
+        if (authorShare.includes('Mixed')) {
+          const isMain = authorShare.includes('Main (70%');
+          friendlyShare = `Mixed Roles (${isMain ? 'Main' : 'Co-Author'} ${poolPercentage}% Pool Share)`;
+        } else if (authorShare.includes('Sole')) {
+          friendlyShare = authorShare.replace('Sole', 'Sole Author').replace('(', '').replace(')', '');
+        } else if (authorShare.includes('Multiple')) {
+          friendlyShare = authorShare.replace('Multiple', 'Shared').replace('(', '').replace(')', '');
         }
 
-        if (authorShare.includes('Ineligible')) {
-            steps.push({ label: '4. Eligibility Check', value: 'Ineligible' });
-            steps.push({ label: '5. Reason', value: authorShare.split(': ')[1] || authorShare });
-        } else {
-            // Mapping technical shorthand to friendly text
-            let friendlyShare = authorShare;
-            if (authorShare.includes('Mixed')) {
-                const isMain = authorShare.includes('Main (70%');
-                friendlyShare = `Mixed Roles (${isMain ? 'Main' : 'Co-Author'} ${poolPercentage}% Pool Share)`;
-            } else if (authorShare.includes('Sole')) {
-                friendlyShare = authorShare.replace('Sole', 'Sole Author').replace('(', '').replace(')', '');
-            } else if (authorShare.includes('Multiple')) {
-                friendlyShare = authorShare.replace('Multiple', 'Shared').replace('(', '').replace(')', '');
-            }
+        steps.push({ label: '4. Author Sharing Policy', value: friendlyShare });
 
-            steps.push({ label: '4. Author Sharing Policy', value: friendlyShare });
-            
-            // Show the explicit pool math
-            if (poolAmount !== undefined && poolAmount !== adjustedAmount) {
-                steps.push({ label: '5. Your Group Pool Amount', value: `₹${poolAmount.toLocaleString('en-IN')} (${poolPercentage}% of ₹${Math.round(deductedAmount).toLocaleString('en-IN')})` });
-            }
-
-            // Show the final division if multiple authors
-            if (sharingAuthorsCount && sharingAuthorsCount > 1) {
-                steps.push({ label: '6. Internal Members (Sharing)', value: `${sharingAuthorsCount} Authors` });
-                steps.push({ label: 'Final Individual Share', value: `₹${Math.round(finalAmount).toLocaleString('en-IN')} (₹${poolAmount?.toLocaleString('en-IN')} / ${sharingAuthorsCount})` });
-            } else {
-                steps.push({ label: 'Final Individual Share', value: `₹${Math.round(finalAmount).toLocaleString('en-IN')} (100% Allocation)` });
-            }
+        // Show the explicit pool math
+        if (poolAmount !== undefined && poolAmount !== adjustedAmount) {
+          steps.push({ label: '5. Your Group Pool Amount', value: `₹${poolAmount.toLocaleString('en-IN')} (${poolPercentage}% of ₹${Math.round(deductedAmount).toLocaleString('en-IN')})` });
         }
 
-        return steps;
+        // Show the final division if multiple authors
+        if (sharingAuthorsCount && sharingAuthorsCount > 1) {
+          steps.push({ label: '6. Internal Members (Sharing)', value: `${sharingAuthorsCount} Authors` });
+          steps.push({ label: 'Final Individual Share', value: `₹${Math.round(finalAmount).toLocaleString('en-IN')} (₹${poolAmount?.toLocaleString('en-IN')} / ${sharingAuthorsCount})` });
+        } else {
+          steps.push({ label: 'Final Individual Share', value: `₹${Math.round(finalAmount).toLocaleString('en-IN')} (100% Allocation)` });
+        }
+      }
+
+      return steps;
     }
 
     // Fallback if breakdown not yet calculated
     return [
-        { label: '1. Calculation Pending', value: '...' },
-        { label: '2. Please wait', value: '...' }
+      { label: '1. Calculation Pending', value: '...' },
+      { label: '2. Please wait', value: '...' }
     ];
   }
 
@@ -528,8 +528,8 @@ export function ResearchPaperForm() {
       publicationType: '',
       indexType: undefined,
       doi: '',
-      scopusLink: 'https://www.scopus.com/pages/publications/',
-      wosLink: 'https://www.webofscience.com/wos/woscc/full-record/WOS:',
+      scopusLink: '',
+      wosLink: '',
       journalClassification: undefined,
       wosType: undefined,
       journalName: '',
@@ -564,10 +564,10 @@ export function ResearchPaperForm() {
     if (!user || !user.faculty) return;
     setIsCalculating(true);
     const formValues = form.getValues();
-    
+
     // Server-side calculation
     const result = await calculateResearchPaperIncentive({ ...formValues, userEmail: user.email } as any, user.faculty, user.designation);
-    
+
     setIsCalculating(false);
     if (result.success && result.amount !== undefined) {
       const finalAmount = result.amount;
@@ -626,8 +626,20 @@ export function ResearchPaperForm() {
           const claimSnap = await getDoc(claimRef);
           if (claimSnap.exists()) {
             const draftData = claimSnap.data() as IncentiveClaim;
+            
+            // Auto-detect user's position in the authors list for pre-filling
+            let detectedPosition = draftData.authorPosition;
+            if (user?.email && draftData.authors) {
+              const userIndex = draftData.authors.findIndex(a => a.email.toLowerCase() === user.email.toLowerCase());
+              if (userIndex !== -1) {
+                const posLabels = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
+                detectedPosition = posLabels[userIndex] || detectedPosition;
+              }
+            }
+
             form.reset({
               ...draftData,
+              authorPosition: detectedPosition,
               publicationProof: undefined, // Files can't be pre-filled
             });
           } else {
@@ -685,10 +697,21 @@ export function ResearchPaperForm() {
   const getAvailableRoles = (currentAuthor?: Author) => {
     if (publicationType === 'Scopus Indexed Conference Proceedings') {
       const isCurrentAuthorPresenting = currentAuthor && (currentAuthor.role === 'Presenting Author' || currentAuthor.role === 'First & Presenting Author');
-      if (presentingAuthorExists && !isCurrentAuthorPresenting) {
-        return conferenceAuthorRoles.filter(role => role !== 'Presenting Author' && role !== 'First & Presenting Author');
+      const isClaimant = currentAuthor && user && currentAuthor.email.toLowerCase() === user.email.toLowerCase();
+      
+      let availableRoles = [...conferenceAuthorRoles];
+      
+      // Applicant cannot be a Co-Author for conference proceedings
+      if (isClaimant) {
+        availableRoles = availableRoles.filter(role => role !== 'Co-Author');
       }
-      return conferenceAuthorRoles;
+
+      // Only one presenting author allowed
+      if (presentingAuthorExists && !isCurrentAuthorPresenting) {
+        availableRoles = availableRoles.filter(role => role !== 'Presenting Author' && role !== 'First & Presenting Author');
+      }
+      
+      return availableRoles;
     }
     const isCurrentAuthorFirst = currentAuthor && (currentAuthor.role === 'First Author' || currentAuthor.role === 'First & Corresponding Author');
     if (firstAuthorExists && !isCurrentAuthorFirst) {
@@ -710,6 +733,21 @@ export function ResearchPaperForm() {
       form.setValue("indexType", undefined, { shouldValidate: true })
     }
   }, [availableIndexTypes, form])
+
+  useEffect(() => {
+    if (publicationType === 'Scopus Indexed Conference Proceedings') {
+      form.setValue('journalClassification', undefined);
+      
+      // If claimant is currently Co-Author, switch them to Presenting Author as they can't be Co-Author
+      const currentAuthors = form.getValues('authors');
+      const claimantIndex = currentAuthors.findIndex(a => a.email.toLowerCase() === user?.email.toLowerCase());
+      if (claimantIndex !== -1 && currentAuthors[claimantIndex].role === 'Co-Author') {
+        const updatedAuthors = [...currentAuthors];
+        updatedAuthors[claimantIndex] = { ...updatedAuthors[claimantIndex], role: 'Presenting Author' as any };
+        form.setValue('authors', updatedAuthors);
+      }
+    }
+  }, [publicationType, form, user?.email]);
 
   const handleFetchData = async (source: 'scopus' | 'wos' | 'sciencedirect') => {
     const doi = form.getValues('doi');
@@ -950,25 +988,25 @@ export function ResearchPaperForm() {
     return (
       <div className="w-full max-w-5xl mx-auto pb-20 animate-in fade-in duration-700">
         <form onSubmit={form.handleSubmit(onFinalSubmit)}>
-           <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} calculatedIncentive={calculatedIncentive} user={user} />
-           <div className="max-w-4xl mx-auto mt-10 flex flex-col md:flex-row items-center justify-between gap-6 bg-card p-8 rounded-[2.5rem] border shadow-xl border-primary/10">
-              <div className="space-y-1 text-center md:text-left">
-                <p className="text-sm font-bold text-muted-foreground">Ready to submit?</p>
-                <p className="text-[10px] text-muted-foreground/60 max-w-[200px]">By submitting, you confirm all details are accurate.</p>
-              </div>
-              <Button type="submit" size="lg" disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing} className="w-full md:w-auto rounded-2xl h-16 px-12 font-black shadow-2xl shadow-primary/20 hover:shadow-primary/40 transition-all hover:scale-[1.02] active:scale-[0.98] text-xl group">
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-3 h-6 w-6 animate-spin" />
-                    Finalizing...
-                  </>
-                ) : (
-                  <>
-                    Submit Application <CheckCircle2 className="ml-3 h-6 w-6 group-hover:rotate-12 transition-transform" />
-                  </>
-                )}
-              </Button>
-           </div>
+          <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} calculatedIncentive={calculatedIncentive} user={user} />
+          <div className="max-w-4xl mx-auto mt-10 flex flex-col md:flex-row items-center justify-between gap-6 bg-card p-8 rounded-[2.5rem] border shadow-xl border-primary/10">
+            <div className="space-y-1 text-center md:text-left">
+              <p className="text-sm font-bold text-muted-foreground">Ready to submit?</p>
+              <p className="text-[10px] text-muted-foreground/60 max-w-[200px]">By submitting, you confirm all details are accurate.</p>
+            </div>
+            <Button type="submit" size="lg" disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing} className="w-full md:w-auto rounded-2xl h-16 px-12 font-black shadow-2xl shadow-primary/20 hover:shadow-primary/40 transition-all hover:scale-[1.02] active:scale-[0.98] text-xl group">
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-3 h-6 w-6 animate-spin" />
+                  Finalizing...
+                </>
+              ) : (
+                <>
+                  Submit Application <CheckCircle2 className="ml-3 h-6 w-6 group-hover:rotate-12 transition-transform" />
+                </>
+              )}
+            </Button>
+          </div>
         </form>
       </div>
     );
@@ -1017,7 +1055,7 @@ export function ResearchPaperForm() {
                   <div className="h-8 w-1.5 bg-primary rounded-full"></div>
                   Publication Type
                 </div>
-                
+
                 <FormField
                   control={form.control}
                   name="publicationType"
@@ -1047,120 +1085,120 @@ export function ResearchPaperForm() {
               <Separator />
 
               <section className="space-y-6">
-                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-primary font-bold text-lg">
-                      <div className="h-8 w-1.5 bg-primary rounded-full"></div>
-                      Article Identification
-                    </div>
-                    <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20">Step 1 of 2</Badge>
-                 </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-primary font-bold text-lg">
+                    <div className="h-8 w-1.5 bg-primary rounded-full"></div>
+                    Article Identification
+                  </div>
+                  <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20">Step 1 of 2</Badge>
+                </div>
 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="indexType"
-                        render={({ field }) => (
-                          <FormItem className="space-y-3">
-                            <FormLabel className="text-base font-semibold">Indexing / Listing Status</FormLabel>
-                            <FormControl>
-                              <div>
-                                <RadioGroup
-                                  onValueChange={field.onChange}
-                                  value={field.value}
-                                  className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2"
-                                >
-                                  {availableIndexTypes.map((option) => (
-                                    <Label 
-                                      key={option.value}
-                                      htmlFor={option.value} 
-                                      className="flex items-center space-x-3 bg-muted/30 px-3 py-3 rounded-xl border hover:bg-muted transition-all cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 shadow-sm"
-                                    >
-                                      <RadioGroupItem value={option.value} id={option.value} />
-                                      <span className="font-medium text-sm flex-1">{option.label}</span>
-                                    </Label>
-                                  ))}
-                                </RadioGroup>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                   </div>
-
-                   <div className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="doi"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-base font-semibold">DOI (Digital Object Identifier)</FormLabel>
-                            <FormControl>
-                              <div className="flex gap-2">
-                                <Input 
-                                  placeholder="e.g. 10.1145/334252.334253" 
-                                  {...field} 
-                                  disabled={isSubmitting || isFetching} 
-                                  className="h-12 shadow-sm focus-visible:ring-primary rounded-xl"
-                                />
-                                <div className="flex gap-1">
-                                  {(!indexType || indexType === 'scopus' || indexType === 'both' || indexType === 'sci') && systemSettings?.apiIntegrations?.scopus !== false && (
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      className="h-12 px-3 hover:bg-primary/10 transition-colors rounded-xl font-bold"
-                                      onClick={() => handleFetchData('scopus')}
-                                      disabled={isSubmitting || isFetching || !form.getValues('doi')}
-                                    >
-                                      Scopus
-                                    </Button>
-                                  )}
-                                  {(!indexType || indexType === 'wos' || indexType === 'both' || indexType === 'sci') && systemSettings?.apiIntegrations?.wos !== false && (
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      className="h-12 px-3 hover:bg-primary/10 transition-colors rounded-xl font-bold"
-                                      onClick={() => handleFetchData('wos')}
-                                      disabled={isSubmitting || isFetching || !form.getValues('doi')}
-                                    >
-                                      WoS
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            </FormControl>
-                            <FormDescription className="text-xs">Primary way we verify publication details.</FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {(indexType === 'wos' || indexType === 'both' || showWosAccession) && (
-                        <FormField
-                          control={form.control}
-                          name="wosAccessionNumber"
-                          render={({ field }) => (
-                            <FormItem className="animate-in slide-in-from-top-2">
-                              <FormLabel className="text-base font-semibold">WoS Accession Number</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  placeholder="e.g. WOS:000123456700001" 
-                                  {...field} 
-                                  disabled={isSubmitting || isFetching} 
-                                  className="h-12 shadow-sm border-primary/20 focus-visible:ring-primary rounded-xl"
-                                />
-                              </FormControl>
-                              <FormDescription className="text-xs">Required if DOI is not available for Web of Science papers.</FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="indexType"
+                      render={({ field }) => (
+                        <FormItem className="space-y-3">
+                          <FormLabel className="text-base font-semibold">Indexing / Listing Status</FormLabel>
+                          <FormControl>
+                            <div>
+                              <RadioGroup
+                                onValueChange={field.onChange}
+                                value={field.value}
+                                className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2"
+                              >
+                                {availableIndexTypes.map((option) => (
+                                  <Label
+                                    key={option.value}
+                                    htmlFor={option.value}
+                                    className="flex items-center space-x-3 bg-muted/30 px-3 py-3 rounded-xl border hover:bg-muted transition-all cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 shadow-sm"
+                                  >
+                                    <RadioGroupItem value={option.value} id={option.value} />
+                                    <span className="font-medium text-sm flex-1">{option.label}</span>
+                                  </Label>
+                                ))}
+                              </RadioGroup>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
                       )}
-                   </div>
-                 </div>
+                    />
+                  </div>
 
-                 <FormField
+                  <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="doi"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold">DOI (Digital Object Identifier)</FormLabel>
+                          <FormControl>
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="e.g. 10.1145/334252.334253"
+                                {...field}
+                                disabled={isSubmitting || isFetching}
+                                className="h-12 shadow-sm focus-visible:ring-primary rounded-xl"
+                              />
+                              <div className="flex gap-1">
+                                {(!indexType || indexType === 'scopus' || indexType === 'both' || indexType === 'sci') && systemSettings?.apiIntegrations?.scopus !== false && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-12 px-3 hover:bg-primary/10 transition-colors rounded-xl font-bold"
+                                    onClick={() => handleFetchData('scopus')}
+                                    disabled={isSubmitting || isFetching || !form.getValues('doi')}
+                                  >
+                                    Scopus
+                                  </Button>
+                                )}
+                                {(!indexType || indexType === 'wos' || indexType === 'both' || indexType === 'sci') && systemSettings?.apiIntegrations?.wos !== false && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-12 px-3 hover:bg-primary/10 transition-colors rounded-xl font-bold"
+                                    onClick={() => handleFetchData('wos')}
+                                    disabled={isSubmitting || isFetching || !form.getValues('doi')}
+                                  >
+                                    WoS
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </FormControl>
+                          <FormDescription className="text-xs">Primary way we verify publication details.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {(indexType === 'wos' || indexType === 'both' || showWosAccession) && (
+                      <FormField
+                        control={form.control}
+                        name="wosAccessionNumber"
+                        render={({ field }) => (
+                          <FormItem className="animate-in slide-in-from-top-2">
+                            <FormLabel className="text-base font-semibold">WoS Accession Number</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g. WOS:000123456700001"
+                                {...field}
+                                disabled={isSubmitting || isFetching}
+                                className="h-12 shadow-sm border-primary/20 focus-visible:ring-primary rounded-xl"
+                              />
+                            </FormControl>
+                            <FormDescription className="text-xs">Required if DOI is not available for Web of Science papers.</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <FormField
                   control={form.control}
                   name="paperTitle"
                   render={({ field }) => (
@@ -1331,7 +1369,7 @@ export function ResearchPaperForm() {
                 </div>
 
                 <div className="space-y-4 pt-2">
-                   {indexType === 'other' && (
+                  {indexType === 'other' && (
                     <FormField
                       control={form.control}
                       name="relevantLink"
@@ -1355,7 +1393,7 @@ export function ResearchPaperForm() {
                         <FormItem>
                           <FormLabel className="text-sm font-semibold">Scopus URL</FormLabel>
                           <FormControl>
-                            <Input placeholder="https://www.scopus.com/..." {...field} disabled={isSubmitting} className="h-10 shadow-sm rounded-lg" />
+                            <Input placeholder="https://www.scopus.com/pages/publications/..." {...field} disabled={isSubmitting} className="h-10 shadow-sm rounded-lg" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1371,7 +1409,7 @@ export function ResearchPaperForm() {
                         <FormItem>
                           <FormLabel className="text-sm font-semibold">Web of Science URL</FormLabel>
                           <FormControl>
-                            <Input placeholder="https://www.webofscience.com/..." {...field} disabled={isSubmitting} className="h-10 shadow-sm rounded-lg" />
+                            <Input placeholder="https://www.webofscience.com/wos/woscc/full-record/WOS:..." {...field} disabled={isSubmitting} className="h-10 shadow-sm rounded-lg" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1380,7 +1418,7 @@ export function ResearchPaperForm() {
                   )}
                 </div>
 
-                 {(indexType === 'scopus' || indexType === 'wos' || indexType === 'both' || indexType === 'sci') && (
+                {(indexType === 'scopus' || indexType === 'wos' || indexType === 'both' || indexType === 'sci') && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {(indexType === 'wos' || indexType === 'both') && (
                       <FormField
@@ -1414,37 +1452,39 @@ export function ResearchPaperForm() {
                       />
                     )}
 
-                    <FormField
-                      control={form.control}
-                      name="journalClassification"
-                      render={({ field }) => (
-                        <FormItem className="space-y-3">
-                          <FormLabel className="text-base font-semibold">Classification (Q-rating)</FormLabel>
-                          <FormControl>
-                            <div>
-                              <RadioGroup 
-                                onValueChange={field.onChange} 
-                                value={field.value} 
-                                className="flex flex-wrap gap-3 mt-2" 
-                                disabled={isSubmitting}
-                              >
-                                {availableClassifications.map((option) => (
-                                  <Label 
-                                    key={option.value}
-                                    htmlFor={`q-${option.value}`} 
-                                    className="flex items-center space-x-2 bg-muted/30 px-4 py-2.5 rounded-xl border hover:bg-muted cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 shadow-sm transition-all whitespace-nowrap"
-                                  >
-                                    <RadioGroupItem value={option.value} id={`q-${option.value}`} />
-                                    <span className="font-medium text-xs">{option.label}</span>
-                                  </Label>
-                                ))}
-                              </RadioGroup>
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {publicationType !== 'Scopus Indexed Conference Proceedings' && (
+                       <FormField
+                        control={form.control}
+                        name="journalClassification"
+                        render={({ field }) => (
+                          <FormItem className="space-y-3">
+                            <FormLabel className="text-base font-semibold">Classification (Q-rating)</FormLabel>
+                            <FormControl>
+                              <div>
+                                <RadioGroup
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                  className="flex flex-wrap sm:flex-nowrap gap-1.5 mt-2"
+                                  disabled={isSubmitting}
+                                >
+                                  {availableClassifications.map((option) => (
+                                    <Label 
+                                      key={option.value}
+                                      htmlFor={`q-${option.value}`} 
+                                      className="flex items-center space-x-1.5 bg-muted/30 px-3 py-2 rounded-lg border hover:bg-muted cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 shadow-sm transition-all whitespace-nowrap"
+                                    >
+                                      <RadioGroupItem value={option.value} id={`q-${option.value}`} />
+                                      <span className="font-medium text-[11px]">{option.label}</span>
+                                    </Label>
+                                  ))}
+                                </RadioGroup>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                   </div>
                 )}
               </section>
@@ -1470,22 +1510,25 @@ export function ResearchPaperForm() {
                     {fields.map((field, index) => (
                       <div key={field.id} className="flex flex-col md:flex-row items-start md:items-center gap-4 bg-background p-4 rounded-xl border shadow-sm animate-in slide-in-from-left-2">
                         <div className="flex-1 space-y-0.5">
-                           <div className="flex items-center gap-2">
-                              <p className="font-bold text-sm">{field.name}</p>
-                              {field.isExternal && <Badge variant="outline" className="text-[9px] h-4">External</Badge>}
-                              {field.email.toLowerCase() === user?.email.toLowerCase() && <Badge variant="secondary" className="text-[9px] h-4 bg-primary/10 text-primary border-none">You</Badge>}
-                           </div>
-                           <p className="text-xs text-muted-foreground">{field.email}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-sm">{field.name}</p>
+                            {field.isExternal && <Badge variant="outline" className="text-[9px] h-4">External</Badge>}
+                            {field.email.toLowerCase() === user?.email.toLowerCase() && <Badge variant="secondary" className="text-[9px] h-4 bg-primary/10 text-primary border-none">You</Badge>}
+                            {publicationType === 'Scopus Indexed Conference Proceedings' && field.role === 'Co-Author' && (
+                              <Badge variant="outline" className="text-[8px] h-3.5 bg-yellow-50 text-yellow-700 border-yellow-200 uppercase font-black tracking-tighter">Ineligible to Claim</Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{field.email}</p>
                         </div>
                         <div className="flex items-center gap-3 w-full md:w-auto">
                           <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={field.role}>
                             <SelectTrigger className="h-10 w-full md:w-[220px] rounded-lg text-xs font-semibold shadow-sm">
-                               <SelectValue placeholder="Role" />
+                              <SelectValue placeholder="Role" />
                             </SelectTrigger>
                             <SelectContent className="rounded-xl">
-                               {getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (
-                                 <SelectItem key={role} value={role} className="text-xs">{role}</SelectItem>
-                               ))}
+                              {getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (
+                                <SelectItem key={role} value={role} className="text-xs">{role}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           {field.email.toLowerCase() !== user?.email.toLowerCase() && (
@@ -1548,45 +1591,45 @@ export function ResearchPaperForm() {
               </section>
 
               {indexType !== 'other' && calculatedIncentive !== null && (
-                 <Alert className="bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md">
-                   <div className="flex flex-col gap-1.5 relative">
-                      <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4" /> 
-                        Estimated Incentive Amount
-                      </p>
-                      <h4 className="text-4xl font-black text-foreground tracking-tight py-1">
-                        ₹{calculatedIncentive.toLocaleString('en-IN')}
-                      </h4>
-                      <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
-                      
-                      <div className="mt-4 border-t border-primary/10 pt-4">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
-                          onClick={() => setShowLogic(!showLogic)}
-                          type="button"
-                        >
-                          View Calculation Logic
-                          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
-                        </Button>
-                        
-                        {showLogic && (
-                          <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2">
-                            {getPaperLogicBreakdown(form.getValues()).map((step, idx) => (
-                              <div key={idx} className="flex justify-between items-center py-1 border-b last:border-0 border-muted">
-                                <span className="text-muted-foreground">{step.label}</span>
-                                <span className={idx === 4 ? "font-bold text-green-600" : "font-semibold"}>{step.value}</span>
-                              </div>
-                            ))}
-                            <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
-                              *Logic matches official policy matrix evaluated by approvers during technical audit. If author position &gt; 5th, final eligible amount is ₹0.
+                <Alert className="bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md">
+                  <div className="flex flex-col gap-1.5 relative">
+                    <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Estimated Incentive Amount
+                    </p>
+                    <h4 className="text-4xl font-black text-foreground tracking-tight py-1">
+                      ₹{calculatedIncentive.toLocaleString('en-IN')}
+                    </h4>
+                    <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
+
+                    <div className="mt-4 border-t border-primary/10 pt-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
+                        onClick={() => setShowLogic(!showLogic)}
+                        type="button"
+                      >
+                        View Calculation Logic
+                        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                      </Button>
+
+                      {showLogic && (
+                        <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2">
+                          {getPaperLogicBreakdown(form.getValues()).map((step, idx) => (
+                            <div key={idx} className="flex justify-between items-center py-1 border-b last:border-0 border-muted">
+                              <span className="text-muted-foreground">{step.label}</span>
+                              <span className={idx === 4 ? "font-bold text-green-600" : "font-semibold"}>{step.value}</span>
                             </div>
+                          ))}
+                          <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
+                            *Logic matches official policy matrix evaluated by approvers during technical audit. If author position &gt; 5th, final eligible amount is ₹0.
                           </div>
-                        )}
-                      </div>
-                   </div>
-                 </Alert>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Alert>
               )}
 
               <Separator />
@@ -1636,7 +1679,7 @@ export function ResearchPaperForm() {
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" className="w-full justify-between h-10 font-medium shadow-sm rounded-lg">
                             {field.value?.length > 0 ? (
-                               <Badge variant="secondary" className="px-2 py-0 text-xs">{field.value.length} selected</Badge>
+                              <Badge variant="secondary" className="px-2 py-0 text-xs">{field.value.length} selected</Badge>
                             ) : "Select goals"}
                             <ChevronDown className="h-4 w-4 opacity-50" />
                           </Button>
@@ -1670,7 +1713,7 @@ export function ResearchPaperForm() {
               <Separator />
 
               <section className="space-y-6">
-                 <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
+                <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
                   <div className="h-8 w-1.5 bg-primary rounded-full"></div>
                   Documentation & Proof
                 </div>
@@ -1683,10 +1726,10 @@ export function ResearchPaperForm() {
                       <FormLabel className="text-base font-semibold text-primary">Upload Proof (PDF)</FormLabel>
                       <FormControl>
                         <div className="relative flex flex-col items-center justify-center p-8 border-2 border-dashed border-primary/20 rounded-2xl bg-muted/20 hover:bg-muted/30 transition-all cursor-pointer group">
-                           <FileText className="h-12 w-12 text-primary/40 group-hover:text-primary transition-colors mb-2" />
-                           <p className="text-sm font-bold text-primary mb-1">Click or drag to upload PDF</p>
-                           <p className="text-[10px] text-muted-foreground">Select the published paper (Max 10MB)</p>
-                           <input
+                          <FileText className="h-12 w-12 text-primary/40 group-hover:text-primary transition-colors mb-2" />
+                          <p className="text-sm font-bold text-primary mb-1">Click or drag to upload PDF</p>
+                          <p className="text-[10px] text-muted-foreground">Select the published paper (Max 10MB)</p>
+                          <input
                             key={(value as FileList)?.[0]?.name || 'empty-upload'}
                             type="file"
                             accept=".pdf"
@@ -1698,11 +1741,11 @@ export function ResearchPaperForm() {
                       </FormControl>
                       {value && (value as FileList).length > 0 && (
                         <div className="flex items-center gap-2 text-xs font-bold text-green-700 bg-green-50 p-2 rounded-lg border border-green-200 mt-3 relative pr-8 animate-in fade-in duration-300">
-                           <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
-                           <span className="truncate flex-1">{(value as FileList)[0].name} successfully selected</span>
-                           <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 text-green-700/60 hover:text-green-700 hover:bg-green-100/50" onClick={(e) => { e.preventDefault(); onChange(undefined); }}>
-                             <X className="h-3 w-3" />
-                           </Button>
+                          <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate flex-1">{(value as FileList)[0].name} successfully selected</span>
+                          <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 text-green-700/60 hover:text-green-700 hover:bg-green-100/50" onClick={(e) => { e.preventDefault(); onChange(undefined); }}>
+                            <X className="h-3 w-3" />
+                          </Button>
                         </div>
                       )}
                       <FormMessage />
@@ -1714,8 +1757,8 @@ export function ResearchPaperForm() {
 
             <CardFooter className="flex flex-col md:flex-row justify-between items-center p-8 bg-muted/10 border-t gap-4">
               <div className="flex items-center gap-2 w-full md:w-auto">
-                 <Button variant="ghost" type="button" onClick={() => router.back()} className="flex-1 md:flex-none rounded-xl h-12 font-semibold hover:bg-muted">Cancel</Button>
-                 <Button variant="outline" type="button" onClick={() => handleSave('Draft')} disabled={isSubmitting} className="flex-1 md:flex-none rounded-xl h-12 border-primary/30 text-primary hover:bg-primary/5">Save for later</Button>
+                <Button variant="ghost" type="button" onClick={() => router.back()} className="flex-1 md:flex-none rounded-xl h-12 font-semibold hover:bg-muted">Cancel</Button>
+                <Button variant="outline" type="button" onClick={() => handleSave('Draft')} disabled={isSubmitting} className="flex-1 md:flex-none rounded-xl h-12 border-primary/30 text-primary hover:bg-primary/5">Save for later</Button>
               </div>
               <Button type="button" size="lg" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing} className="w-full md:w-auto rounded-xl h-12 px-12 font-black shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all">
                 Review Application

@@ -3,6 +3,7 @@
 'use server';
 
 import { adminDb } from '@/lib/admin';
+import { getIncentiveClaimByIdCombined } from '@/lib/incentive-data-admin';
 import type { IncentiveClaim, User } from '@/types';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
@@ -39,12 +40,10 @@ function getInstituteAcronym(name?: string): string {
 
 export async function generateConferenceIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
-    const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
-    const claimSnap = await claimRef.get();
-    if (!claimSnap.exists) {
+    const claim = await getIncentiveClaimByIdCombined(claimId);
+    if (!claim) {
       return { success: false, error: 'Incentive claim not found.' };
     }
-    const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
 
     const userRef = adminDb.collection('users').doc(claim.uid);
     const userSnap = await userRef.get();

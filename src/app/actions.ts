@@ -12,6 +12,12 @@ export * from "@/services/document-service";
 export * from "./scopus-actions";
 export * from "./wos-actions";
 export * from "./sciencedirect-actions";
+export * from "./incentive-actions";
+export * from "./research-paper-actions";
+export * from "./patent-actions";
+export * from "./conference-actions";
+export * from "./membership-actions";
+export * from "./arps-actions";
 
 // Note: Any custom logic that doesn't fit into a specific domain can be added here, 
 // but most business logic should live in src/services/

@@ -29,7 +29,8 @@ export default function Error({
     // Send email report
     sendErrorEmail(
       { message: error.message, digest: error.digest },
-      parsedUser
+      parsedUser,
+      window.location.href
     ).catch(e => console.error("Failed to send error report email:", e));
 
     // Log to observability system
@@ -41,30 +42,53 @@ export default function Error({
 
   }, [error]);
 
+  const isChunkError = error.message.toLowerCase().includes('chunk') || error.message.toLowerCase().includes('dynamically imported module');
+
   return (
     <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center p-4">
-        <Card className="w-full max-w-lg text-center shadow-lg">
+        <Card className="w-full max-w-lg text-center shadow-lg border-2 border-destructive/20 ring-1 ring-destructive/10">
             <CardHeader>
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-                    <AlertTriangle className="h-6 w-6 text-destructive" />
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 animate-pulse">
+                    <AlertTriangle className="h-8 w-8 text-destructive" />
                 </div>
-                <CardTitle className="mt-4 text-2xl">An Unexpected Error Occurred</CardTitle>
-                <CardDescription>We apologize for the inconvenience. Our technical team has been automatically notified of this issue.</CardDescription>
+                <CardTitle className="mt-4 text-2xl font-bold tracking-tight">
+                    {isChunkError ? 'Application Update Detected' : 'An Unexpected Error Occurred'}
+                </CardTitle>
+                <CardDescription className="text-base">
+                    {isChunkError 
+                        ? 'We have recently updated the portal. Please refresh your browser to load the latest version.'
+                        : 'We apologize for the inconvenience. Our technical team has been automatically notified and is looking into it.'
+                    }
+                </CardDescription>
             </CardHeader>
-            <CardContent>
-                <p className="text-muted-foreground">
-                    Please try again. If the problem persists, please contact our support team for assistance.
+            <CardContent className="space-y-4">
+                <div className="bg-muted/50 p-3 rounded-lg text-left">
+                  <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-1">Error Trace ID</p>
+                  <p className="text-xs font-mono break-all">{error.digest || 'N/A'}</p>
+                  <p className="text-xs font-mono mt-2 text-destructive/80 bg-destructive/5 p-2 rounded border border-destructive/10">{error.message}</p>
+                </div>
+                
+                <p className="text-sm text-muted-foreground">
+                    If refreshing doesn't help, please contact our support team.
                 </p>
-                <p className="mt-4 font-semibold">
+                <p className="font-semibold">
                     <a href="mailto:helpdesk.rdc@paruluniversity.ac.in" className="text-primary hover:underline">
                         helpdesk.rdc@paruluniversity.ac.in
                     </a>
                 </p>
             </CardContent>
-            <CardFooter className="flex justify-center">
-                <Button onClick={() => reset()}>
-                    Try Again
+            <CardFooter className="flex flex-col gap-2">
+                <Button 
+                  onClick={() => isChunkError ? window.location.reload() : reset()} 
+                  className="w-full h-11 text-base font-bold shadow-lg shadow-primary/20"
+                >
+                    {isChunkError ? 'Refresh Now' : 'Try Again'}
                 </Button>
+                {isChunkError && (
+                  <p className="text-[10px] text-muted-foreground italic">
+                    Tip: If the error persists, try clearing your browser cache.
+                  </p>
+                )}
             </CardFooter>
         </Card>
     </div>

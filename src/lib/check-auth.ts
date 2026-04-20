@@ -26,17 +26,25 @@ export async function checkAuth(options: {
     let userRole = decodedToken.role as string;
     const uid = decodedToken.uid;
 
-    if (role && !userRole) {
-      const { adminDb } = await import('./admin');
-      const userDoc = await adminDb.collection('users').doc(uid).get();
-      if (userDoc.exists) {
-        userRole = userDoc.data()?.role;
-      }
-    }
-
     if (role) {
       const allowedRoles = Array.isArray(role) ? role : [role];
-      if (!allowedRoles.includes(userRole)) {
+      const normalizedAllowedRoles = allowedRoles.map(r => r.toLowerCase().replace(/\s+/g, '-'));
+      let normalizedUserRole = userRole?.toLowerCase().replace(/\s+/g, '-');
+
+      // If role is missing or doesn't match, try fetching a fresh one from the database
+      if (!normalizedUserRole || !normalizedAllowedRoles.includes(normalizedUserRole)) {
+        const { adminDb } = await import('./admin');
+        const userDoc = await adminDb.collection('users').doc(uid).get();
+        if (userDoc.exists) {
+          const dbRole = userDoc.data()?.role;
+          if (dbRole) {
+            userRole = dbRole;
+            normalizedUserRole = dbRole.toLowerCase().replace(/\s+/g, '-');
+          }
+        }
+      }
+
+      if (!normalizedUserRole || !normalizedAllowedRoles.includes(normalizedUserRole)) {
         if (shouldRedirect) redirect('/unauthorized');
         return { 
           authenticated: true, 

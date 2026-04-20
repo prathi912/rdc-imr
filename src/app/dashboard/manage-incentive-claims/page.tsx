@@ -35,13 +35,12 @@ import type { IncentiveClaim, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  generateOfficeNotingsZip, 
-  markPaymentsCompleted, 
-  submitToAccounts, 
-  generateIncentivePaymentSheet, 
-  downloadPaymentSheetByRef 
+import {
+  downloadPaymentSheetByRef,
+  fetchAllClaimsAction,
+  logFrontendAction
 } from '@/app/actions';
+import { reportSystemError } from '@/lib/error-reporting';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -102,23 +101,11 @@ export default function ManageIncentiveClaimsPage() {
       const userList = userSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as User));
       setUsers(userList);
 
-      const claimsCollection = collection(db, 'incentiveClaims');
-      let q;
-      if (currentUser.role === 'Super-admin' || currentUser.role === 'admin') {
-        q = query(claimsCollection, orderBy('submissionDate', 'desc'));
-      } else if (currentUser.role === 'CRO') {
-        q = query(claimsCollection, where('faculty', 'in', currentUser.faculties || []), orderBy('submissionDate', 'desc'));
-      } else {
-        setAllClaims([]);
-        setLoading(false);
-        return;
-      }
-
-      const claimSnapshot = await getDocs(q);
-      const claimList = claimSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
+      const claimList = await fetchAllClaimsAction(currentUser);
       setAllClaims(claimList);
     } catch (error) {
       console.error("Error fetching data:", error);
+      reportSystemError(error, currentUser, "Fetching all incentive claims and users for management dashboard");
       toast({ variant: "destructive", title: "Error", description: "Could not fetch incentive claims or user data." });
     } finally {
       setLoading(false);

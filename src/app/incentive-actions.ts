@@ -2,7 +2,8 @@
 
 'use server';
 
-import { adminDb } from '@/lib/admin';
+import { adminDb, adminRtdb } from '@/lib/admin';
+import { getIncentiveClaimByIdCombined } from '@/lib/incentive-data-admin';
 import type { IncentiveClaim, User } from '@/types';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
@@ -12,12 +13,10 @@ import { getSystemSettings } from './actions';
 
 export async function generateBookIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
-    const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
-    const claimSnap = await claimRef.get();
-    if (!claimSnap.exists) {
+    const claim = await getIncentiveClaimByIdCombined(claimId);
+    if (!claim) {
       return { success: false, error: 'Incentive claim not found.' };
     }
-    const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
 
     let userRef;
     let userSnap;
@@ -102,5 +101,80 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
   } catch (error: any) {
     console.error('Error generating book incentive form:', error);
     return { success: false, error: error.message || 'Failed to generate the form.' };
+  }
+}
+/**
+ * Fetches incentive claims from both Firestore and RTDB, merges them and applies role-based filtering.
+ * This runs on the server to bypass RTDB security rule limitations for complex client-side queries.
+ */
+export async function fetchAllClaimsAction(user: User): Promise<IncentiveClaim[]> {
+  if (!user) return [];
+
+  try {
+    const isAdmin = user.role === 'Super-admin' || user.role === 'admin';
+    // Simplified approver check for server action context
+    const isApprover = user.allowedModules?.some(m => m.startsWith('incentive-approver-'));
+    
+    // 1. Fetch from Firestore
+    let firestoreClaims: IncentiveClaim[] = [];
+    const claimsCollection = adminDb.collection('incentiveClaims');
+
+    if (isAdmin || isApprover) {
+      const snap = await claimsCollection.orderBy('submissionDate', 'desc').get();
+      firestoreClaims = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
+    } else if (user.role === 'CRO') {
+      const snap = await claimsCollection.where('faculty', 'in', user.faculties || []).orderBy('submissionDate', 'desc').get();
+      firestoreClaims = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
+    } else {
+      // Regular user: owned + co-authored
+      const [snap1, snap2, snap3] = await Promise.all([
+        claimsCollection.where('uid', '==', user.uid).get(),
+        claimsCollection.where('authorUids', 'array-contains', user.uid).get(),
+        claimsCollection.where('authorEmails', 'array-contains', user.email.toLowerCase()).get()
+      ]);
+      
+      const map = new Map<string, IncentiveClaim>();
+      [snap1, snap2, snap3].forEach(snap => {
+        snap.forEach(doc => map.set(doc.id, { id: doc.id, ...doc.data() } as IncentiveClaim));
+      });
+      firestoreClaims = Array.from(map.values());
+    }
+
+    // 2. Fetch from RTDB
+    const rtdbSnap = await adminRtdb.ref('incentiveClaims').get();
+    let rtdbClaims: IncentiveClaim[] = [];
+
+    if (rtdbSnap.exists()) {
+      const data = rtdbSnap.val();
+      rtdbClaims = Object.keys(data).map(key => ({ id: key, ...data[key] } as IncentiveClaim));
+
+      // Filter RTDB data
+      if (isAdmin || isApprover) {
+        // No filtering
+      } else if (user.role === 'CRO') {
+        rtdbClaims = rtdbClaims.filter(c => (user.faculties || []).includes(c.faculty || ''));
+      } else {
+        rtdbClaims = rtdbClaims.filter(c => 
+          c.uid === user.uid || 
+          c.authorUids?.includes(user.uid) || 
+          c.authorEmails?.includes(user.email.toLowerCase())
+        );
+      }
+    }
+
+    // 3. Merge (RTDB wins)
+    const combinedMap = new Map<string, IncentiveClaim>();
+    firestoreClaims.forEach(c => combinedMap.set(c.id, c));
+    rtdbClaims.forEach(c => combinedMap.set(c.id, c));
+
+    return Array.from(combinedMap.values()).sort((a, b) => {
+      const dateA = new Date(a.submissionDate).getTime();
+      const dateB = new Date(b.submissionDate).getTime();
+      return dateB - dateA;
+    });
+
+  } catch (error) {
+    console.error("Error in fetchAllClaimsAction:", error);
+    return [];
   }
 }

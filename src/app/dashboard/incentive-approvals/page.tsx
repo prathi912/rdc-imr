@@ -7,6 +7,7 @@ import type { User, IncentiveClaim } from '@/types';
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { fetchAllClaimsAction } from '@/app/actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -46,32 +47,17 @@ export default function IncentiveApprovalsPage() {
     const fetchClaimsAndUsers = useCallback(async (currentUser: User, stage: number) => {
         setLoading(true);
         try {
-            const claimsCollection = collection(db, 'incentiveClaims');
-            const usersQuery = query(collection(db, 'users'));
-            
             const statusToFetch = `Pending Stage ${stage + 1} Approval`;
-            
-            const pendingClaimsQuery = query(
-                claimsCollection, 
-                where('status', '==', statusToFetch), 
-                orderBy('submissionDate', 'desc')
-            );
-
-            // History should include all claims the user has acted upon at their stage
-            const historyQuery = query(
-              claimsCollection, 
-              where(`approvals.${stage}.approverUid`, '==', currentUser.uid),
-              orderBy('submissionDate', 'desc')
-            );
-            
-            const [pendingSnapshot, historySnapshot, usersSnapshot] = await Promise.all([
-                getDocs(pendingClaimsQuery),
-                getDocs(historyQuery),
-                getDocs(usersQuery)
+            const [combinedClaims, usersSnapshot] = await Promise.all([
+                fetchAllClaimsAction(currentUser),
+                getDocs(query(collection(db, 'users')))
             ]);
+            
+            const pending = combinedClaims.filter(c => c.status === statusToFetch);
+            const history = combinedClaims.filter(c => c.approvals?.[stage]?.approverUid === currentUser.uid);
 
-            setPendingClaims(pendingSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim)));
-            setHistoryClaims(historySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim)));
+            setPendingClaims(pending);
+            setHistoryClaims(history);
             setAllUsers(usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as User)));
 
         } catch (error) {

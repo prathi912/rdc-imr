@@ -606,7 +606,7 @@ export function EmrManagementClient({ call, allUsers, currentUser, onActionCompl
             setHasMore(snapshot.docs.length === pageSize);
         } catch (error) {
             console.error("Error fetching interests:", error);
-            reportSystemError(error, currentUser);
+            reportSystemError(error, currentUser, `Fetching EMR interests/registrations for call: ${call.title}`);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch registrations.' });
         } finally {
             setLoadingInterests(false);

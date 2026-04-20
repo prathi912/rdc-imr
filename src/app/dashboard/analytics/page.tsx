@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { toPng } from 'html-to-image';
 import { useRouter } from 'next/navigation';
-import { getStorageUsage } from '@/app/actions';
+import { getStorageUsage, fetchAllClaimsAction } from '@/app/actions';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -389,9 +389,10 @@ export default function AnalyticsPage() {
       setEmrProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest)));
     }, (error) => { console.error("Error fetching EMR data:", error); });
 
-    const unsubscribeClaims = onSnapshot(claimsQuery, (snapshot) => {
-      setIncentiveClaims(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim)));
-    }, (error) => { console.error("Error fetching incentive claims:", error); });
+    // Fetch incentive claims via server action
+    fetchAllClaimsAction(user).then(claims => {
+      setIncentiveClaims(claims);
+    }).catch(err => console.error("Error fetching claims in analytics:", err));
 
     const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
       setLoginLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -400,7 +401,6 @@ export default function AnalyticsPage() {
     return () => {
       unsubscribeProjects();
       unsubscribeEmr();
-      unsubscribeClaims();
       unsubscribeLogs();
     }
 
