@@ -151,6 +151,7 @@ export function AdminDashboard({ user }: { user: User }) {
       if (isPrincipal && !user?.institute) return 'Principal Dashboard (No Institute Set)';
       if (isHod && user?.department) return `${user.department} Dashboard`;
       if (isCro) return 'CRO Dashboard';
+      if (user?.role === 'IQAC') return "Quality Assurance Dashboard";
       return "Admin Dashboard";
   };
 

@@ -13,7 +13,7 @@ import {
   Layers, Zap, BarChart3, Database, Box, UserCheck, Settings
 } from 'lucide-react'
 import { format, parseISO, differenceInDays, subDays } from 'date-fns'
-import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore'
+import { collection, onSnapshot, query, where, orderBy, Timestamp } from 'firebase/firestore'
 
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -58,57 +58,108 @@ export default function SystemAnalyticsPage() {
     const thresholdIso = thresholdDate.toISOString()
     const unsubscribes: (() => void)[] = []
 
-    unsubscribes.push(onSnapshot(collection(db, 'projects'), (snapshot) => {
-      setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)))
-    }))
-    unsubscribes.push(onSnapshot(collection(db, 'emrInterests'), (snapshot) => {
-      setEmrInterests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest)))
-    }))
-    unsubscribes.push(onSnapshot(collection(db, 'users'), (snapshot) => {
-      setUsers(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User)))
-    }))
-
-    // Fetch incentive claims via server action
-    const currentUser = JSON.parse(localStorage.getItem('user') || '{}') as User;
-    if (currentUser.uid) {
-      fetchAllClaimsAction(currentUser).then(claims => {
-        setIncentiveClaims(claims);
-      }).catch(err => console.error("Error fetching claims in system analytics:", err));
+    const errorHandler = (name: string) => (error: any) => {
+      console.error(`Error syncing ${name}:`, error)
+      toast({ variant: 'destructive', title: 'Analytics Sync Error', description: `Failed to load ${name}. Data may be incomplete.` })
+      setLoading(false)
     }
 
-    const logsQuery = query(collection(db, 'logs'), where('timestamp', '>=', thresholdIso), orderBy('timestamp', 'asc'))
-    unsubscribes.push(onSnapshot(logsQuery, (snapshot) => {
-      setLogs(snapshot.docs.map(doc => doc.data()))
-      setLoading(false)
-    }))
+    unsubscribes.push(onSnapshot(collection(db, 'projects'), 
+      (snap) => setProjects(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project))),
+      errorHandler('projects')
+    ))
+    unsubscribes.push(onSnapshot(collection(db, 'emrInterests'), 
+      (snap) => setEmrInterests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest))),
+      errorHandler('emrInterests')
+    ))
+    unsubscribes.push(onSnapshot(collection(db, 'users'), 
+      (snap) => setUsers(snap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User))),
+      errorHandler('users')
+    ))
 
-    return () => unsubscribes.forEach(unsub => unsub())
-  }, [timeRange])
+    const storedUser = localStorage.getItem('user')
+    if (storedUser) {
+      const parsed = JSON.parse(storedUser) as User
+      if (parsed.uid) {
+        fetchAllClaimsAction(parsed)
+          .then(setIncentiveClaims)
+          .catch(err => {
+            console.error("Claims fetch error:", err)
+            setLoading(false)
+          })
+      }
+    }
 
-  // --- DATA PROCESSING (Identical to previous Step for consistency) ---
+    const logsQuery = query(collection(db, 'system_logs'), where('timestamp', '>=', thresholdDate), orderBy('timestamp', 'asc'))
+    unsubscribes.push(onSnapshot(logsQuery, 
+      (snapshot) => {
+        setLogs(snapshot.docs.map(doc => {
+          const data = doc.data();
+          const timestamp = data.timestamp instanceof Timestamp 
+            ? data.timestamp.toDate().toISOString() 
+            : data.timestamp;
+            
+          return {
+            ...data,
+            timestamp,
+            // Standardize log fields for the analytics logic
+            projectId: data.projectId || data.metadata?.projectId || data.context?.projectId,
+            newStatus: data.newStatus || data.metadata?.newStatus,
+            uid: data.uid || data.userId || data.metadata?.uid
+          };
+        }))
+        setLoading(false)
+      },
+      errorHandler('activity metrics')
+    ))
+
+    // Safety timeout to resolve loading state if snapshots hang
+    const timeout = setTimeout(() => setLoading(false), 8000)
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub())
+      clearTimeout(timeout)
+    }
+  }, [timeRange, toast])
+
   const analytics = useMemo(() => {
     if (loading) return null
     const criticalStages = ['Submitted', 'Under Review', 'Recommended', 'Sanctioned']
     const auditGaps: any[] = []
     
+    // O(L) - Map logs by project for O(1) lookup in the project map
+    const logsMap = new Map<string, any[]>()
+    logs.forEach(l => {
+      const pid = l.projectId || l.context?.projectId
+      if (pid) {
+        if (!logsMap.has(pid)) logsMap.set(pid, [])
+        logsMap.get(pid)!.push(l)
+      }
+    })
+    
     const projectTraces = projects.map(p => {
-      const projectLogs = logs.filter(l => l.projectId === p.id || l.context?.projectId === p.id)
-      const sorted = projectLogs.filter(l => l.newStatus).sort((a,b) => a.timestamp.localeCompare(b.timestamp))
+      const projectLogs = logsMap.get(p.id) || []
+      // Logs are pre-sorted by Firestore query
+      const sorted = projectLogs.filter(l => l.newStatus) 
+      
       const stagesPresent = new Set(sorted.map(l => l.newStatus))
       const missing = criticalStages.filter(s => {
         const statusIdx = criticalStages.indexOf(p.status)
         const stageIdx = criticalStages.indexOf(s)
         return stageIdx < statusIdx && !stagesPresent.has(s)
       })
+      
       if (missing.length > 0 && p.status !== 'Draft') {
         auditGaps.push({ id: p.id, title: p.title, missing })
       }
+      
       const stageDurs: Record<string, number> = {}
       for(let i=0; i<sorted.length - 1; i++) {
         const from = sorted[i].newStatus
-        const dur = differenceInDays(parseISO(sorted[i+1].timestamp), parseISO(sorted[i].timestamp))
+        const dur = Math.max(0, differenceInDays(parseISO(sorted[i+1].timestamp), parseISO(sorted[i].timestamp)))
         stageDurs[from] = (stageDurs[from] || 0) + dur
       }
+      
       return { id: p.id, history: sorted, gaps: missing, eventCount: projectLogs.length, stageDurations: stageDurs, status: p.status }
     })
 
@@ -116,16 +167,29 @@ export default function SystemAnalyticsPage() {
     const violationsCount = logs.filter(l => l.level === 'WARNING' || l.message?.includes('Unauthorized')).length
     const governanceRate = totalTransitions > 0 ? (((totalTransitions - violationsCount) / totalTransitions) * 100).toFixed(1) : '100'
     const sancP = projects.filter(p => p.status === 'Sanctioned' || p.status === 'Completed')
+    
     const meanComp = sancP.length > 0 
-      ? (sancP.reduce((acc, p) => acc + differenceInDays(p.sanctionDate ? parseISO(p.sanctionDate) : new Date(), parseISO(p.submissionDate)), 0) / sancP.length).toFixed(1)
+      ? (sancP.reduce((acc, p) => {
+          const start = p.submissionDate ? parseISO(p.submissionDate) : new Date()
+          const end = p.sanctionDate ? parseISO(p.sanctionDate) : new Date()
+          return acc + Math.max(0, differenceInDays(end, start))
+        }, 0) / sancP.length).toFixed(1)
       : '0'
+      
     const actUsers = new Set(logs.map(l => l.uid || l.userId)).size
     const auditComp = projects.length > 0 ? (((projects.length - auditGaps.length) / projects.length) * 100).toFixed(1) : '100'
 
     const stageTimes: Record<string, number[]> = {}
-    projectTraces.forEach(pt => { Object.entries(pt.stageDurations).forEach(([s, d]) => { if (!stageTimes[s]) stageTimes[s] = []; stageTimes[s].push(d) }) })
+    projectTraces.forEach(pt => { 
+      Object.entries(pt.stageDurations).forEach(([s, d]) => { 
+        if (!stageTimes[s]) stageTimes[s] = []; 
+        stageTimes[s].push(d) 
+      }) 
+    })
+    
     const medianStageDurations = Object.entries(stageTimes).map(([s, times]) => {
-      const srt = times.sort((a,b) => a-b); const mid = Math.floor(srt.length / 2)
+      const srt = times.sort((a,b) => a-b); 
+      const mid = Math.floor(srt.length / 2)
       const med = srt.length % 2 !== 0 ? srt[mid] : (srt[mid-1] + srt[mid]) / 2
       return { name: s, value: med || 0 }
     }).sort((a,b) => b.value - a.value).slice(0, 5)
@@ -136,19 +200,23 @@ export default function SystemAnalyticsPage() {
       { name: 'Under Review', count: projects.filter(p => ['Under Review', 'Recommended', 'Sanctioned', 'Completed'].includes(p.status)).length },
       { name: 'Sanctioned', count: projects.filter(p => ['Sanctioned', 'Completed'].includes(p.status)).length },
     ]
+    
     const revisionLoops = logs.filter(l => l.newStatus === 'Revision Needed' || l.message?.includes('Revision')).length
     const bottleneck = medianStageDurations[0]?.name || 'N/A'
+    
     const violationMonitoring = [
       { name: 'Unauthorized', value: logs.filter(l => l.message?.toLowerCase().includes('unauthorized')).length },
       { name: 'Role Violations', value: logs.filter(l => l.message?.toLowerCase().includes('role') || l.message?.toLowerCase().includes('actor')).length },
       { name: 'State Bypasses', value: logs.filter(l => l.message?.toLowerCase().includes('invalid transition') || l.message?.toLowerCase().includes('bypass')).length },
     ]
+    
     const eventDensity = [
       { name: '1-2 Events', count: projectTraces.filter(pt => pt.eventCount <= 2).length },
       { name: '3-5 Events', count: projectTraces.filter(pt => pt.eventCount > 2 && pt.eventCount <= 5).length },
       { name: '6-10 Events', count: projectTraces.filter(pt => pt.eventCount > 5 && pt.eventCount <= 10).length },
       { name: '10+ Events', count: projectTraces.filter(pt => pt.eventCount > 10).length },
     ]
+    
     const featureIntensity = [
       { name: 'EMR Interests', value: emrInterests.length },
       { name: 'Incentive Claims', value: incentiveClaims.length },
@@ -158,7 +226,7 @@ export default function SystemAnalyticsPage() {
     return {
       summary: { governanceRate, meanComp, actUsers, auditComp },
       process: { medianStageDurations, processFunnel, totalTransitions, revisionLoops, bottleneck },
-      governance: { violationMonitoring, integrity: [{ name: 'Valid', value: totalTransitions - violationsCount }, { name: 'Violations', value: violationsCount }] },
+      governance: { violationMonitoring, integrity: [{ name: 'Valid', value: Math.max(0, totalTransitions - violationsCount) }, { name: 'Violations', value: violationsCount }] },
       audit: { eventDensity, avgEvents: (logs.length / Math.max(projects.length, 1)).toFixed(1) },
       adoption: { featureIntensity, totalWorkflows: projects.length + emrInterests.length + incentiveClaims.length, totalUsers: users.length }
     }

@@ -14,6 +14,17 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Separator } from '@/components/ui/separator'
 import { Label } from '@/components/ui/label'
 import { useState, useEffect, useMemo, useCallback } from 'react'
@@ -464,6 +475,7 @@ export function ResearchPaperForm() {
   const [showLogic, setShowLogic] = useState(false);
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [showDraftWarning, setShowDraftWarning] = useState(false);
 
   useEffect(() => {
     async function fetchSettings() {
@@ -1757,7 +1769,34 @@ export function ResearchPaperForm() {
             <CardFooter className="flex flex-col md:flex-row justify-between items-center p-8 bg-muted/10 border-t gap-4">
               <div className="flex items-center gap-2 w-full md:w-auto">
                 <Button variant="ghost" type="button" onClick={() => router.back()} className="flex-1 md:flex-none rounded-xl h-12 font-semibold hover:bg-muted">Cancel</Button>
-                <Button variant="outline" type="button" onClick={() => handleSave('Draft')} disabled={isSubmitting} className="flex-1 md:flex-none rounded-xl h-12 border-primary/30 text-primary hover:bg-primary/5">Save for later</Button>
+                <div className="flex flex-col md:flex-row gap-4">
+                  <AlertDialog open={showDraftWarning} onOpenChange={setShowDraftWarning}>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" type="button" disabled={isSubmitting} className="flex-1 md:flex-none rounded-xl h-12 border-primary/30 text-primary hover:bg-primary/5">Save for later</Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="rounded-3xl border-primary/20 shadow-2xl">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-xl font-black flex items-center gap-2">
+                          <Bot className="h-5 w-5 text-primary" /> Save for later?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-sm font-medium leading-relaxed pt-2">
+                          Your progress will be saved, but please note that <span className="font-bold text-foreground underline decoration-primary decoration-2">any uploaded files will not be saved</span> in this draft.
+                          <br /><br />
+                          You will need to upload your documents again when you are ready for final review and submission.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="pt-4">
+                        <AlertDialogCancel className="rounded-xl font-bold">Review Files</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={() => handleSave("Draft")}
+                          className="rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90"
+                        >
+                          Save Anyway
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
               <Button type="button" size="lg" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing} className="w-full md:w-auto rounded-xl h-12 px-12 font-black shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all">
                 Review Application

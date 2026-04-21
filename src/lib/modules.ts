@@ -38,7 +38,7 @@ const hierarchyCoreModules = ["analytics"]
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules]
 const croDefaults = [...coreModules, ...facultyCoreModules, "all-projects", "analytics"]
-const iqacDefaults = [...coreModules, "all-projects", "analytics"]
+const iqacDefaults = [...coreModules, "all-projects", "analytics", "manage-incentive-claims", "pending-reviews", "completed-reviews", "recruitment-approvals", "emr-management"]
 const adminDefaults = [...croDefaults, "schedule-meeting", "pending-reviews", "completed-reviews", "emr-management", "manage-incentive-claims"]
 const superAdminDefaults = [...adminDefaults, "module-management", "arps-calculator"]
 

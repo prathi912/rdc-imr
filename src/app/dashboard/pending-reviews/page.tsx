@@ -26,7 +26,7 @@ export default function PendingReviewsPage() {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
-       if (!parsedUser.allowedModules?.includes('pending-reviews')) {
+       if (!parsedUser.allowedModules?.includes('pending-reviews') && parsedUser.role !== 'IQAC') {
         toast({
           title: 'Access Denied',
           description: "You don't have permission to view this page.",

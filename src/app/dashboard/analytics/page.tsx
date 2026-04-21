@@ -332,11 +332,11 @@ export default function AnalyticsPage() {
     const projectsCollection = collection(db, 'projects');
     const emrCollection = collection(db, 'emrInterests');
     const claimsCollection = collection(db, 'incentiveClaims');
-    const logsCollection = collection(db, 'logs');
+    const logsCollection = collection(db, 'system_logs');
     let projectsQuery, emrQuery, claimsQuery;
 
     const sevenDaysAgo = startOfDay(subDays(new Date(), 6));
-    const logsQuery = query(logsCollection, where('message', '==', 'User logged in'), where('timestamp', '>=', sevenDaysAgo.toISOString()));
+    const logsQuery = query(logsCollection, where('message', '==', 'User logged in successfully'), where('timestamp', '>=', sevenDaysAgo));
 
     const isPrincipal = user.designation === 'Principal';
     const isCro = user.role === 'CRO';
@@ -395,7 +395,13 @@ export default function AnalyticsPage() {
     }).catch(err => console.error("Error fetching claims in analytics:", err));
 
     const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
-      setLoginLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoginLogs(snapshot.docs.map(doc => {
+        const data = doc.data();
+        const timestamp = data.timestamp instanceof Timestamp 
+          ? data.timestamp.toDate().toISOString() 
+          : data.timestamp;
+        return { id: doc.id, ...data, timestamp };
+      }));
     }, (error) => { console.error("Error fetching log data:", error); });
 
     return () => {

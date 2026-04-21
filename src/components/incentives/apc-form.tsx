@@ -13,6 +13,17 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Separator } from '@/components/ui/separator'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
@@ -233,6 +244,7 @@ export function ApcForm({ user }: { user: User }) {
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false)
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null)
   const [isLoadingDraft, setIsLoadingDraft] = useState(true)
+  const [showDraftWarning, setShowDraftWarning] = useState(false)
   const [step, setStep] = useState<'edit' | 'review'>('edit')
   const [showLogic, setShowLogic] = useState(false)
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
@@ -521,6 +533,40 @@ export function ApcForm({ user }: { user: User }) {
         />
         <div className="flex justify-end max-w-4xl mx-auto gap-4">
           <Button variant="ghost" onClick={() => setStep('edit')} disabled={isSubmitting}>Modify Details</Button>
+          <AlertDialog open={showDraftWarning} onOpenChange={setShowDraftWarning}>
+            <AlertDialogTrigger asChild>
+              <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isSubmitting}
+                  className="rounded-2xl px-6 h-12 font-bold hover:bg-primary/5 text-primary"
+              >
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Save as Draft
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="rounded-3xl border-primary/20 shadow-2xl">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-xl font-black flex items-center gap-2">
+                  <Bot className="h-5 w-5 text-primary" /> Save as Draft?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm font-medium leading-relaxed pt-2">
+                  Your progress will be saved, but please note that <span className="font-bold text-foreground underline decoration-primary decoration-2">any uploaded files will not be saved</span> in this draft.
+                  <br /><br />
+                  You will need to upload your documents again when you are ready for final review and submission.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="pt-4">
+                <AlertDialogCancel className="rounded-xl font-bold">Review Files</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={() => handleSave("Draft")}
+                  className="rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  Save Anyway
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button size="lg" onClick={() => handleSave('Pending')} disabled={isSubmitting} className="px-10 font-bold shadow-lg shadow-primary/20">
             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
             Finalize Submission
@@ -849,7 +895,32 @@ export function ApcForm({ user }: { user: User }) {
         </Form>
       </CardContent>
       <CardFooter className="flex justify-between p-8 bg-muted/30 border-t border-muted/50 gap-4">
-        <Button variant="ghost" size="lg" onClick={() => handleSave('Draft')} disabled={isSubmitting} className="rounded-2xl px-8 h-12 font-bold hover:bg-primary/5 text-primary">Save to Draft</Button>
+        <AlertDialog open={showDraftWarning} onOpenChange={setShowDraftWarning}>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" size="lg" disabled={isSubmitting} className="rounded-2xl px-8 h-12 font-bold hover:bg-primary/5 text-primary">Save to Draft</Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="rounded-3xl border-primary/20 shadow-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-black flex items-center gap-2">
+                <Bot className="h-5 w-5 text-primary" /> Save as Draft?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-sm font-medium leading-relaxed pt-2">
+                Your progress will be saved, but please note that <span className="font-bold text-foreground underline decoration-primary decoration-2">any uploaded files will not be saved</span> in this draft.
+                <br /><br />
+                You will need to upload your documents again when you are ready for final review and submission.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="pt-4">
+              <AlertDialogCancel className="rounded-xl font-bold">Review Files</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => handleSave("Draft")}
+                className="rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Save Anyway
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <div className="flex gap-4">
           <Button variant="outline" size="lg" onClick={() => router.back()} disabled={isSubmitting} className="rounded-2xl px-6 h-12">Cancel</Button>
           <Button size="lg" onClick={form.handleSubmit(() => setStep('review'))} disabled={isSubmitting} className="rounded-2xl px-12 h-12 font-black shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-[1.02]">

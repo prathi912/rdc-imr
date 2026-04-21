@@ -12,11 +12,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Separator } from "@/components/ui/separator"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { db } from "@/lib/config"
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
 import type { User, IncentiveClaim, Author } from "@/types"
 import { uploadFileToApi } from "@/lib/upload-client"
 import { Loader2, AlertCircle, Info, Edit, Trash2, CheckCircle2, FileText, X, Globe, MapPin, Calendar, Award, Bot, ChevronDown } from "lucide-react"
@@ -433,6 +445,9 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false)
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false)
   const [eligibility, setEligibility] = useState<{ eligible: boolean; nextAvailableDate?: string }>({ eligible: true })
+  const [isUploading, setIsUploading] = useState(false)
+  const [showDraftWarning, setShowDraftWarning] = useState(false)
+  const [departments, setDepartments] = useState<string[]>([])
   const [isLoadingDraft, setIsLoadingDraft] = useState(true)
   const [step, setStep] = useState<"edit" | "review">("edit")
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null)
@@ -1295,7 +1310,32 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
         </Form>
       </CardContent>
       <CardFooter className="flex justify-between p-8 bg-muted/20 border-t border-muted/30 gap-4">
-        <Button variant="ghost" size="lg" onClick={() => handleSave("Draft")} disabled={isSubmitting} className="rounded-2xl px-8 h-12 font-bold hover:bg-primary/5 text-primary">Save as Draft</Button>
+        <AlertDialog open={showDraftWarning} onOpenChange={setShowDraftWarning}>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" size="lg" disabled={isSubmitting} className="rounded-2xl px-8 h-12 font-bold hover:bg-primary/5 text-primary">Save as Draft</Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="rounded-3xl border-primary/20 shadow-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-black flex items-center gap-2">
+                <Bot className="h-5 w-5 text-primary" /> Save as Draft?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-sm font-medium leading-relaxed pt-2">
+                Your progress will be saved, but please note that <span className="font-bold text-foreground underline decoration-primary decoration-2">any uploaded files will not be saved</span> in this draft.
+                <br /><br />
+                You will need to upload your documents again when you are ready for final review and submission.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="pt-4">
+              <AlertDialogCancel className="rounded-xl font-bold">Review Files</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => handleSave("Draft")}
+                className="rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Save Anyway
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <div className="flex gap-4">
           <Button variant="outline" size="lg" onClick={() => router.back()} disabled={isSubmitting} className="rounded-2xl px-6 h-12">Cancel</Button>
           <Button size="lg" onClick={handleProceedToReview} disabled={isFormDisabled} className="rounded-2xl px-12 h-12 font-black shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-[1.02]">

@@ -12,6 +12,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Separator } from "@/components/ui/separator"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -212,6 +223,7 @@ export function AwardForm({ user }: { user: User }) {
   const [uploading, setUploading] = useState(false)
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false)
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false)
+  const [showDraftWarning, setShowDraftWarning] = useState(false)
   const [isLoadingDraft, setIsLoadingDraft] = useState(true)
   const [showLogic, setShowLogic] = useState(false)
 

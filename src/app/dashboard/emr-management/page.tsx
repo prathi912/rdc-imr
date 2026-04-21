@@ -156,7 +156,7 @@ function EmrLogsTab({ user }: { user: User | null }) {
             let logsQuery;
             const baseQuery = query(collection(db, 'emrInterests'), where('status', '==', 'Submitted to Agency'), orderBy('submittedToAgencyAt', 'desc'));
 
-            const isSuperAdminOrAdmin = user.role === 'Super-admin' || user.role === 'admin';
+            const isSuperAdminOrAdmin = user.role === 'Super-admin' || user.role === 'admin' || user.role === 'IQAC';
             const isCro = user.role === 'CRO';
             const isPrincipal = user.designation === 'Principal';
             const isHod = user.designation === 'HOD';
@@ -401,7 +401,7 @@ export default function EmrManagementOverviewPage() {
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
             const parsedUser = JSON.parse(storedUser);
-            if (!parsedUser.allowedModules?.includes('emr-management')) {
+            if (!parsedUser.allowedModules?.includes('emr-management') && parsedUser.role !== 'IQAC') {
                 toast({
                     title: 'Access Denied',
                     description: "You don't have permission to view this page.",

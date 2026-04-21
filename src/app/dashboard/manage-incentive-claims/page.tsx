@@ -91,7 +91,7 @@ export default function ManageIncentiveClaimsPage() {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser) as User;
-      if (!parsedUser.allowedModules?.includes('manage-incentive-claims')) {
+      if (!parsedUser.allowedModules?.includes('manage-incentive-claims') && parsedUser.role !== 'IQAC') {
         toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to view this page.' });
         router.replace('/dashboard');
         return;

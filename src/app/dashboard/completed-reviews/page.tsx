@@ -8,20 +8,35 @@ import { db } from '@/lib/config';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import type { Project, User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 export default function CompletedReviewsPage() {
   const [completedProjects, setCompletedProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setCurrentUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser) as User;
+      if (!parsedUser.allowedModules?.includes('completed-reviews') && parsedUser.role !== 'IQAC') {
+        toast({
+          title: 'Access Denied',
+          description: "You don't have permission to view this page.",
+          variant: 'destructive',
+        });
+        router.replace('/dashboard');
+        return;
+      }
+      setCurrentUser(parsedUser);
+    } else {
+        router.replace('/login');
     }
+  }, [router, toast]);
     
     async function getCompletedProjects() {
       try {

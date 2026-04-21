@@ -723,7 +723,7 @@ export default function SettingsPage() {
       
       <div className="mt-8">
         <Tabs defaultValue="account" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+          <TabsList className={`grid w-full ${user?.role === "Super-admin" ? "grid-cols-2 max-w-[400px]" : "grid-cols-1 max-w-[200px]"}`}>
             <TabsTrigger value="account">Account Settings</TabsTrigger>
             {user?.role === "Super-admin" && <TabsTrigger value="system">System Administration</TabsTrigger>}
           </TabsList>

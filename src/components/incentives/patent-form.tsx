@@ -13,6 +13,17 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Separator } from '@/components/ui/separator';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -295,6 +306,7 @@ const patentSchema = z
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
   const [addType, setAddType] = useState<'inventor' | 'applicant'>('inventor');
+  const [showDraftWarning, setShowDraftWarning] = useState(false);
   const [showLogic, setShowLogic] = useState(false);
 
   const getPatentLogicBreakdown = (data: Partial<PatentFormValues>) => {
@@ -1185,32 +1197,241 @@ const patentSchema = z
                             )}
                         </div>
                     </div>
+                                        >
+                                            <RadioGroupItem value="true" id="ipr-cell-yes" />
+                                            <span className="font-semibold cursor-pointer flex-1">Yes</span>
+                                        </Label>
+                                        <Label 
+                                            htmlFor="ipr-cell-no" 
+                                            className="flex items-center space-x-3 bg-background px-4 py-2 rounded-xl border hover:bg-muted transition-colors cursor-pointer flex-1 [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5"
+                                        >
+                                            <RadioGroupItem value="false" id="ipr-cell-no" />
+                                            <span className="font-semibold cursor-pointer flex-1">No</span>
+                                        </Label>
+                                    </RadioGroup>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem> 
+                        )} />
+
+                        {patentFiledFromIprCell === false && (
+                            <FormField name="patentPermissionTaken" control={form.control} render={({ field }) => ( 
+                                <FormItem className="space-y-3 p-4 bg-orange-50 rounded-2xl border border-orange-200">
+                                    <FormLabel className="text-base font-bold text-orange-700">Permission Taken?</FormLabel>
+                                    <FormControl>
+                                        <RadioGroup onValueChange={(val) => field.onChange(val === 'true')} value={String(field.value)} className="flex gap-4">
+                                            <Label 
+                                                htmlFor="perm-yes" 
+                                                className="flex items-center space-x-3 bg-background px-4 py-2 rounded-xl border hover:bg-muted transition-colors cursor-pointer flex-1 [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5"
+                                            >
+                                                <RadioGroupItem value="true" id="perm-yes" />
+                                                <span className="font-semibold cursor-pointer flex-1">Yes</span>
+                                            </Label>
+                                            <Label 
+                                                htmlFor="perm-no" 
+                                                className="flex items-center space-x-3 bg-background px-4 py-2 rounded-xl border hover:bg-muted transition-colors cursor-pointer flex-1 [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5"
+                                            >
+                                                <RadioGroupItem value="false" id="perm-no" />
+                                                <span className="font-semibold cursor-pointer flex-1">No</span>
+                                            </Label>
+                                        </RadioGroup>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem> 
+                            )} />
+                        )}
+                    </div>
+
+                    <div className="bg-primary/5 p-6 rounded-2xl border border-primary/20 space-y-6">
+                        <FormField name="currentStatus" control={form.control} render={({ field }) => ( 
+                            <FormItem>
+                                <FormLabel className="text-base font-bold text-primary">Current Lifecycle Status</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl><SelectTrigger className="h-12 shadow-sm font-bold bg-background"><SelectValue placeholder="Select status"/></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="Filed">Filed (Form 1 submitted)</SelectItem>
+                                        <SelectItem value="Published">Published (Official Journal)</SelectItem>
+                                        <SelectItem value="Granted">Granted (Patent Certificate awarded)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem> 
+                        )} />
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField name="filingDate" control={form.control} render={({ field }) => ( 
+                                <FormItem className="flex flex-col">
+                                    <FormLabel className="text-sm font-semibold mb-2">Date of Filing</FormLabel>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <FormControl>
+                                                <Button variant={"outline"} className={cn("h-12 pl-3 text-left font-normal bg-background shadow-sm", !field.value && "text-muted-foreground")}>
+                                                    {field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}
+                                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                </Button>
+                                            </FormControl>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0 rounded-xl" align="start">
+                                            <Calendar 
+                                                mode="single" 
+                                                selected={field.value} 
+                                                onSelect={field.onChange} 
+                                                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                                initialFocus 
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                    <FormMessage />
+                                </FormItem> 
+                            )} />
+                            {(currentStatus === 'Published' || currentStatus === 'Granted') && (
+                                <FormField name="publicationDate" control={form.control} render={({ field }) => ( 
+                                    <FormItem className="flex flex-col">
+                                        <FormLabel className="text-sm font-semibold mb-2">Date of Publication</FormLabel>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <FormControl>
+                                                    <Button variant={"outline"} className={cn("h-12 pl-3 text-left font-normal bg-background shadow-sm", !field.value && "text-muted-foreground")}>
+                                                        {field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}
+                                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                    </Button>
+                                                </FormControl>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0 rounded-xl" align="start">
+                                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                                            </PopoverContent>
+                                        </Popover>
+                                        <FormMessage />
+                                    </FormItem> 
+                                )} />
+                            )}
+                            {currentStatus === 'Granted' && (
+                                <FormField name="grantDate" control={form.control} render={({ field }) => ( 
+                                    <FormItem className="flex flex-col">
+                                        <FormLabel className="text-sm font-semibold mb-2 text-green-700 font-bold">Date of Grant</FormLabel>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <FormControl>
+                                                    <Button variant={"outline"} className={cn("h-12 pl-3 text-left font-normal bg-background border-green-200 shadow-sm", !field.value && "text-muted-foreground")}>
+                                                        {field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}
+                                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                    </Button>
+                                                </FormControl>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0 rounded-xl" align="start">
+                                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                                            </PopoverContent>
+                                        </Popover>
+                                        <FormMessage />
+                                    </FormItem> 
+                                )} />
+                            )}
+                        </div>
+                    </div>
+                </section>
+
+                 <section className="space-y-6">
+                    <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
+                        <div className="h-8 w-1.5 bg-primary rounded-full"></div>
+                        Documentation
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <FormField name="patentForm1" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel className="font-semibold text-xs uppercase tracking-widest text-muted-foreground">Attach Proof (Form 1) (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" className="h-12 border-dashed bg-muted/10" /></FormControl><FormMessage /></FormItem> )} />
+                        <FormField name="patentGovtReceipt" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel className="font-semibold text-xs uppercase tracking-widest text-muted-foreground">Attach Proof (Govt. Receipt) (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" className="h-12 border-dashed bg-muted/10"/></FormControl><FormMessage /></FormItem> )} />
+                    </div>
+                    {patentFiledFromIprCell === false && (
+                        <FormField name="patentApprovalProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel className="font-semibold text-xs uppercase tracking-widest text-muted-foreground">Attach Proof of Approval (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" className="h-12 border-dashed bg-muted/10"/></FormControl><FormMessage /></FormItem> )} />
+                    )}
+
+                    <FormField control={form.control} name="patentSelfDeclaration" render={({ field }) => ( 
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-2xl border-2 border-primary/20 p-6 bg-primary/5 shadow-sm">
+                            <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} className="h-6 w-6 rounded-md" /></FormControl>
+                            <div className="space-y-1">
+                                <FormLabel className="font-bold text-primary">Self Declaration Acknowledgement</FormLabel>
+                                <p className="text-sm text-primary/80 font-medium">I hereby confirm that I have not applied/claimed for any incentive for the same IP application earlier and all details are accurate.</p>
+                                <FormMessage />
+                            </div>
+                        </FormItem> 
+                    )} />
+                </section>
+
+                {calculatedIncentive !== null && (
+                    <Alert className="mt-8 bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md mb-8">
+                    <div className="flex flex-col gap-1.5">
+                        <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> Estimated Incentive Amount
+                        </p>
+                        <h4 className="text-4xl font-black text-foreground tracking-tight py-1">₹{calculatedIncentive.toLocaleString('en-IN')}</h4>
+                        <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
+                        
+                        <div className="mt-4 border-t border-primary/10 pt-4">
+                            <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
+                            onClick={() => setShowLogic(!showLogic)}
+                            type="button"
+                            >
+                            View Calculation Logic
+                            <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                            </Button>
+                            
+                            {showLogic && (
+                            <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2">
+                                {getPatentLogicBreakdown(form.getValues()).map((step, idx) => (
+                                <div key={idx} className="flex justify-between items-center py-1 border-b last:border-0 border-muted">
+                                    <span className="text-muted-foreground">{step.label}</span>
+                                    <span className={idx === (getPatentLogicBreakdown(form.getValues()).length - 1) ? "font-bold text-green-600" : "font-semibold"}>{step.value}</span>
+                                </div>
+                                ))}
+                                <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
+                                *Logic matches official policy matrix evaluated by approvers during technical audit.
+                                </div>
+                            </div>
+                            )}
+                        </div>
+                    </div>
                     </Alert>
                 )}
             </div>
           </form>
         </Form>
       </CardContent>
-      <CardFooter className="flex justify-between p-8 bg-muted/20 border-t items-center">
-        <Button
-            type="button"
-            variant="ghost"
-            onClick={() => handleSave('Draft')}
-            disabled={isSubmitting}
-            className="rounded-xl px-6 h-12 font-semibold hover:bg-background/80"
-        >
-            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save as Draft
-        </Button>
-        
-        <div className="flex gap-4">
-            <Button variant="ghost" size="lg" onClick={() => router.back()} className="rounded-xl px-8 h-12 font-semibold">Cancel</Button>
-            <Button size="lg" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing} className="rounded-xl px-10 h-12 font-bold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all">
-                Review Application
-            </Button>
+      <CardFooter className="flex flex-col md:flex-row justify-between items-center p-8 bg-muted/10 border-t gap-4">
+        <div className="flex items-center gap-2 w-full md:w-auto">
+            <Button variant="ghost" type="button" onClick={() => router.back()} className="flex-1 md:flex-none rounded-xl h-12 font-semibold">Cancel</Button>
+            <AlertDialog open={showDraftWarning} onOpenChange={setShowDraftWarning}>
+                <AlertDialogTrigger asChild>
+                    <Button variant="outline" type="button" disabled={isSubmitting} className="flex-1 md:flex-none rounded-xl h-12 border-primary/30 text-primary hover:bg-primary/5">Save for later</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-3xl border-primary/20 shadow-2xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-xl font-black flex items-center gap-2">
+                            <Bot className="h-5 w-5 text-primary" /> Save for later?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-sm font-medium leading-relaxed pt-2">
+                            Your progress will be saved, but please note that <span className="font-bold text-foreground underline decoration-primary decoration-2">any uploaded files will not be saved</span> in this draft.
+                            <br /><br />
+                            You will need to upload your documents again when you are ready for final review and submission.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="pt-4">
+                        <AlertDialogCancel className="rounded-xl font-bold">Review Files</AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={() => handleSave("Draft")}
+                            className="rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90"
+                        >
+                            Save Anyway
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
+        <Button type="button" size="lg" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing} className="w-full md:w-auto rounded-xl h-12 px-12 font-black shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all">
+            Review Application
+        </Button>
       </CardFooter>
     </Card>
   );
 }
-

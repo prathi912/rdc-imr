@@ -111,10 +111,20 @@ export default function RecruitmentApprovalsPage() {
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
-            setUser(JSON.parse(storedUser));
+            const parsedUser = JSON.parse(storedUser) as User;
+            if (!parsedUser.allowedModules?.includes('recruitment-approvals') && parsedUser.role !== 'IQAC') {
+                toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to view this page.' });
+                router.replace('/dashboard');
+                return;
+            }
+            setUser(parsedUser);
+        } else {
+            router.replace('/login');
         }
         fetchAllData();
-    }, [fetchAllData]);
+    }, [fetchAllData, router, toast]);
+
+    const isAuditOnly = user?.role === 'IQAC';
 
     const handleApproval = async (id: string, newStatus: 'Approved' | 'Rejected') => {
         try {
@@ -163,8 +173,12 @@ export default function RecruitmentApprovalsPage() {
                                         </div>
                                         <div className="flex flex-shrink-0 gap-2">
                                             <Button variant="outline" size="sm" onClick={() => handleViewDetails(job)}><Eye className="mr-2 h-4 w-4"/>View Details</Button>
-                                            <Button size="sm" onClick={() => handleApproval(job.id, 'Approved')}><Check className="mr-2 h-4 w-4"/>Approve</Button>
-                                            <Button size="sm" variant="destructive" onClick={() => handleApproval(job.id, 'Rejected')}><X className="mr-2 h-4 w-4"/>Reject</Button>
+                                            {!isAuditOnly && (
+                                                <>
+                                                    <Button size="sm" onClick={() => handleApproval(job.id, 'Approved')}><Check className="mr-2 h-4 w-4"/>Approve</Button>
+                                                    <Button size="sm" variant="destructive" onClick={() => handleApproval(job.id, 'Rejected')}><X className="mr-2 h-4 w-4"/>Reject</Button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 </CardHeader>

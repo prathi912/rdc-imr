@@ -12,6 +12,17 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Separator } from '@/components/ui/separator';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -206,6 +217,7 @@ export function MembershipForm() {
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
+  const [showDraftWarning, setShowDraftWarning] = useState(false);
   const [showLogic, setShowLogic] = useState(false);
 
   const getMembershipLogicBreakdown = (data: Partial<MembershipFormValues>) => {
@@ -634,16 +646,40 @@ export function MembershipForm() {
         </Form>
       </CardContent>
       <CardFooter className="flex justify-between p-8 bg-muted/20 border-t items-center">
-        <Button
-            type="button"
-            variant="ghost"
-            onClick={() => handleSave('Draft')}
-            disabled={isSubmitting}
-            className="rounded-xl px-6 h-12 font-semibold hover:bg-background/80"
-        >
-            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save as Draft
-        </Button>
+        <AlertDialog open={showDraftWarning} onOpenChange={setShowDraftWarning}>
+          <AlertDialogTrigger asChild>
+            <Button
+                type="button"
+                variant="ghost"
+                disabled={isSubmitting}
+                className="rounded-xl px-6 h-12 font-semibold hover:bg-background/80"
+            >
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save as Draft
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="rounded-3xl border-primary/20 shadow-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-xl font-black flex items-center gap-2">
+                <Bot className="h-5 w-5 text-primary" /> Save as Draft?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-sm font-medium leading-relaxed pt-2">
+                Your progress will be saved, but please note that <span className="font-bold text-foreground underline decoration-primary decoration-2">any uploaded files will not be saved</span> in this draft.
+                <br /><br />
+                You will need to upload your documents again when you are ready for final review and submission.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="pt-4">
+              <AlertDialogCancel className="rounded-xl font-bold">Review Files</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => handleSave("Draft")}
+                className="rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Save Anyway
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <div className="flex gap-4">
             <Button variant="ghost" size="lg" onClick={() => router.back()} className="rounded-xl px-8 h-12 font-semibold">Cancel</Button>
             <Button size="lg" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing} className="rounded-xl px-10 h-12 font-bold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all">

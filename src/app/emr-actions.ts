@@ -2163,3 +2163,18 @@ export async function addSanctionedEmrProject(data: {
     return { success: false, error: 'Failed to add the project.' };
   }
 }
+
+export async function getPublicFundingCalls(): Promise<FundingCall[]> {
+  try {
+    const callsRef = adminDb.collection("fundingCalls")
+    const snapshot = await callsRef.orderBy('interestDeadline', 'desc').get()
+    const calls: FundingCall[] = []
+    snapshot.forEach((doc) => {
+      calls.push({ id: doc.id, ...(doc.data() as FundingCall) })
+    })
+    return calls
+  } catch (error) {
+    console.error("Error fetching public funding calls:", error)
+    return []
+  }
+}

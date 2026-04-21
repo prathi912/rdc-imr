@@ -13,6 +13,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Separator } from "@/components/ui/separator"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -153,6 +164,13 @@ function ReviewDetails({
   onEdit: () => void
   isSubmitting: boolean
   calculatedIncentive: number | null
+  showDraftWarning: boolean
+  setShowDraftWarning: (val: boolean) => void
+  handleSave: (type: string) => void
+  handleProceedToReview: () => void
+  router: any
+  bankDetailsMissing: boolean
+  orcidOrMisIdMissing: boolean
 }) {
   return (
     <Card className="max-w-4xl mx-auto shadow-xl border-t-4 border-t-primary">
@@ -275,6 +293,7 @@ export function BookForm() {
 
   const [step, setStep] = useState<"edit" | "review">("edit")
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null)
+  const [showDraftWarning, setShowDraftWarning] = useState(false)
   const [isLoadingDraft, setIsLoadingDraft] = useState(true)
   const [showLogic, setShowLogic] = useState(false)
 

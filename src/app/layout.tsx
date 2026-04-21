@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     title: 'R&D Portal | Parul University',
     description: 'A comprehensive portal to manage the entire research lifecycle at Parul University.',
     url: 'https://rndprojects.paruluniversity.ac.in',
-    siteName: 'Parul University Research & Development Portal',
+    siteName: 'Parul University Research Management System',
     images: [
       {
         url: 'https://www.paruluniversity.ac.in/images/header-logo.png',
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'R&D Portal | Parul University',
+    title: 'Research Management System | Parul University',
     description: 'A comprehensive portal to manage the entire research lifecycle at Parul University.',
     images: ['https://www.paruluniversity.ac.in/images/header-logo.png'],
   },
