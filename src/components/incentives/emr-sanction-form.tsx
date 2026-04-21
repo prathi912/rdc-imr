@@ -12,13 +12,14 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 import { useState, useEffect, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import type { User, IncentiveClaim, Author, CoPiDetails } from '@/types'
 import { uploadFileToApi } from '@/lib/upload-client'
 import { Loader2, AlertCircle, Plus, Trash2, Info, FileText, CheckCircle2, ChevronDown } from 'lucide-react'
 import { calculateEmrSanctionIncentive } from "@/app/incentive-calculation"
 import { submitIncentiveClaimViaApi } from "@/lib/incentive-claim-client"
+import { getIncentiveClaimByIdAction } from "@/app/actions"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { AuthorSearch } from "./author-search"

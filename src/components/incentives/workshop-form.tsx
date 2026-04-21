@@ -36,11 +36,11 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { doc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, Author } from '@/types';
 import { uploadFileToApi } from '@/lib/upload-client';
 import { Loader2, AlertCircle, Trash2, Plus, Calendar as CalendarIcon, Bot, CheckCircle2, FileText, X, Globe } from 'lucide-react';
 import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
+import { getIncentiveClaimByIdAction } from '@/app/actions';
 import { AuthorSearch } from './author-search';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -180,6 +180,7 @@ export function WorkshopForm({ initialEventType, onEventTypeChange }: WorkshopFo
   const coAuthorRoles: Author['role'][] = ['First Author', 'Corresponding Author', 'Co-Author', 'Presenting Author', 'First & Presenting Author'];
 
   const selectedEventType = form.watch('eventType');
+  const attendanceMode = form.watch('attendanceMode');
 
   useEffect(() => {
     if (initialEventType) {
@@ -226,10 +227,9 @@ export function WorkshopForm({ initialEventType, onEventTypeChange }: WorkshopFo
       const fetchDraft = async () => {
         setIsLoadingDraft(true);
         try {
-          const claimRef = doc(db, 'incentiveClaims', claimId);
-          const claimSnap = await getDoc(claimRef);
-          if (claimSnap.exists()) {
-            const draftData = claimSnap.data() as any;
+          const result = await getIncentiveClaimByIdAction(claimId);
+          if (result.success && result.data) {
+            const draftData = result.data as any;
             form.reset({
               ...draftData,
               authors: draftData.authors || [],
@@ -238,7 +238,7 @@ export function WorkshopForm({ initialEventType, onEventTypeChange }: WorkshopFo
               travelReceipts: undefined,
             });
           } else {
-            toast({ variant: 'destructive', title: 'Draft Not Found' });
+            toast({ variant: 'destructive', title: result.error || 'Draft Not Found' });
           }
         } catch (error) {
           toast({ variant: 'destructive', title: 'Error Loading Draft' });
@@ -497,64 +497,16 @@ export function WorkshopForm({ initialEventType, onEventTypeChange }: WorkshopFo
                       </FormItem>
                     )}
                   />
-                  <div className="space-y-4">
-                  <FormLabel>Author(s) & Roles</FormLabel>
-                  <div className="grid gap-3">
-                    {fields.map((field, index) => (
-                      <div
-                        key={field.id}
-                        className="flex flex-col md:flex-row items-start md:items-center gap-4 p-3 bg-muted/50 rounded-md"
-                      >
-                        <div className="flex-grow">
-                          <p className="font-medium text-sm">
-                            {field.name} {field.isExternal && <span className="text-xs text-muted-foreground">(External)</span>}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 w-full md:w-auto">
-                          <FormField
-                            control={form.control}
-                            name={`authors.${index}.role`}
-                            render={({ field: roleField }) => (
-                              <FormItem className="w-full md:w-[180px]">
-                                <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={roleField.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-9 text-xs">
-                                      <SelectValue placeholder="Select role" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (
-                                      <SelectItem key={role} value={role}>{role}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
-                            )}
-                          />
-                          {field.email.toLowerCase() !== user?.email.toLowerCase() && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => removeAuthor(index)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
+                  {/* Author selection hidden for Workshop/STTP/FDP/Training as it is individual participation */}
+                  <FormField
+                    name="authors"
+                    control={form.control}
+                    render={() => (
+                      <div className="hidden">
+                        <FormMessage />
                       </div>
-                    ))}
-                  </div>
-
-                  <AuthorSearch
-                    authors={fields}
-                    onAdd={(author) => append(author)}
-                    availableRoles={getAvailableRoles()}
-                    currentUserEmail={user?.email}
+                    )}
                   />
-                  <FormMessage>{form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}</FormMessage>
-                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
@@ -600,87 +552,89 @@ export function WorkshopForm({ initialEventType, onEventTypeChange }: WorkshopFo
                 </div>
               </div>
 
-              <div>
-                <h3 className="font-semibold text-sm -mb-2">TRAVEL DETAILS</h3>
-                <Separator className="mt-4" />
-                <div className="space-y-4 mt-4">
-                  <FormField
-                    name="travelPlaceVisited"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Place Visited</FormLabel>
-                        <FormControl>
-                          <Input placeholder="City/Location" {...field} disabled={isSubmitting} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="travelMode"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Travel Mode</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+              {attendanceMode === 'Offline' && (
+                <div>
+                  <h3 className="font-semibold text-sm -mb-2">TRAVEL DETAILS</h3>
+                  <Separator className="mt-4" />
+                  <div className="space-y-4 mt-4">
+                    <FormField
+                      name="travelPlaceVisited"
+                      control={form.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Place Visited</FormLabel>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select travel mode" />
-                            </SelectTrigger>
+                            <Input placeholder="City/Location" {...field} disabled={isSubmitting} />
                           </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Bus">Bus</SelectItem>
-                            <SelectItem value="Train">Train</SelectItem>
-                            <SelectItem value="Air">Air</SelectItem>
-                            <SelectItem value="Other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="travelDetails"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Travel Details</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Ticket/route/class details" {...field} disabled={isSubmitting} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="travelFare"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Travel Fare Incurred (INR)</FormLabel>
-                        <FormControl>
-                          <Input type="number" min="0" {...field} disabled={isSubmitting} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="travelReceipts"
-                    control={form.control}
-                    render={({ field: { value, onChange, ...fieldProps } }) => (
-                      <FormItem>
-                        <FormLabel>Attach Tickets/Receipts (PDF, Below 10MB)</FormLabel>
-                        <FormControl>
-                          <Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isSubmitting} accept="application/pdf" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="travelMode"
+                      control={form.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Travel Mode</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select travel mode" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Bus">Bus</SelectItem>
+                              <SelectItem value="Train">Train</SelectItem>
+                              <SelectItem value="Air">Air</SelectItem>
+                              <SelectItem value="Other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="travelDetails"
+                      control={form.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Travel Details</FormLabel>
+                          <FormControl>
+                            <Textarea placeholder="Ticket/route/class details" {...field} disabled={isSubmitting} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="travelFare"
+                      control={form.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Travel Fare Incurred (INR)</FormLabel>
+                          <FormControl>
+                            <Input type="number" min="0" {...field} disabled={isSubmitting} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="travelReceipts"
+                      control={form.control}
+                      render={({ field: { value, onChange, ...fieldProps } }) => (
+                        <FormItem>
+                          <FormLabel>Attach Tickets/Receipts (PDF, Below 10MB)</FormLabel>
+                          <FormControl>
+                            <Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isSubmitting} accept="application/pdf" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div>
                 <h3 className="font-semibold text-sm -mb-2">DECLARATION</h3>

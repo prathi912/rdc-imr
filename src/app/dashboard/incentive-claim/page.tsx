@@ -65,7 +65,7 @@ function UserClaimsList({
     }
 
     const getClaimTitle = (claim: IncentiveClaim): string => {
-        return claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.conferencePaperTitle || claim.professionalBodyName || claim.apcPaperTitle || claim.awardTitle || claim.emrProjectName || 'Untitled Claim';
+        return claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.conferencePaperTitle || claim.workshopName || claim.professionalBodyName || claim.apcPaperTitle || claim.awardTitle || claim.emrProjectName || 'Untitled Claim';
     };
 
     const getClaimEditHref = (claim: IncentiveClaim): string => {
@@ -79,6 +79,7 @@ function UserClaimsList({
             'Honoring the Award Winner': 'award',
             'Award': 'award',
             'EMR Sanction Project': 'emr-sanction',
+            'Workshop/FDP/Training': 'conference',
         };
         const slug = typeMap[claim.claimType] || '';
         return `/dashboard/incentive-claim/${slug}?claimId=${claim.id}`;

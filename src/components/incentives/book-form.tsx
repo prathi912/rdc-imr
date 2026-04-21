@@ -17,8 +17,6 @@ import { Separator } from "@/components/ui/separator"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { db } from "@/lib/config"
-import { doc, getDoc } from "firebase/firestore"
 import type { User, IncentiveClaim, Author } from "@/types"
 import { fetchWosDataByUrl } from "@/app/wos-actions";
 import { Loader2, AlertCircle, Info, ChevronDown, Upload, FileText, CheckCircle2, Copy, Globe, Calendar, Award, Search, BookOpen, Edit, Trash2 } from "lucide-react"
@@ -441,18 +439,17 @@ export function BookForm() {
       const fetchDraft = async () => {
         setIsLoadingDraft(true)
         try {
-          const claimRef = doc(db, "incentiveClaims", claimId)
-          const claimSnap = await getDoc(claimRef)
-          if (claimSnap.exists()) {
-            const draftData = claimSnap.data() as any
+          const result = await getIncentiveClaimByIdAction(claimId)
+          if (result.success && result.data) {
+            const draftData = result.data as any
             form.reset({
               ...draftData,
-              publicationYear: draftData.bookPublicationYear ?? draftData.publicationYear,
+              authors: draftData.authors || [],
               bookProof: undefined,
               scopusProof: undefined,
             })
           } else {
-            toast({ variant: "destructive", title: "Draft Not Found" })
+            toast({ variant: "destructive", title: result.error || "Draft Not Found" })
           }
         } catch (error) {
           toast({ variant: "destructive", title: "Error Loading Draft" })

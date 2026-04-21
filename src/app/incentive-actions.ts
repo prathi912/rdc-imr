@@ -178,3 +178,20 @@ export async function fetchAllClaimsAction(user: User): Promise<IncentiveClaim[]
     return [];
   }
 }
+
+/**
+ * Server action to fetch a single incentive claim by ID.
+ * This is used by form components to safely load drafts from either RTDB or Firestore.
+ */
+export async function getIncentiveClaimByIdAction(claimId: string): Promise<{ success: boolean; data?: IncentiveClaim; error?: string }> {
+  try {
+    const claim = await getIncentiveClaimByIdCombined(claimId);
+    if (!claim) {
+      return { success: false, error: 'Incentive claim not found.' };
+    }
+    return { success: true, data: claim };
+  } catch (error: any) {
+    console.error(`Error in getIncentiveClaimByIdAction for ID ${claimId}:`, error);
+    return { success: false, error: error.message || 'Failed to fetch incentive claim.' };
+  }
+}

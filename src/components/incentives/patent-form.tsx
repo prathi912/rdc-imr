@@ -18,9 +18,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { doc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, PatentInventor } from '@/types';
-import { checkPatentUniqueness } from '@/app/actions';
+import { checkPatentUniqueness, getIncentiveClaimByIdAction } from '@/app/actions';
 import { uploadFileToApi } from '@/lib/upload-client';
 import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Calendar as CalendarIcon, ChevronDown, Edit, Users, UserPlus, FileText, CheckCircle2 } from 'lucide-react';
 import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
@@ -407,10 +406,9 @@ const patentSchema = z
         const fetchDraft = async () => {
             setIsLoadingDraft(true);
             try {
-                const claimRef = doc(db, 'incentiveClaims', claimId);
-                const claimSnap = await getDoc(claimRef);
-                if (claimSnap.exists()) {
-                  const draftData = claimSnap.data() as IncentiveClaim;
+                const result = await getIncentiveClaimByIdAction(claimId);
+                if (result.success && result.data) {
+                  const draftData = result.data as any;
                   const normalizeStatus = (status?: string): PatentFormValues['currentStatus'] | undefined => {
                     if (status === 'Awarded') return 'Granted';
                     if (status === 'Under Examination' || status === 'FER Responded' || status === 'Amended Examination') {
@@ -420,7 +418,7 @@ const patentSchema = z
                     return undefined;
                   };
                   form.reset({
-                    ...(draftData as unknown as PatentFormValues),
+                    ...draftData,
                     filingDate: draftData.filingDate ? parseISO(draftData.filingDate) : undefined,
                     publicationDate: draftData.publicationDate ? parseISO(draftData.publicationDate) : undefined,
                     grantDate: draftData.grantDate ? parseISO(draftData.grantDate) : undefined,
@@ -430,7 +428,7 @@ const patentSchema = z
                     patentGovtReceipt: undefined,
                   });
                 } else {
-                    toast({ variant: 'destructive', title: 'Draft Not Found' });
+                    toast({ variant: 'destructive', title: result.error || 'Draft Not Found' });
                 }
             } catch (error) {
                 toast({ variant: 'destructive', title: 'Error Loading Draft' });

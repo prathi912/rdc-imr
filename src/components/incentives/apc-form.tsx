@@ -17,9 +17,8 @@ import { Separator } from '@/components/ui/separator'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { db } from '@/lib/config'
-import { doc, getDoc } from 'firebase/firestore'
 import type { User, IncentiveClaim, Author, SystemSettings } from '@/types'
-import { getSystemSettings } from '@/app/actions'
+import { getSystemSettings, getIncentiveClaimByIdAction } from '@/app/actions'
 import { uploadFileToApi } from '@/lib/upload-client'
 import { AuthorSearch } from './author-search'
 import { Loader2, AlertCircle, Info, Trash2, Bot, CheckCircle2, FileText, X, Globe, ChevronDown } from 'lucide-react'
@@ -379,17 +378,19 @@ export function ApcForm({ user }: { user: User }) {
       const fetchDraft = async () => {
         setIsLoadingDraft(true);
         try {
-          const claimRef = doc(db, 'incentiveClaims', claimId);
-          const claimSnap = await getDoc(claimRef);
-          if (claimSnap.exists()) {
-            const draftData = claimSnap.data() as IncentiveClaim;
+          const result = await getIncentiveClaimByIdAction(claimId);
+          if (result.success && result.data) {
+            const draftData = result.data as any;
             form.reset({
               ...draftData,
-              apcQRating: draftData.apcQRating as any,
+              authors: draftData.authors || [],
               apcApcWaiverProof: undefined,
               apcPublicationProof: undefined,
               apcInvoiceProof: undefined,
             });
+            setStep('edit');
+          } else {
+            toast({ variant: 'destructive', title: result.error || 'Draft Not Found' });
           }
         } catch (error) {
           toast({ variant: 'destructive', title: 'Error Loading Draft' });

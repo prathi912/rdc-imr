@@ -16,14 +16,15 @@ import { Separator } from '@/components/ui/separator';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/config';
-import { doc, getDoc } from 'firebase/firestore';
-import type { User, IncentiveClaim } from '@/types';
+import type { User, IncentiveClaim, Author } from '@/types';
 import { uploadFileToApi } from '@/lib/upload-client';
-import { Loader2, AlertCircle, Edit, FileText, CheckCircle2, Info, Award, ChevronDown } from 'lucide-react';
+import { Loader2, AlertCircle, Info, Edit, Trash2, CheckCircle2, FileText, X, Globe, Plus, Calendar as CalendarIcon, Link as LinkIcon, BadgeCheck, ShieldCheck, ChevronDown } from 'lucide-react';
+import { parseISO, addYears, format } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
+import { getIncentiveClaimByIdAction } from '@/app/actions';
+import { cn } from "@/lib/utils";
 import { Badge } from '@/components/ui/badge';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -278,16 +279,15 @@ export function MembershipForm() {
         const fetchDraft = async () => {
             setIsLoadingDraft(true);
             try {
-                const claimRef = doc(db, 'incentiveClaims', claimId);
-                const claimSnap = await getDoc(claimRef);
-                if (claimSnap.exists()) {
-                    const draftData = claimSnap.data() as IncentiveClaim;
+                const result = await getIncentiveClaimByIdAction(claimId);
+                if (result.success && result.data) {
+                    const draftData = result.data as any;
                     form.reset({
                         ...draftData,
-                        membershipProof: undefined, // Files can't be pre-filled
+                        membershipProof: undefined,
                     });
                 } else {
-                    toast({ variant: 'destructive', title: 'Draft Not Found' });
+                    toast({ variant: 'destructive', title: result.error || 'Draft Not Found' });
                 }
             } catch (error) {
                 toast({ variant: 'destructive', title: 'Error Loading Draft' });

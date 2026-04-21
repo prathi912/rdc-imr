@@ -19,11 +19,9 @@ import { Label } from '@/components/ui/label'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
-import { db } from '@/lib/config'
-import { doc, getDoc } from 'firebase/firestore'
 import type { User, IncentiveClaim, Author, SystemSettings } from '@/types'
 import { uploadFileToApi } from '@/lib/upload-client'
-import { getSystemSettings } from "@/app/actions";
+import { getSystemSettings, getIncentiveClaimByIdAction } from "@/app/actions";
 import { fetchScopusDataByUrl } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
 import { fetchScienceDirectData } from "@/app/sciencedirect-actions";
@@ -631,30 +629,22 @@ export function ResearchPaperForm() {
       const fetchDraft = async () => {
         setIsLoadingDraft(true);
         try {
-          const claimRef = doc(db, 'incentiveClaims', claimId);
-          const claimSnap = await getDoc(claimRef);
-          if (claimSnap.exists()) {
-            const draftData = claimSnap.data() as IncentiveClaim;
-            
-            // Auto-detect user's position in the authors list for pre-filling
-            let detectedPosition = draftData.authorPosition;
-            if (user?.email && draftData.authors) {
-              const userIndex = draftData.authors.findIndex(a => a.email.toLowerCase() === user.email.toLowerCase());
-              if (userIndex !== -1) {
-                const posLabels = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
-                detectedPosition = posLabels[userIndex] || detectedPosition;
-              }
-            }
-
+          const result = await getIncentiveClaimByIdAction(claimId);
+          if (result.success && result.data) {
+            const draftData = result.data as any;
             form.reset({
               ...draftData,
-              authorPosition: detectedPosition,
-              publicationProof: undefined, // Files can't be pre-filled
+              authors: draftData.authors || [],
+              publicationProof: undefined,
             });
+            if (draftData.authors) {
+                setAuthors(draftData.authors);
+            }
           } else {
-            toast({ variant: 'destructive', title: 'Draft Not Found' });
+            toast({ variant: 'destructive', title: result.error || 'Draft Not Found' });
           }
         } catch (error) {
+          console.error("Error fetching draft:", error);
           toast({ variant: 'destructive', title: 'Error Loading Draft' });
         } finally {
           setIsLoadingDraft(false);

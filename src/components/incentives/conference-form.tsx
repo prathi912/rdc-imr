@@ -17,7 +17,6 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { db } from "@/lib/config"
-import { collection, doc, getDoc, getDocs, query, where, orderBy } from "firebase/firestore"
 import type { User, IncentiveClaim, Author } from "@/types"
 import { uploadFileToApi } from "@/lib/upload-client"
 import { Loader2, AlertCircle, Info, Edit, Trash2, CheckCircle2, FileText, X, Globe, MapPin, Calendar, Award, Bot, ChevronDown } from "lucide-react"
@@ -29,6 +28,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { submitIncentiveClaimViaApi } from "@/lib/incentive-claim-client"
+import { getIncentiveClaimByIdAction } from "@/app/actions"
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 
 const workshopEventTypes = ["STTP", "Workshop", "Training Program", "FDP", "Other"]
@@ -370,10 +370,9 @@ export function ConferenceForm({ user }: { user: User }) {
     if (claimId) {
       const fetchDraft = async () => {
         try {
-          const claimRef = doc(db, "incentiveClaims", claimId)
-          const claimSnap = await getDoc(claimRef)
-          if (claimSnap.exists()) {
-            const draftData = claimSnap.data() as IncentiveClaim
+          const result = await getIncentiveClaimByIdAction(claimId)
+          if (result.success && result.data) {
+            const draftData = result.data as any
             const eventType = draftData.eventType || null
             setSelectedEventType(eventType)
           }
@@ -577,10 +576,9 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
       const fetchDraft = async () => {
         setIsLoadingDraft(true)
         try {
-          const claimRef = doc(db, "incentiveClaims", claimId)
-          const claimSnap = await getDoc(claimRef)
-          if (claimSnap.exists()) {
-            const draftData = claimSnap.data() as any
+          const result = await getIncentiveClaimByIdAction(claimId)
+          if (result.success && result.data) {
+            const draftData = result.data as any
             form.reset({
               ...draftData,
               authors: draftData.authors || [],
@@ -593,6 +591,8 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
               additionalDocuments: undefined,
               travelReceipts: undefined,
             })
+          } else {
+            toast({ variant: "destructive", title: result.error || "Draft Not Found" })
           }
         } catch (error) {
           toast({ variant: "destructive", title: "Error Loading Draft" })

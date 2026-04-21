@@ -17,11 +17,11 @@ import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { db } from "@/lib/config"
-import { doc, getDoc } from "firebase/firestore"
 import type { User, IncentiveClaim } from "@/types"
 import { uploadFileToApi } from "@/lib/upload-client"
 import { Loader2, AlertCircle, Info, Edit, Trash2, CheckCircle2, FileText, X, Globe, MapPin, Calendar, Award, Search, ChevronDown } from "lucide-react"
 import { submitIncentiveClaimViaApi } from "@/lib/incentive-claim-client"
+import { getIncentiveClaimByIdAction } from "@/app/actions"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 
@@ -267,30 +267,24 @@ export function AwardForm({ user }: { user: User }) {
     const claimId = searchParams.get('claimId')
     if (claimId && user) {
       const fetchDraft = async () => {
+        setIsLoadingDraft(true)
         try {
-          const claimRef = doc(db, 'incentiveClaims', claimId)
-          const claimSnap = await getDoc(claimRef)
-          if (claimSnap.exists()) {
-            const draftData = claimSnap.data() as IncentiveClaim
-              form.reset({
-                awardTitle: draftData.awardTitle || "",
-                awardingBody: draftData.awardingBody || "",
-                awardStature: draftData.awardStature as "National" | "International" | undefined,
-                awardBodyType: draftData.awardBodyType as "Government" | "NGO (Non-Governmental Organization)" | "Any Other" | undefined,
-                awardCategory: draftData.awardCategory as any,
-                isPaidAward: draftData.isPaidAward || false,
-                awardLocale: draftData.awardLocale || "",
-                membershipNumber: draftData.membershipNumber || "",
-                amountPaid: draftData.amountPaid || 0,
-                paymentDate: draftData.paymentDate || "",
-                awardDate: draftData.awardDate || "",
-                awardProof: draftData.awardProofUrls || [],
-                awardSelfDeclaration: draftData.awardSelfDeclaration || false,
-              })
+          const result = await getIncentiveClaimByIdAction(claimId)
+          if (result.success && result.data) {
+            const draftData = result.data as any
+            form.reset({
+              ...draftData,
+              awardProof: [],
+              awardSelfDeclaration: draftData.awardSelfDeclaration || false,
+            })
+          } else {
+            toast({ variant: "destructive", title: result.error || "Draft Not Found" })
           }
         } catch (error) {
           console.error("Error fetching draft:", error)
-          toast({ variant: "destructive", title: "Error", description: "Failed to load draft." })
+          toast({ variant: "destructive", title: "Error Loading Draft" })
+        } finally {
+          setIsLoadingDraft(false)
         }
       }
       fetchDraft()

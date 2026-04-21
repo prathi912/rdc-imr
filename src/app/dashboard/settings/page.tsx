@@ -17,6 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { useToast } from "@/hooks/use-toast"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { db, auth } from "@/lib/config"
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore"
 import {
@@ -719,491 +720,627 @@ export default function SettingsPage() {
   return (
     <div className="container mx-auto py-10">
       <PageHeader title="Settings" description="Manage your account settings and preferences." />
-      <div className="mt-8 space-y-8">
-        {user?.role === "Super-admin" && systemSettings && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <ShieldCheck />
-                <CardTitle>System Settings</CardTitle>
-              </div>
-              <CardDescription>Global settings for the application. Changes affect all users.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2"><Bot className="h-5 w-5" /><Label className="text-base">API Integrations</Label></div>
-                <p className="text-sm text-muted-foreground">Enable or disable external data fetching services.</p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="scopus-toggle">Scopus</Label><Switch id="scopus-toggle" checked={systemSettings.apiIntegrations?.scopus !== false} onCheckedChange={(c) => handleApiIntegrationToggle('scopus', c)} disabled={isSavingSettings} /></div>
-                  <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="wos-toggle">Web of Science</Label><Switch id="wos-toggle" checked={systemSettings.apiIntegrations?.wos !== false} onCheckedChange={(c) => handleApiIntegrationToggle('wos', c)} disabled={isSavingSettings} /></div>
-                  <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="sci-toggle">ScienceDirect</Label><Switch id="sci-toggle" checked={systemSettings.apiIntegrations?.sci !== false} onCheckedChange={(c) => handleApiIntegrationToggle('sci', c)} disabled={isSavingSettings} /></div>
-                </div>
-              </div>
-              <Separator />
-              <div className="space-y-4">
-                <div className="flex items-center gap-2"><FileText className="h-5 w-5" /><Label className="text-base">Template Management</Label></div>
-                <p className="text-sm text-muted-foreground">Provide the direct download URLs for the DOCX templates used to generate office notings and other documents.</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                  {templateFields.map(({ key, label }) => (<div key={key} className="space-y-1"><Label htmlFor={`template-${key}`} className="text-sm">{label}</Label><Input id={`template-${key}`} placeholder="https://..." value={systemSettings?.templateUrls?.[key] || ''} onChange={(e) => handleTemplateUrlChange(key, e.target.value)} disabled={isSavingSettings} /></div>))}
-                </div>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5"><Label className="text-base">Two-Factor Authentication (2FA)</Label><p className="text-sm text-muted-foreground">{systemSettings.is2faEnabled ? "Enabled" : "Disabled"} - Require users to verify their identity with an email OTP upon login.</p></div>
-                <Switch checked={systemSettings.is2faEnabled} onCheckedChange={handle2faToggle} disabled={isSavingSettings} />
-              </div>
-              <Separator />
-              <div className="space-y-4"><div className="flex items-center gap-2"><Clock className="h-5 w-5" /><Label className="text-base">IMR Mid-term Review Window</Label></div><p className="text-sm text-muted-foreground">Set the number of months after a grant is awarded that a project becomes eligible for a mid-term review.</p><div className="flex items-center gap-2"><Input type="number" className="w-24" value={systemSettings?.imrMidTermReviewMonths || 6} onChange={(e) => handleImrMidTermReviewChange(parseInt(e.target.value, 10) || 6)} disabled={isSavingSettings} min="1" /><span className="text-sm text-muted-foreground">months</span></div></div>
-              <Separator />
-              <div className="space-y-4"><div className="flex items-center gap-2"><CalendarIcon className="h-5 w-5" /><Label className="text-base">IMR Evaluation Window</Label></div><p className="text-sm text-muted-foreground">Set the number of days evaluators have to submit their feedback after the scheduled meeting date. Set to 0 to only allow same-day evaluations.</p><div className="flex items-center gap-2"><Input type="number" className="w-24" value={systemSettings?.imrEvaluationDays || 0} onChange={(e) => handleImrEvaluationDaysChange(parseInt(e.target.value, 10) || 0)} disabled={isSavingSettings} min="0" /><span className="text-sm text-muted-foreground">days</span></div></div>
-              <Separator />
-              <div className="space-y-4"><div className="flex items-center gap-2"><Award className="h-5 w-5" /><Label className="text-base">Incentive Claim Management</Label></div><p className="text-sm text-muted-foreground">Enable or disable specific types of incentive claims for all users.</p><div className="grid grid-cols-2 md:grid-cols-3 gap-4">{incentiveClaimTypes.map(type => (<div key={type} className="flex items-center space-x-2"><Switch id={`incentive-${type.replace(/\s+/g, '-')}`} checked={systemSettings.enabledIncentiveTypes?.[type] !== false} onCheckedChange={(checked) => handleIncentiveTypeToggle(type, checked)} disabled={isSavingSettings} /><Label htmlFor={`incentive-${type.replace(/\s+/g, '-')}`}>{type}</Label></div>))}</div></div>
-              <Separator />
-              <div className="space-y-4"><div className="flex items-center gap-2"><Award className="h-5 w-5" /><Label className="text-base">Incentive Approval Workflow</Label></div><p className="text-sm text-muted-foreground">Select which approval stages are required for each claim type. The first selected stage will be the starting point.</p><Table><TableHeader><TableRow><TableHead>Claim Type</TableHead><TableHead className="text-center">Stage 1</TableHead><TableHead className="text-center">Stage 2</TableHead><TableHead className="text-center">Stage 3</TableHead><TableHead className="text-center">Stage 4</TableHead></TableRow></TableHeader><TableBody>{incentiveClaimTypes.map(type => { const workflow = systemSettings.incentiveApprovalWorkflows?.[type] || [1, 2, 3, 4]; return (<TableRow key={type}><TableCell className="font-medium">{type}</TableCell>{[1, 2, 3, 4].map(stage => (<TableCell key={stage} className="text-center"><Checkbox checked={workflow.includes(stage)} onCheckedChange={(checked) => handleWorkflowChange(type, stage, !!checked)} disabled={isSavingSettings} /></TableCell>))}</TableRow>); })}</TableBody></Table></div>
-              <Separator />
-              <div className="space-y-4"><div className="flex items-center gap-2"><Mail className="h-5 w-5" /><Label className="text-base">Do Not Disturb (DND) Email</Label></div><p className="text-sm text-muted-foreground">The email address entered here will be excluded from all automated system email notifications.</p><Input placeholder="dnd.user@paruluniversity.ac.in" value={systemSettings.dndEmail || ''} onChange={(e) => setSystemSettings(prev => prev ? { ...prev, dndEmail: e.target.value } : null)} onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, dndEmail: e.target.value })} disabled={isSavingSettings} /></div>
-              <Separator />
-              <div className="space-y-4"><Label className="text-base">Allowed Email Domains</Label><p className="text-sm text-muted-foreground">Users with these email domains can register and access the portal.</p><div className="flex gap-2"><Input placeholder="@newcampus.paruluniversity.ac.in" value={newAllowedDomain} onChange={(e) => setNewAllowedDomain(e.target.value)} /><Button onClick={addAllowedDomain} disabled={isSavingSettings || !newAllowedDomain.trim()}><Plus className="h-4 w-4" /></Button></div><div className="flex flex-wrap gap-2">{(systemSettings.allowedDomains || []).map((domain) => (<Badge key={domain} variant="secondary" className="flex items-center gap-1">{domain}<Button variant="ghost" size="icon" className="h-4 w-4 hover:bg-destructive hover:text-destructive-foreground" onClick={() => removeAllowedDomain(domain)} disabled={isSavingSettings}><X className="h-3 w-3" /></Button></Badge>))}</div></div>
+      
+      <div className="mt-8">
+        <Tabs defaultValue="account" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+            <TabsTrigger value="account">Account Settings</TabsTrigger>
+            {user?.role === "Super-admin" && <TabsTrigger value="system">System Administration</TabsTrigger>}
+          </TabsList>
 
-              <Separator />
-              <div className="space-y-4"><div className="flex items-center gap-2"><Mail className="h-5 w-5" /><Label className="text-base">Utilization Report Email Recipient</Label></div><p className="text-sm text-muted-foreground">The email address that will receive a notification when a PI submits a utilization report and requests the next grant phase.</p><Input placeholder="finance.rdc@paruluniversity.ac.in" value={systemSettings?.utilizationNotificationEmail || ''} onChange={(e) => handleSystemSettingsSave({ ...systemSettings, utilizationNotificationEmail: e.target.value })} disabled={isSavingSettings} /></div>
-              <Separator />
-              <div className="space-y-4"><Label className="text-base">IQAC Email Address</Label><p className="text-sm text-muted-foreground">The user who signs up with this email will be automatically assigned the IQAC role.</p><Input placeholder="iqac@paruluniversity.ac.in" value={systemSettings?.iqacEmail || ''} onChange={(e) => handleSystemSettingsSave({ ...systemSettings, iqacEmail: e.target.value })} disabled={isSavingSettings} /></div>
-              <Separator />
-              <div className="space-y-4">
-                <Form {...dummyForm}>
-                  <Label className="text-base">Incentive Approval Workflow</Label>
-                  <p className="text-sm text-muted-foreground">Define the email addresses for the four stages of incentive claim approval.</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {[1, 2, 3, 4].map(stage => {
-                      const approver = systemSettings?.incentiveApprovers?.find(a => a.stage === stage);
-                      return (<div key={stage} className="p-4 border rounded-lg space-y-3"><FormItem><FormLabel>Stage {stage} Approver Email</FormLabel><Input type="email" placeholder={`approver.stage${stage}@paruluniversity.ac.in`} value={approver?.email || ''} onChange={(e) => handleApproverChange(stage as 1 | 2 | 3 | 4, e.target.value)} disabled={isSavingSettings} /></FormItem></div>);
-                    })}
-                  </div>
-                </Form>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile Picture</CardTitle>
-            <CardDescription>Update your profile picture.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex items-center gap-6">
-            <Avatar className="h-20 w-20">
-              <AvatarImage src={previewUrl || user?.photoURL || undefined} alt={user?.name || ""} />
-              <AvatarFallback>{user?.name?.[0]?.toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div className="space-y-2">
-              <Input
-                id="picture"
-                type="file"
-                onChange={handleFileChange}
-                accept="image/png, image/jpeg"
-                className="max-w-xs"
-              />
-              <p className="text-xs text-muted-foreground">PNG or JPG. 2MB max.</p>
-            </div>
-          </CardContent>
-          <CardFooter className="border-t px-6 py-4">
-            <Button onClick={handlePictureUpdate} disabled={isUploading || !profilePicFile}>
-              {isUploading ? "Uploading..." : "Save Picture"}
-            </Button>
-          </CardFooter>
-        </Card>
-
-        <Form {...profileForm}>
-          <form onSubmit={profileForm.handleSubmit(onProfileSubmit)}>
+          <TabsContent value="account" className="space-y-8">
             <Card>
               <CardHeader>
-                <CardTitle>Profile</CardTitle>
-                <CardDescription>Update your personal information.</CardDescription>
+                <CardTitle>Profile Picture</CardTitle>
+                <CardDescription>Update your profile picture.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={profileForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Your name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+              <CardContent className="flex items-center gap-6">
+                <Avatar className="h-20 w-20">
+                  <AvatarImage src={previewUrl || user?.photoURL || undefined} alt={user?.name || ""} />
+                  <AvatarFallback>{user?.name?.[0]?.toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="space-y-2">
+                  <Input
+                    id="picture"
+                    type="file"
+                    onChange={handleFileChange}
+                    accept="image/png, image/jpeg"
+                    className="max-w-xs"
                   />
-                  <FormField
-                    control={profileForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Your email" {...field} disabled />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <p className="text-xs text-muted-foreground">PNG or JPG. 2MB max.</p>
                 </div>
-                <FormField name="campus" control={profileForm.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Campus</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={user?.email?.endsWith('@goa.paruluniversity.ac.in')}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select your campus" /></SelectTrigger></FormControl>
-                      <SelectContent>{campuses.map(campus => (<SelectItem key={campus} value={campus}>{campus}</SelectItem>))}</SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField
-                  name="faculty"
-                  control={profileForm.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Faculty</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your faculty" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {(selectedCampus === 'Goa' ? goaFaculties : faculties).map((f) => (
-                            <SelectItem key={f} value={f}>
-                              {f}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  name="institute"
-                  control={profileForm.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Institute</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your institute" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {[...new Set(selectedCampus === 'Goa' ? goaInstitutes : institutes)].map((i, index) => (
-                            <SelectItem key={`${i}-${index}`} value={i}>
-                              {i}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={profileForm.control}
-                  name="department"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Department</FormLabel>
-                      <Combobox
-                        options={departmentOptions}
-                        value={field.value || ""}
-                        onChange={field.onChange}
-                        placeholder="Select your department"
-                        searchPlaceholder="Search departments..."
-                        emptyPlaceholder="No department found. If you feel this is a error, please drop a mail to helpdesk.rdc@paruluniversity.ac.in"
-                        disabled={isAcademicInfoLocked}
+              </CardContent>
+              <CardFooter className="border-t px-6 py-4">
+                <Button onClick={handlePictureUpdate} disabled={isUploading || !profilePicFile}>
+                  {isUploading ? "Uploading..." : "Save Picture"}
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <Form {...profileForm}>
+              <form onSubmit={profileForm.handleSubmit(onProfileSubmit)}>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Profile</CardTitle>
+                    <CardDescription>Update your personal information.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={profileForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Full Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Your name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={profileForm.control}
-                  name="designation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Designation</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Professor" {...field} disabled={isPrincipal} />
-                      </FormControl>
-                      {isPrincipal && <FormDescription>The 'Principal' designation cannot be changed.</FormDescription>}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={profileForm.control}
-                  name="phoneNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
-                      <FormControl>
-                        <Input type="tel" placeholder="e.g. 9876543210" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Separator />
-                <h3 className="text-md font-semibold pt-2">Academic & Researcher IDs</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={profileForm.control}
-                    name="misId"
-                    render={({ field }) => (
+                      <FormField
+                        control={profileForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Your email" {...field} disabled />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField name="campus" control={profileForm.control} render={({ field }) => (
                       <FormItem>
-                        <FormLabel>MIS ID</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Your MIS ID" {...field} />
-                        </FormControl>
+                        <FormLabel>Campus</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={user?.email?.endsWith('@goa.paruluniversity.ac.in')}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Select your campus" /></SelectTrigger></FormControl>
+                          <SelectContent>{campuses.map(campus => (<SelectItem key={campus} value={campus}>{campus}</SelectItem>))}</SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={profileForm.control}
-                    name="orcidId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>ORCID iD</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={profileForm.control}
-                  name="scopusId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Scopus ID (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Your Scopus Author ID" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={profileForm.control}
-                  name="vidwanId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Vidwan ID (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Your Vidwan-ID" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={profileForm.control}
-                  name="googleScholarId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Google Scholar ID (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Your Google Scholar Profile ID" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-              <CardFooter className="border-t px-6 py-4">
-                <Button type="submit" disabled={isSubmittingProfile}>
-                  {isSubmittingProfile ? "Saving..." : "Save Changes"}
-                </Button>
-              </CardFooter>
-            </Card>
-          </form>
-        </Form>
+                    )} />
+                    <FormField
+                      name="faculty"
+                      control={profileForm.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Faculty</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select your faculty" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {(selectedCampus === 'Goa' ? goaFaculties : faculties).map((f) => (
+                                <SelectItem key={f} value={f}>
+                                  {f}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="institute"
+                      control={profileForm.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Institute</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select your institute" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {[...new Set(selectedCampus === 'Goa' ? goaInstitutes : institutes)].map((i, index) => (
+                                <SelectItem key={`${i}-${index}`} value={i}>
+                                  {i}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={profileForm.control}
+                      name="department"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Department</FormLabel>
+                          <Combobox
+                            options={departmentOptions}
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            placeholder="Select your department"
+                            searchPlaceholder="Search departments..."
+                            emptyPlaceholder="No department found. If you feel this is a error, please drop a mail to helpdesk.rdc@paruluniversity.ac.in"
+                            disabled={isAcademicInfoLocked}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={profileForm.control}
+                      name="designation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Designation</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., Professor" {...field} disabled={isPrincipal} />
+                          </FormControl>
+                          {isPrincipal && <FormDescription>The 'Principal' designation cannot be changed.</FormDescription>}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={profileForm.control}
+                      name="phoneNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                            <Input type="tel" placeholder="e.g. 9876543210" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Separator />
+                    <h3 className="text-md font-semibold pt-2">Academic & Researcher IDs</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={profileForm.control}
+                        name="misId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>MIS ID</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Your MIS ID" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={profileForm.control}
+                        name="orcidId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>ORCID iD</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={profileForm.control}
+                      name="scopusId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Scopus ID (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Your Scopus Author ID" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={profileForm.control}
+                      name="vidwanId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Vidwan ID (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Your Vidwan-ID" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={profileForm.control}
+                      name="googleScholarId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Google Scholar ID (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Your Google Scholar Profile ID" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                  <CardFooter className="border-t px-6 py-4">
+                    <Button type="submit" disabled={isSubmittingProfile}>
+                      {isSubmittingProfile ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </form>
+            </Form>
 
-        <Form {...bankForm}>
-          <form onSubmit={bankForm.handleSubmit(onBankDetailsSubmit)}>
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Banknote />
-                  <CardTitle>Salary Bank Account Details</CardTitle>
-                </div>
-                <CardDescription>
-                  This information is required for monetary disbursals. These details would be only visible to RDC Admin Office.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <FormField
-                  name="beneficiaryName"
-                  control={bankForm.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Beneficiary Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Name as per bank records" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  name="accountNumber"
-                  control={bankForm.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Account Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Your bank account number" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  name="ifscCode"
-                  control={bankForm.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>IFSC Code</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., HDFC0000001" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  name="bankName"
-                  control={bankForm.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Bank Name</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your bank" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {salaryBanks.map((b) => (
-                            <SelectItem key={b} value={b}>
-                              {b}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    name="branchName"
-                    control={bankForm.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Branch Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., Akota" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    name="city"
-                    control={bankForm.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>City</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., Vadodara" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+            <Form {...bankForm}>
+              <form onSubmit={bankForm.handleSubmit(onBankDetailsSubmit)}>
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Banknote />
+                      <CardTitle>Salary Bank Account Details</CardTitle>
+                    </div>
+                    <CardDescription>
+                      This information is required for monetary disbursals. These details would be only visible to RDC Admin Office.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <FormField
+                      name="beneficiaryName"
+                      control={bankForm.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Beneficiary Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Name as per bank records" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="accountNumber"
+                      control={bankForm.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Account Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Your bank account number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="ifscCode"
+                      control={bankForm.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>IFSC Code</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., HDFC0000001" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="bankName"
+                      control={bankForm.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bank Name</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select your bank" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {salaryBanks.map((b) => (
+                                <SelectItem key={b} value={b}>
+                                  {b}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        name="branchName"
+                        control={bankForm.control}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Branch Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Akota" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        name="city"
+                        control={bankForm.control}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>City</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Vadodara" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </CardContent>
+                  <CardFooter className="border-t px-6 py-4">
+                    <Button type="submit" disabled={isSubmittingBank}>
+                      {isSubmittingBank ? "Saving..." : "Save Bank Details"}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </form>
+            </Form>
 
-              </CardContent>
-              <CardFooter className="border-t px-6 py-4">
-                <Button type="submit" disabled={isSubmittingBank}>
-                  {isSubmittingBank ? "Saving..." : "Save Bank Details"}
-                </Button>
-              </CardFooter>
-            </Card>
-          </form>
-        </Form>
+            <Form {...passwordForm}>
+              <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Password</CardTitle>
+                    <CardDescription>Change your password. Please enter your current password to confirm.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <FormField
+                      control={passwordForm.control}
+                      name="currentPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Current Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Separator />
+                    <FormField
+                      control={passwordForm.control}
+                      name="newPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>New Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={passwordForm.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Confirm New Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                  <CardFooter className="border-t px-6 py-4">
+                    <Button type="submit" disabled={isSubmittingPassword}>
+                      {isSubmittingPassword ? "Updating..." : "Update Password"}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </form>
+            </Form>
+          </TabsContent>
 
-        <Form {...passwordForm}>
-          <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
-            <Card>
-              <CardHeader>
-                <CardTitle>Password</CardTitle>
-                <CardDescription>Change your password. Please enter your current password to confirm.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <FormField
-                  control={passwordForm.control}
-                  name="currentPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Current Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Separator />
-                <FormField
-                  control={passwordForm.control}
-                  name="newPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>New Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={passwordForm.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Confirm New Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-              <CardFooter className="border-t px-6 py-4">
-                <Button type="submit" disabled={isSubmittingPassword}>
-                  {isSubmittingPassword ? "Updating..." : "Update Password"}
-                </Button>
-              </CardFooter>
-            </Card>
-          </form>
-        </Form>
+          {user?.role === "Super-admin" && systemSettings && (
+            <TabsContent value="system">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-primary" />
+                    <CardTitle>System Administration</CardTitle>
+                  </div>
+                  <CardDescription>Global configuration for the research portal.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="general" className="flex flex-col md:flex-row gap-6">
+                    <TabsList className="flex flex-col h-auto bg-muted/50 p-1 md:w-48 justify-start">
+                      <TabsTrigger value="general" className="w-full justify-start gap-2 h-10">General</TabsTrigger>
+                      <TabsTrigger value="incentives" className="w-full justify-start gap-2 h-10">Incentives</TabsTrigger>
+                      <TabsTrigger value="projects" className="w-full justify-start gap-2 h-10">Projects (IMR)</TabsTrigger>
+                      <TabsTrigger value="integrations" className="w-full justify-start gap-2 h-10">API & Templates</TabsTrigger>
+                    </TabsList>
+
+                    <div className="flex-grow">
+                      <TabsContent value="general" className="mt-0 space-y-6">
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/20">
+                            <div className="space-y-0.5">
+                              <Label className="text-base">Two-Factor Authentication (2FA)</Label>
+                              <p className="text-sm text-muted-foreground">{systemSettings.is2faEnabled ? "Enabled" : "Disabled"} - Require email OTP upon login.</p>
+                            </div>
+                            <Switch checked={systemSettings.is2faEnabled} onCheckedChange={handle2faToggle} disabled={isSavingSettings} />
+                          </div>
+
+                          <div className="space-y-4 rounded-lg border p-4">
+                            <div className="flex items-center gap-2"><Mail className="h-5 w-5 text-muted-foreground" /><Label className="text-base">Control Emails</Label></div>
+                            <div className="space-y-3">
+                              <div className="space-y-1">
+                                <Label htmlFor="dnd-email" className="text-xs font-bold uppercase text-muted-foreground tracking-tighter">DND Email (Exclude from alerts)</Label>
+                                <Input id="dnd-email" placeholder="dnd.user@paruluniversity.ac.in" value={systemSettings.dndEmail || ''} onChange={(e) => setSystemSettings(prev => prev ? { ...prev, dndEmail: e.target.value } : null)} onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, dndEmail: e.target.value })} disabled={isSavingSettings} />
+                              </div>
+                              <div className="space-y-1">
+                                <Label htmlFor="iqac-email" className="text-xs font-bold uppercase text-muted-foreground tracking-tighter">IQAC Role Designation Email</Label>
+                                <Input id="iqac-email" placeholder="iqac@paruluniversity.ac.in" value={systemSettings?.iqacEmail || ''} onChange={(e) => handleSystemSettingsSave({ ...systemSettings, iqacEmail: e.target.value })} disabled={isSavingSettings} />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4 rounded-lg border p-4">
+                            <Label className="text-base">Allowed Email Domains</Label>
+                            <p className="text-sm text-muted-foreground">White-listed domains for registration.</p>
+                            <div className="flex gap-2">
+                              <Input placeholder="@paruluniversity.ac.in" value={newAllowedDomain} onChange={(e) => setNewAllowedDomain(e.target.value)} />
+                              <Button onClick={addAllowedDomain} disabled={isSavingSettings || !newAllowedDomain.trim()}><Plus className="h-4 w-4" /></Button>
+                            </div>
+                            <div className="flex flex-wrap gap-2 pt-2">
+                              {(systemSettings.allowedDomains || []).map((domain) => (
+                                <Badge key={domain} variant="secondary" className="pl-2 pr-1 py-1 gap-1">
+                                  {domain}
+                                  <Button variant="ghost" size="icon" className="h-4 w-4 hover:bg-destructive hover:text-white rounded-full" onClick={() => removeAllowedDomain(domain)} disabled={isSavingSettings}><X className="h-3 w-3" /></Button>
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="incentives" className="mt-0 space-y-6">
+                        <Card className="border-none shadow-none bg-transparent">
+                          <CardHeader className="px-0 pt-0">
+                            <CardTitle className="text-lg">Incentive Policy Management</CardTitle>
+                            <CardDescription>Enable claim types and define approval stages.</CardDescription>
+                          </CardHeader>
+                          <CardContent className="px-0 space-y-8">
+                            <div className="space-y-4">
+                              <Label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Enabled Claim Types</Label>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {incentiveClaimTypes.map(type => (
+                                  <div key={type} className="flex items-center space-x-2 bg-muted/30 p-2 rounded-md border border-muted-foreground/10">
+                                    <Switch id={`incentive-${type.replace(/\s+/g, '-')}`} checked={systemSettings.enabledIncentiveTypes?.[type] !== false} onCheckedChange={(checked) => handleIncentiveTypeToggle(type, checked)} disabled={isSavingSettings} />
+                                    <Label htmlFor={`incentive-${type.replace(/\s+/g, '-')}`} className="text-xs truncate">{type}</Label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="space-y-4">
+                              <Label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Approval Workflow (Stages)</Label>
+                              <div className="overflow-hidden rounded-lg border border-muted-foreground/10">
+                                <Table>
+                                  <TableHeader className="bg-muted/50">
+                                    <TableRow>
+                                      <TableHead className="text-[10px] uppercase font-black">Type</TableHead>
+                                      <TableHead className="text-center text-[10px] uppercase font-black">S1</TableHead>
+                                      <TableHead className="text-center text-[10px] uppercase font-black">S2</TableHead>
+                                      <TableHead className="text-center text-[10px] uppercase font-black">S3</TableHead>
+                                      <TableHead className="text-center text-[10px] uppercase font-black">S4</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {incentiveClaimTypes.map(type => { 
+                                      const workflow = systemSettings.incentiveApprovalWorkflows?.[type] || [1, 2, 3, 4]; 
+                                      return (
+                                        <TableRow key={type}>
+                                          <TableCell className="py-2 text-[11px] font-medium leading-none">{type}</TableCell>
+                                          {[1, 2, 3, 4].map(stage => (
+                                            <TableCell key={stage} className="text-center py-2"><Checkbox checked={workflow.includes(stage)} onCheckedChange={(checked) => handleWorkflowChange(type, stage, !!checked)} disabled={isSavingSettings} /></TableCell>
+                                          ))}
+                                        </TableRow>
+                                      ); 
+                                    })}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+
+                            <div className="space-y-4">
+                              <Label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Global Approver Assignments</Label>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {[1, 2, 3, 4].map(stage => {
+                                  const approver = systemSettings?.incentiveApprovers?.find(a => a.stage === stage);
+                                  return (
+                                    <div key={stage} className="space-y-1.5 p-3 rounded-lg border bg-muted/10">
+                                      <Label className="text-xs font-bold">Stage {stage} Admin Email</Label>
+                                      <Input type="email" className="h-8 text-xs" placeholder={`approver.stage${stage}@...`} value={approver?.email || ''} onChange={(e) => handleApproverChange(stage as 1 | 2 | 3 | 4, e.target.value)} disabled={isSavingSettings} />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+
+                      <TabsContent value="projects" className="mt-0 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-4 rounded-lg border p-4">
+                            <div className="flex items-center gap-2 text-primary"><Clock className="h-5 w-5" /><Label className="text-base">Mid-term Review</Label></div>
+                            <p className="text-xs text-muted-foreground">Project eligibility for halfway review.</p>
+                            <div className="flex items-center gap-3">
+                              <Input type="number" className="w-20" value={systemSettings?.imrMidTermReviewMonths || 6} onChange={(e) => handleImrMidTermReviewChange(parseInt(e.target.value, 10) || 6)} disabled={isSavingSettings} min="1" />
+                              <span className="text-sm font-medium">Months</span>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-4 rounded-lg border p-4">
+                            <div className="flex items-center gap-2 text-primary"><CalendarIcon className="h-5 w-5" /><Label className="text-base">Evaluation Period</Label></div>
+                            <p className="text-xs text-muted-foreground">Days allowed for evaluator feedback post-meeting.</p>
+                            <div className="flex items-center gap-3">
+                              <Input type="number" className="w-20" value={systemSettings?.imrEvaluationDays || 0} onChange={(e) => handleImrEvaluationDaysChange(parseInt(e.target.value, 10) || 0)} disabled={isSavingSettings} min="0" />
+                              <span className="text-sm font-medium">Days</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3 rounded-lg border p-4">
+                          <div className="flex items-center gap-2 text-primary"><Mail className="h-5 w-5" /><Label className="text-base">Utilization Notifications</Label></div>
+                          <p className="text-xs text-muted-foreground">Recipient for PI utilization report alerts.</p>
+                          <Input placeholder="finance.rdc@paruluniversity.ac.in" value={systemSettings?.utilizationNotificationEmail || ''} onChange={(e) => handleSystemSettingsSave({ ...systemSettings, utilizationNotificationEmail: e.target.value })} disabled={isSavingSettings} />
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="integrations" className="mt-0 space-y-6">
+                        <div className="space-y-4">
+                          <Label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Data Service Integrations</Label>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            {['scopus', 'wos', 'sci'].map((api) => (
+                              <div key={api} className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
+                                <Label htmlFor={`${api}-toggle`} className="capitalize text-sm font-medium">{api === 'sci' ? 'ScienceDirect' : api === 'wos' ? 'Web of Science' : api}</Label>
+                                <Switch id={`${api}-toggle`} checked={systemSettings.apiIntegrations?.[api as keyof ApiIntegrations] !== false} onCheckedChange={(c) => handleApiIntegrationToggle(api as keyof ApiIntegrations, c)} disabled={isSavingSettings} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        <div className="space-y-4">
+                          <Label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">DOCX Template URLs</Label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {templateFields.map(({ key, label }) => (
+                              <div key={key} className="space-y-1.5 p-3 border rounded-lg hover:border-primary/30 transition-colors">
+                                <Label htmlFor={`template-${key}`} className="text-[11px] font-bold text-muted-foreground truncate">{label}</Label>
+                                <Input id={`template-${key}`} className="h-8 text-xs focus-visible:ring-primary/40" placeholder="https://..." value={systemSettings?.templateUrls?.[key] || ''} onChange={(e) => handleTemplateUrlChange(key, e.target.value)} disabled={isSavingSettings} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </TabsContent>
+                    </div>
+                  </Tabs>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+        </Tabs>
       </div>
     </div>
   )
