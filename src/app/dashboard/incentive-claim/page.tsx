@@ -367,7 +367,6 @@ function UserClaimsList({
 }
 
 const coAuthorApplySchema = z.object({
-    publicationOrderInYear: z.enum(['First', 'Second', 'Third']).optional(),
     authorPosition: z.string().min(1, "Author position is required"),
 });
 
@@ -386,38 +385,21 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
         resolver: zodResolver(coAuthorApplySchema),
     });
 
-    const toAuthorPositionLabel = (position: number): IncentiveClaim['authorPosition'] | undefined => {
-        const labels: Record<number, IncentiveClaim['authorPosition']> = {
-            1: '1st',
-            2: '2nd',
-            3: '3rd',
-            4: '4th',
-            5: '5th',
-            6: '6th',
-            7: '7th',
-            8: '8th',
-            9: '9th',
-            10: '10th',
-        };
-        return labels[position];
-    };
+
 
     const handleOpenDialog = useCallback((claim: IncentiveClaim) => {
         if (!currentUser) return;
         setClaimToApply(claim);
         setCalculatedAmount(undefined);
         setCalculationBreakdown(null);
-        
-        const detectedPos = toAuthorPositionLabel((claim.authors || []).findIndex(a => a.email.toLowerCase() === currentUser.email.toLowerCase()) + 1);
+
         form.reset({
-            authorPosition: detectedPos || '',
-            publicationOrderInYear: 'First'
+            authorPosition: '',
         });
-    }, [currentUser, form, toAuthorPositionLabel]);
+    }, [currentUser, form]);
 
     // Handle recalculation when author position changes
     const watchedPosition = form.watch('authorPosition');
-    const watchedOrder = form.watch('publicationOrderInYear');
 
     useEffect(() => {
         if (!claimToApply || !currentUser || !watchedPosition) return;
@@ -450,7 +432,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                     userEmail: currentUser.email,
                     authorType: myAuthorDetails.role,
                     authorPosition: watchedPosition as any,
-                    publicationOrderInYear: watchedOrder as any
+                    publicationOrderInYear: 'First' // Default to 1st paper of the year for co-authors
                 };
 
                 if (claimToApply.claimType === 'Research Papers') {
@@ -479,7 +461,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
         };
 
         calculate();
-    }, [watchedPosition, watchedOrder, claimToApply, currentUser]);
+    }, [watchedPosition, claimToApply, currentUser]);
 
     const handleApply = async (values: CoAuthorApplyValues) => {
         if (!claimToApply || !currentUser) {
@@ -496,7 +478,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
 
             const newClaim: Omit<IncentiveClaim, 'id' | 'claimId'> = {
                 ...originalClaimData,
-                publicationOrderInYear: values.publicationOrderInYear,
+                publicationOrderInYear: 'First', // Default to 1st paper of the year
                 originalClaimId: id,
                 uid: currentUser.uid,
                 userName: currentUser.name,
@@ -768,7 +750,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                                     <p className="text-sm font-semibold">Estimated Incentive Amount</p>
                                     {isCalculating && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
                                 </div>
-                                
+
                                 {calculatedAmount !== undefined ? (
                                     <div className="space-y-1 text-sm pt-2">
                                         <div className="flex justify-between items-center py-1">
@@ -851,7 +833,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
 
                         <Form {...form}>
                             <form id="co-author-apply-form" onSubmit={form.handleSubmit(handleApply)} className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 gap-4">
                                     <FormField
                                         control={form.control}
                                         name="authorPosition"
@@ -868,30 +850,6 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                                                         {['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'].map(pos => (
                                                             <SelectItem key={pos} value={pos}>{pos} Author</SelectItem>
                                                         ))}
-                                                    </SelectContent>
-                                                </Select>
-                                                <p className="text-[10px] text-muted-foreground mt-1">Detected automatically from author list.</p>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="publicationOrderInYear"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Publication Order (This Year)</FormLabel>
-                                                <Select onValueChange={field.onChange} value={field.value}>
-                                                    <FormControl>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select order" />
-                                                        </SelectTrigger>
-                                                    </FormControl>
-                                                    <SelectContent>
-                                                        <SelectItem value="First">1st Paper of the Year</SelectItem>
-                                                        <SelectItem value="Second">2nd Paper of the Year</SelectItem>
-                                                        <SelectItem value="Third">3rd Paper or more</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                                 <FormMessage />
@@ -950,9 +908,9 @@ export default function IncentiveClaimPage() {
 
             // 2. Membership Eligibility check (using owned claims)
             const currentYear = new Date().getFullYear();
-            const claimInCurrentYear = ownedClaims.find(c => 
-                c.claimType === 'Membership of Professional Bodies' && 
-                c.status !== 'Draft' && 
+            const claimInCurrentYear = ownedClaims.find(c =>
+                c.claimType === 'Membership of Professional Bodies' &&
+                c.status !== 'Draft' &&
                 c.status !== 'Rejected' &&
                 new Date(c.submissionDate).getFullYear() === currentYear
             );
@@ -968,9 +926,9 @@ export default function IncentiveClaimPage() {
             // 3. Co-author Claims
             // Filter claims where user is listed as co-author but not primary author, 
             // and exclude co-author-derived claims (originalClaimId check).
-            const coAuthorList = combinedClaims.filter(c => 
-                c.uid !== uid && 
-                !c.originalClaimId && 
+            const coAuthorList = combinedClaims.filter(c =>
+                c.uid !== uid &&
+                !c.originalClaimId &&
                 (c.authorUids?.includes(uid) || (c.authorEmails?.includes(email.toLowerCase())))
             );
 
@@ -1044,12 +1002,12 @@ export default function IncentiveClaimPage() {
 
 
     const draftClaims = userClaims.filter(c => c.status === 'Draft');
-    
+
     // Filtered "My Claims" based on status selection
     const filteredOtherClaims = useMemo(() => {
         const other = userClaims.filter(c => c.status !== 'Draft');
         if (myClaimsStatusFilter === 'all') return other;
-        
+
         return other.filter(claim => {
             if (myClaimsStatusFilter === 'pending') {
                 return claim.status === 'Pending' || claim.status.startsWith('Pending Stage');
