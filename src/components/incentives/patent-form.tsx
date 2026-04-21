@@ -989,15 +989,13 @@ const patentSchema = z
                                     <RadioGroup onValueChange={(val) => field.onChange(val === 'true')} value={String(field.value)} className="flex gap-4">
                                         <Label 
                                             htmlFor="ipr-cell-yes" 
-                                            className="flex items-center space-x-3 bg-background px-4 py-2 rounded-xl border hover:bg-muted transition-colors cursor-pointer flex-1 [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5"
-                                        >
+                                            className="flex items-center space-x-3 bg-background px-4 py-2 rounded-xl border hover:bg-muted transition-colors cursor-pointer flex-1 [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5">
                                             <RadioGroupItem value="true" id="ipr-cell-yes" />
                                             <span className="font-semibold cursor-pointer flex-1">Yes</span>
                                         </Label>
                                         <Label 
                                             htmlFor="ipr-cell-no" 
-                                            className="flex items-center space-x-3 bg-background px-4 py-2 rounded-xl border hover:bg-muted transition-colors cursor-pointer flex-1 [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5"
-                                        >
+                                            className="flex items-center space-x-3 bg-background px-4 py-2 rounded-xl border hover:bg-muted transition-colors cursor-pointer flex-1 [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5">
                                             <RadioGroupItem value="false" id="ipr-cell-no" />
                                             <span className="font-semibold cursor-pointer flex-1">No</span>
                                         </Label>
