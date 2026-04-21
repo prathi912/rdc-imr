@@ -386,20 +386,42 @@ export async function submitIncentiveClaim(
     }
 
     if (!!claimData.originalClaimId === false && finalClaimData.status !== 'Draft' && finalClaimData.authors) {
-      const coAuthorUidsToNotify = finalClaimData.authors.map(a => a.uid).filter((uid): uid is string => !!uid && uid !== claimData.uid);
-      if (coAuthorUidsToNotify.length > 0) {
-        const usersRef = adminDb.collection('users');
-        for (let i = 0; i < coAuthorUidsToNotify.length; i += 30) {
-          const chunk = coAuthorUidsToNotify.slice(i, i + 30);
-          const coAuthorUsersSnapshot = await usersRef.where(FieldPath.documentId(), 'in', chunk).get();
-          for (const userDoc of coAuthorUsersSnapshot.docs) {
-            const coAuthorUser = { uid: userDoc.id, ...userDoc.data() } as User;
-            const userModules = coAuthorUser.allowedModules || getDefaultModulesForRole(coAuthorUser.role, coAuthorUser.designation);
-            if (!userModules.includes('incentive-claim')) continue;
+      // 1. Identify all internal co-authors who are not the primary claimant
+      const internalCoAuthors = finalClaimData.authors.filter(a => 
+        !a.isExternal && a.email?.toLowerCase() !== claimData.userEmail?.toLowerCase()
+      );
 
-            const coAuthor = finalClaimData.authors.find(a => a.uid === coAuthorUser.uid);
-            if (!coAuthor) continue;
+      if (internalCoAuthors.length > 0) {
+        // 2. Map of registered users to their UIDs for permission checking
+        const coAuthorUids = internalCoAuthors.map(a => a.uid).filter((uid): uid is string => !!uid);
+        const uidToUserMap = new Map<string, User>();
+        
+        if (coAuthorUids.length > 0) {
+          const usersRef = adminDb.collection('users');
+          for (let i = 0; i < coAuthorUids.length; i += 30) {
+            const chunk = coAuthorUids.slice(i, i + 30);
+            const coAuthorUsersSnapshot = await usersRef.where(FieldPath.documentId(), 'in', chunk).get();
+            coAuthorUsersSnapshot.docs.forEach(doc => {
+              uidToUserMap.set(doc.id, { uid: doc.id, ...doc.data() } as User);
+            });
+          }
+        }
 
+        // 3. Send notifications (Email to all, In-App to registered)
+        for (const coAuthor of internalCoAuthors) {
+          if (!coAuthor.email) continue;
+
+          let hasPermission = true;
+          if (coAuthor.uid) {
+            const coAuthorUser = uidToUserMap.get(coAuthor.uid);
+            if (coAuthorUser) {
+              const userModules = coAuthorUser.allowedModules || getDefaultModulesForRole(coAuthorUser.role, coAuthorUser.designation);
+              hasPermission = userModules.includes('incentive-claim');
+            }
+          }
+
+          // Create In-app notification for registered users with permissions
+          if (coAuthor.uid && hasPermission) {
             await adminDb.collection('notifications').add({
               uid: coAuthor.uid,
               title: `${claimData.userName} listed you as a co-author on an incentive claim.`,
@@ -408,60 +430,62 @@ export async function submitIncentiveClaim(
               type: 'default',
               projectId: '/dashboard/incentive-claim?tab=co-author'
             });
+          }
 
-            if (coAuthor.email) {
-              const claimTitle = getClaimTitle(finalClaimData);
-              const isConf = finalClaimData.claimType === 'Conference Presentations' || finalClaimData.publicationType === 'Scopus Indexed Conference Proceedings';
-              const isEmr = finalClaimData.claimType === 'EMR Sanction Project';
-              const isEligible = !isEmr && (!isConf || (coAuthor.role === 'Presenting Author' || coAuthor.role === 'First & Presenting Author'));
+          // Always send email to internal authors (as requested)
+          // For registered users, we skip if they specifically don't have the module (respecting current skip logic)
+          if (!coAuthor.uid || hasPermission) {
+            const claimTitle = getClaimTitle(finalClaimData);
+            const isConf = finalClaimData.claimType === 'Conference Presentations' || finalClaimData.publicationType === 'Scopus Indexed Conference Proceedings';
+            const isEmr = finalClaimData.claimType === 'EMR Sanction Project';
+            const isEligible = !isEmr && (!isConf || (coAuthor.role === 'Presenting Author' || coAuthor.role === 'First & Presenting Author'));
 
-              const ctaUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://rdc.paruluniversity.ac.in'}/dashboard/incentive-claim?tab=co-author`;
+            const ctaUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://rdc.paruluniversity.ac.in'}/dashboard/incentive-claim?tab=co-author`;
 
-              let subMessage = "";
-              if (isEligible) {
-                subMessage = `Since you are listed as a <strong>${coAuthor.role}</strong>, you are eligible to apply for your individual share in the portal.`;
-              } else if (isEmr) {
-                subMessage = `This notification is for your records as an internal team member on this sanctioned project.`;
-              } else if (isConf) {
-                subMessage = `Note: For conference proceedings, only the Presenting Author is eligible to file a monetary claim. This notification is for your citation records.`;
-              }
-
-              await sendEmailUtility({
-                to: coAuthor.email,
-                subject: `[Co-author] Action Required: ${claimTitle.substring(0, 50)}...`,
-                from: 'default',
-                category: 'Incentive',
-                html: `
-                                <div ${EMAIL_STYLES.background}>
-                                    ${EMAIL_STYLES.logo}
-                                    <h2 style="color: #64b5f6; border-bottom: 2px solid #64b5f6; padding-bottom: 10px; margin-bottom: 20px;">Co-author Incentive Application</h2>
-                                    <p style="color:#e0e0e0; line-height: 1.6;">
-                                        <strong>${claimData.userName}</strong> has submitted an incentive claim for <strong>${finalClaimData.claimType}</strong>:
-                                    </p>
-                                    
-                                    <div style="background: rgba(255,255,255,0.05); padding: 25px; border-radius: 12px; border-left: 5px solid #00e676; margin: 25px 0;">
-                                        <p style="color:#ffffff; margin: 0 0 12px 0; font-weight: bold; font-size: 1.2em; line-height: 1.4;">"${claimTitle}"</p>
-                                        <p style="color:#e0e0e0; margin: 0; font-size: 0.95em;">
-                                            <strong>Listed Role:</strong> ${coAuthor.role} ${finalClaimData.authorPosition ? `| <strong>Position:</strong> ${finalClaimData.authorPosition}` : ''}
-                                        </p>
-                                    </div>
-
-                                    <p style="color:#ffffff; font-weight: bold; margin-bottom: 20px;">
-                                        ${subMessage}
-                                    </p>
-
-                                    ${isEligible ? `
-                                    <div style="text-align: center; margin: 40px 0;">
-                                        <a href="${ctaUrl}" style="background-color: #64B5F6; color: #000; padding: 18px 36px; text-decoration: none; border-radius: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; display: inline-block; box-shadow: 0 4px 20px rgba(0,230,118,0.4); font-size: 1em;">
-                                            View & Apply for Share
-                                        </a>
-                                    </div>
-                                    ` : ''}
-                                    ${EMAIL_STYLES.footer}
-                                </div>
-                              `
-              });
+            let subMessage = "";
+            if (isEligible) {
+              subMessage = `Since you are listed as a <strong>${coAuthor.role}</strong>, you are eligible to apply for your individual share in the portal.`;
+            } else if (isEmr) {
+              subMessage = `This notification is for your records as an internal team member on this sanctioned project.`;
+            } else if (isConf) {
+              subMessage = `Note: For conference proceedings, only the Presenting Author is eligible to file a monetary claim. This notification is for your citation records.`;
             }
+
+            await sendEmailUtility({
+              to: coAuthor.email,
+              subject: `[Co-author] Action Required: ${claimTitle.substring(0, 50)}...`,
+              from: 'default',
+              category: 'Incentive',
+              html: `
+                              <div ${EMAIL_STYLES.background}>
+                                  ${EMAIL_STYLES.logo}
+                                  <h2 style="color: #64b5f6; border-bottom: 2px solid #64b5f6; padding-bottom: 10px; margin-bottom: 20px;">Co-author Incentive Application</h2>
+                                  <p style="color:#e0e0e0; line-height: 1.6;">
+                                      <strong>${claimData.userName}</strong> has submitted an incentive claim for <strong>${finalClaimData.claimType}</strong>:
+                                  </p>
+                                  
+                                  <div style="background: rgba(255,255,255,0.05); padding: 25px; border-radius: 12px; border-left: 5px solid #00e676; margin: 25px 0;">
+                                      <p style="color:#ffffff; margin: 0 0 12px 0; font-weight: bold; font-size: 1.2em; line-height: 1.4;">"${claimTitle}"</p>
+                                      <p style="color:#e0e0e0; margin: 0; font-size: 0.95em;">
+                                          <strong>Listed Role:</strong> ${coAuthor.role} ${finalClaimData.authorPosition ? `| <strong>Position:</strong> ${finalClaimData.authorPosition}` : ''}
+                                      </p>
+                                  </div>
+
+                                  <p style="color:#ffffff; font-weight: bold; margin-bottom: 20px;">
+                                      ${subMessage}
+                                  </p>
+
+                                  ${isEligible ? `
+                                  <div style="text-align: center; margin: 40px 0;">
+                                      <a href="${ctaUrl}" style="background-color: #64B5F6; color: #000; padding: 18px 36px; text-decoration: none; border-radius: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; display: inline-block; box-shadow: 0 4px 20px rgba(0,230,118,0.4); font-size: 1em;">
+                                          View & Apply for Share
+                                      </a>
+                                  </div>
+                                  ` : ''}
+                                  ${EMAIL_STYLES.footer}
+                              </div>
+                            `
+            });
           }
         }
       }
