@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { generateOfficeNotingForClaim } from '@/app/actions';
 import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
+import { calculateIncentiveBreakdown } from '@/lib/incentive-calculator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
@@ -38,148 +39,10 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
         return false;
     }, [claim]);
 
-    // Calculate incentive breakdown for research papers
-    const calculateIncentiveBreakdown = () => {
-        if (!claim || claim.claimType !== 'Research Papers') return null;
-        
-        try {
-            const { journalClassification, publicationType, wasApcPaidByUniversity, isPuNameInPublication, authors = [] } = claim;
-            
-            // Base incentive
-            let baseAmount = 0;
-            if (publicationType === 'Scopus Indexed Conference Proceedings') {
-                baseAmount = 3000;
-            } else {
-                switch (journalClassification) {
-                    case 'Nature/Science/Lancet': baseAmount = 50000; break;
-                    case 'Top 1% Journals': baseAmount = 25000; break;
-                    case 'Q1': baseAmount = 15000; break;
-                    case 'Q2': baseAmount = 10000; break;
-                    case 'Q3': baseAmount = 6000; break;
-                    case 'Q4': baseAmount = 4000; break;
-                }
-            }
 
-            // Apply publication type adjustment
-            let adjustedAmount = baseAmount;
-            let publicationTypeAdjustment = '1.0×';
-            if (publicationType === 'Case Reports/Short Surveys') {
-                adjustedAmount = baseAmount * 0.9;
-                publicationTypeAdjustment = '0.9×';
-            } else if (publicationType === 'Review Articles' && ['Q3', 'Q4'].includes(journalClassification || '')) {
-                adjustedAmount = baseAmount * 0.8;
-                publicationTypeAdjustment = '0.8×';
-            } else if (publicationType === 'Letter to the Editor/Editorial') {
-                adjustedAmount = 2500;
-                publicationTypeAdjustment = 'Fixed';
-            }
 
-            // Apply university-level deductions
-            let deductedAmount = adjustedAmount;
-            const deductions = [];
-            if (wasApcPaidByUniversity) {
-                deductedAmount /= 2;
-                deductions.push('APC Paid (÷2)');
-            }
-            if (isPuNameInPublication === false) {
-                deductedAmount /= 2;
-                deductions.push('No PU Name (÷2)');
-            }
-
-            const internalAuthors = authors.map(a => ({
-                ...a,
-                isExternal: a.email.toLowerCase() === claim.userEmail?.toLowerCase() ? false : a.isExternal
-            })).filter(a => !a.isExternal);
-            
-            // Categorize authors
-            const mainRoles = ['First Author', 'Corresponding Author', 'First & Corresponding Author', 'First & Presenting Author'];
-            const mainAuthors = internalAuthors.filter(a => mainRoles.includes(a.role));
-            const coAuthors = internalAuthors.filter(a => a.role === 'Co-Author' || a.role === 'Presenting Author');
-            
-            const isMainAuthor = mainRoles.includes(claim.authorType || '');
-
-            let finalAmount = 0;
-            let authorShare = 'N/A';
-
-            if (internalAuthors.length === 0) {
-                finalAmount = 0;
-                authorShare = 'No internal authors';
-            } else if (internalAuthors.length === 1) {
-                if (mainAuthors.length === 1) {
-                    finalAmount = isMainAuthor ? deductedAmount : 0;
-                    authorShare = 'Sole main author (100%)';
-                } else if (coAuthors.length === 1) {
-                    const multiplier = publicationType === 'Scopus Indexed Conference Proceedings' ? 1.0 : 0.8;
-                    finalAmount = !isMainAuthor ? deductedAmount * multiplier : 0;
-                    authorShare = `Sole co-author (${multiplier * 100}%)`;
-                }
-            }
-            // Mixed roles
-            else if (mainAuthors.length > 0 && coAuthors.length > 0) {
-                if (isMainAuthor) {
-                    finalAmount = (deductedAmount * 0.7) / mainAuthors.length;
-                } else {
-                    finalAmount = (deductedAmount * 0.3) / coAuthors.length;
-                }
-                authorShare = `Mixed: Main (70% ÷ ${mainAuthors.length}), Co-Author (30% ÷ ${coAuthors.length})`;
-            }
-            // Multiple Co-Authors only
-            else if (mainAuthors.length === 0 && coAuthors.length > 0) {
-                const multiplier = publicationType === 'Scopus Indexed Conference Proceedings' ? 1.0 : 0.8;
-                finalAmount = !isMainAuthor ? (deductedAmount * multiplier) / coAuthors.length : 0;
-                authorShare = `Multiple co-authors (${multiplier * 100}% ÷ ${coAuthors.length})`;
-            }
-            // Multiple main authors only
-            else if (mainAuthors.length > 0) {
-                if (isMainAuthor) finalAmount = deductedAmount / mainAuthors.length;
-                authorShare = `Multiple main authors (÷ ${mainAuthors.length})`;
-            }
-
-            // --- Post-Calculation Policy Enforcement ---
-            
-            // Policy: Co-Authors beyond 5th author position are not eligible for monetary incentive.
-            const position = parseInt(claim.authorPosition || '0', 10);
-            if (!isMainAuthor && position > 5) {
-                finalAmount = 0;
-                authorShare = `Ineligible: Co-author at position ${position} (Max position is 5th)`;
-            }
-
-            return {
-                baseAmount,
-                publicationTypeAdjustment,
-                adjustedAmount: Math.round(adjustedAmount),
-                deductions,
-                deductedAmount: Math.round(deductedAmount),
-                internalAuthorsCount: internalAuthors.length,
-                mainAuthorsCount: mainAuthors.length,
-                coAuthorsCount: coAuthors.length,
-                authorShare,
-                finalAmount: Math.round(finalAmount),
-            };
-        } catch (error) {
-            return null;
-        }
-    };
-
-    const calculateAwardBreakdown = () => {
-        if (!claim || claim.claimType !== 'Award') return null;
-        
-        let honorsAmount = 0;
-        if (claim.awardCategory === 'International Award') honorsAmount = 15000;
-        else if (claim.awardCategory === 'National Award') honorsAmount = 5000;
-        else if (claim.awardCategory === 'Best Research Paper Award') honorsAmount = 2000;
-
-        if (claim.isPaidAward) honorsAmount = 0;
-
-        return {
-            category: claim.awardCategory,
-            isPaid: claim.isPaidAward,
-            honorsAmount
-        };
-    };
-
-    const breakdown = calculateIncentiveBreakdown();
-    const awardBreakdown = calculateAwardBreakdown();
+    const breakdown = calculateIncentiveBreakdown(claim);
+    const awardBreakdown = claim?.claimType === 'Award' ? breakdown : null;
     
     const handleDownloadNoting = async () => {
         if (!claim || !isEligibleForFinancialDisbursement(claim)) {

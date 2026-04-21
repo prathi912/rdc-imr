@@ -27,6 +27,7 @@ import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
+import { calculateIncentiveBreakdown } from '@/lib/incentive-calculator';
 
 interface ApprovalDialogProps {
   claim: IncentiveClaim;
@@ -169,98 +170,8 @@ function ResearchPaperClaimDetails({
         );
     };
 
-    // Calculate incentive breakdown
-    const calculateIncentiveBreakdown = () => {
-        try {
-            const { journalClassification, publicationType, wasApcPaidByUniversity, isPuNameInPublication, authors = [] } = claim;
-            const internalAuthors = authors.filter(a => !a.isExternal);
-            const mainAuthors = internalAuthors.filter(a => ['First Author', 'Corresponding Author', 'First & Corresponding Author'].includes(a.role));
-            const coAuthors = internalAuthors.filter(a => a.role === 'Co-Author');
 
-            // Base incentive
-            let baseAmount = 0;
-            if (publicationType === 'Scopus Indexed Conference Proceedings') {
-                baseAmount = 3000;
-            } else {
-                switch (journalClassification) {
-                    case 'Nature/Science/Lancet': baseAmount = 50000; break;
-                    case 'Top 1% Journals': baseAmount = 25000; break;
-                    case 'Q1': baseAmount = 15000; break;
-                    case 'Q2': baseAmount = 10000; break;
-                    case 'Q3': baseAmount = 6000; break;
-                    case 'Q4': baseAmount = 4000; break;
-                }
-            }
-
-            // Apply publication type adjustment
-            let adjustedAmount = baseAmount;
-            if (publicationType === 'Case Reports/Short Surveys') {
-                adjustedAmount = baseAmount * 0.9;
-            } else if (publicationType === 'Review Articles' && ['Q3', 'Q4'].includes(journalClassification || '')) {
-                adjustedAmount = baseAmount * 0.8;
-            } else if (publicationType === 'Letter to the Editor/Editorial') {
-                adjustedAmount = 2500;
-            }
-
-            // Apply university-level deductions
-            let deductedAmount = adjustedAmount;
-            const deductions = [];
-            
-            if (wasApcPaidByUniversity) {
-                deductedAmount /= 2;
-                deductions.push('APC Paid by University (÷2)');
-            }
-            if (isPuNameInPublication === false) {
-                deductedAmount /= 2;
-                deductions.push('PU Name Not in Publication (÷2)');
-            }
-
-            // Calculate share based on author composition
-            let finalAmount = 0;
-            let authorShare = 'N/A';
-
-            if (internalAuthors.length === 0) {
-                finalAmount = 0;
-                authorShare = 'No internal authors';
-            } else if (internalAuthors.length === 1) {
-                if (mainAuthors.length === 1) {
-                    finalAmount = deductedAmount;
-                    authorShare = 'Sole main author (100%)';
-                } else if (coAuthors.length === 1) {
-                    finalAmount = deductedAmount * 0.8;
-                    authorShare = 'Sole co-author (80%)';
-                }
-            } else if (mainAuthors.length > 0 && coAuthors.length > 0) {
-                const mainShare = (deductedAmount * 0.7) / mainAuthors.length;
-                const coShare = (deductedAmount * 0.3) / coAuthors.length;
-                finalAmount = mainAuthors.length > 0 ? mainShare : coShare;
-                authorShare = `Mixed: Main (70% ÷ ${mainAuthors.length}), Co-Author (30% ÷ ${coAuthors.length})`;
-            } else if (mainAuthors.length === 0 && coAuthors.length > 1) {
-                finalAmount = (deductedAmount * 0.8) / coAuthors.length;
-                authorShare = `Multiple co-authors (80% ÷ ${coAuthors.length})`;
-            } else if (mainAuthors.length > 0) {
-                finalAmount = deductedAmount / mainAuthors.length;
-                authorShare = `Multiple main authors (÷ ${mainAuthors.length})`;
-            }
-
-            return {
-                baseAmount,
-                publicationTypeAdjustment: publicationType === 'Case Reports/Short Surveys' ? '0.9×' : publicationType === 'Review Articles' && ['Q3', 'Q4'].includes(journalClassification || '') ? '0.8×' : '1.0×',
-                adjustedAmount: Math.round(adjustedAmount),
-                deductions,
-                deductedAmount: Math.round(deductedAmount),
-                internalAuthorsCount: internalAuthors.length,
-                mainAuthorsCount: mainAuthors.length,
-                coAuthorsCount: coAuthors.length,
-                authorShare,
-                finalAmount: Math.round(finalAmount),
-            };
-        } catch (error) {
-            return null;
-        }
-    };
-
-    const breakdown = calculateIncentiveBreakdown();
+    const breakdown = calculateIncentiveBreakdown(claim);
 
     return (
         <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
