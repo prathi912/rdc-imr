@@ -410,7 +410,9 @@ export type IncentiveClaim = {
   awardStature?: 'National' | 'International';
   awardBodyType?: 'Government' | 'NGO (Non-Governmental Organization)' | 'Any Other';
   awardLocale?: string;
-  amountPaid?: number;
+  awardCategory?: 'International Award' | 'National Award' | 'Best Research Paper Award';
+  isPaidAward?: boolean;
+  amountPaid?: number; // Cash prize received (if any)
   paymentDate?: string; // ISO string
   awardDate?: string; // ISO string
   totalInternalAuthors?: number;

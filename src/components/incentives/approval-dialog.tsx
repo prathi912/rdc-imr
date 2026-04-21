@@ -110,6 +110,17 @@ const additionalResearchPaperFieldsForFinalReview: { id: keyof IncentiveClaim | 
     { id: 'authorsSummary', label: 'All Authors (Role)' },
 ];
 
+const awardFields: { id: keyof IncentiveClaim; label: string }[] = [
+    { id: 'awardTitle', label: 'Award Title' },
+    { id: 'awardCategory', label: 'Award Category' },
+    { id: 'awardingBody', label: 'Awarding Body' },
+    { id: 'awardStature', label: 'Award Stature' },
+    { id: 'awardBodyType', label: 'Awarding Body Type' },
+    { id: 'awardDate', label: 'Award Date' },
+    { id: 'isPaidAward', label: 'Is it a Paid Award?' },
+    { id: 'amountPaid', label: 'Cash Prize Received' },
+];
+
 const conferenceChecklistFields: { id: keyof IncentiveClaim | 'name' | 'designation', label: string }[] = [
     { id: 'designation', label: 'Designation & Department' },
     { id: 'eventType', label: 'Type of Event' },
@@ -428,6 +439,23 @@ function ResearchPaperClaimDetails({
             
             const isMainAuthor = mainRoles.includes(claim.authorType || '');
 
+            if (claim.claimType === 'Award') {
+               let baseAmount = 0;
+               if (claim.awardCategory === 'International Award') baseAmount = 15000;
+               else if (claim.awardCategory === 'National Award') baseAmount = 5000;
+               else if (claim.awardCategory === 'Best Research Paper Award') baseAmount = 2000;
+               
+               let finalAmount = claim.isPaidAward ? 0 : baseAmount;
+               
+               return {
+                   isAward: true,
+                   category: claim.awardCategory,
+                   isPaid: claim.isPaidAward,
+                   baseAmount,
+                   finalAmount
+               };
+            }
+
             // Base incentive
             let baseAmount = 0;
             if (publicationType === 'Scopus Indexed Conference Proceedings') {
@@ -478,8 +506,9 @@ function ResearchPaperClaimDetails({
                     finalAmount = isMainAuthor ? deductedAmount : 0;
                     authorShare = 'Sole main author (100%)';
                 } else if (coAuthors.length === 1) {
-                    finalAmount = !isMainAuthor ? deductedAmount * 0.8 : 0;
-                    authorShare = 'Sole co-author (80%)';
+                    const multiplier = publicationType === 'Scopus Indexed Conference Proceedings' ? 1.0 : 0.8;
+                    finalAmount = !isMainAuthor ? deductedAmount * multiplier : 0;
+                    authorShare = `Sole co-author (${multiplier * 100}%)`;
                 }
             } else if (mainAuthors.length > 0 && coAuthors.length > 0) {
                 const mainShare = (deductedAmount * 0.7) / mainAuthors.length;
@@ -487,8 +516,9 @@ function ResearchPaperClaimDetails({
                 finalAmount = isMainAuthor ? mainShare : coShare;
                 authorShare = `Mixed: Main (70% ÷ ${mainAuthors.length}), Co-Author (30% ÷ ${coAuthors.length})`;
             } else if (mainAuthors.length === 0 && coAuthors.length > 1) {
-                finalAmount = !isMainAuthor ? (deductedAmount * 0.8) / coAuthors.length : 0;
-                authorShare = `Multiple co-authors (80% ÷ ${coAuthors.length})`;
+                const multiplier = publicationType === 'Scopus Indexed Conference Proceedings' ? 1.0 : 0.8;
+                finalAmount = !isMainAuthor ? (deductedAmount * multiplier) / coAuthors.length : 0;
+                authorShare = `Multiple co-authors (${multiplier * 100}% ÷ ${coAuthors.length})`;
             } else if (mainAuthors.length > 0) {
                 finalAmount = isMainAuthor ? deductedAmount / mainAuthors.length : 0;
                 authorShare = `Multiple main authors (÷ ${mainAuthors.length})`;
@@ -542,9 +572,25 @@ function ResearchPaperClaimDetails({
                     {isChecklistEnabled && <span>Your Verify</span>}
                 </div>
             </div>
-            <div className="space-y-1">
-                 {allPossibleResearchPaperFields.map(field => renderDetail(field, (claimWithUserData as any)[field.id]))}
-            </div>
+            {claim.claimType === 'Research Papers' && (
+                <div className="space-y-1">
+                     {allPossibleResearchPaperFields.map(field => renderDetail(field, (claimWithUserData as any)[field.id]))}
+                </div>
+            )}
+            
+            {claim.claimType === 'Award' && (
+                <div className="space-y-1">
+                    {awardFields.map(field => renderDetail(field, (claimWithUserData as any)[field.id]))}
+                </div>
+            )}
+
+            {claim.claimType !== 'Research Papers' && claim.claimType !== 'Award' && (
+                <div className="space-y-1">
+                   {/* Fallback for other types */}
+                   <p className="text-xs text-muted-foreground italic">Details verification for this claim type is handled via the full details view.</p>
+                </div>
+            )}
+
             {!isChecklistEnabled && (
                 <>
                     <Separator />
@@ -554,12 +600,38 @@ function ResearchPaperClaimDetails({
                     </div>
                 </>
             )}
-            {breakdown && (
+            {breakdown && (breakdown as any).isAward && (
+                <>
+                    <Separator />
+                    <div className="space-y-2 bg-purple-50 dark:bg-purple-950 rounded-lg p-3 border border-purple-200 dark:border-purple-800">
+                        <h5 className="text-sm font-semibold text-purple-900 dark:text-purple-100">Award Honorarium Breakdown</h5>
+                        <div className="space-y-1.5 text-xs text-purple-800 dark:text-purple-200">
+                            <div className="flex justify-between">
+                                <span>Policy Base ({(breakdown as any).category}):</span>
+                                <span className="font-semibold">₹{(breakdown as any).baseAmount.toLocaleString('en-IN')}</span>
+                            </div>
+                            {(breakdown as any).isPaid && (
+                                <div className="flex justify-between text-red-600">
+                                    <span>Paid Award (Disqualified):</span>
+                                    <span className="font-semibold">-100%</span>
+                                </div>
+                            )}
+                            <div className="pt-1.5 border-t border-purple-200 dark:border-purple-800 mt-1.5 flex justify-between font-bold text-sm">
+                                <span>Suggested Honorarium:</span>
+                                <span>₹{(breakdown as any).finalAmount.toLocaleString('en-IN')}</span>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {breakdown && !(breakdown as any).isAward && (
                 <>
                     <Separator />
                     <div className="space-y-2 bg-blue-50 dark:bg-blue-950 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
                         <h5 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Incentive Calculation Breakdown</h5>
                         <div className="space-y-1.5 text-xs">
+
                             <div className="grid grid-cols-2 gap-2">
                                 <span className="text-blue-700 dark:text-blue-300">1. Base Amount (Q-Rating):</span>
                                 <span className="font-medium text-right">₹{breakdown.baseAmount.toLocaleString('en-IN')}</span>
@@ -676,6 +748,8 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         path: ['verifiedFields'],
     }), [approvalSchema, isChecklistEnabled, fieldsToVerify]);
 
+    const breakdown = calculateIncentiveBreakdown();
+
     const { defaultAmount, isAutoCalculated } = useMemo(() => {
         if (stageIndex > 0 && claim.approvals) {
             const previousApprovals = claim.approvals
@@ -686,8 +760,13 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                 return { defaultAmount: previousApprovals[0].approvedAmount, isAutoCalculated: false };
             }
         }
-        return { defaultAmount: claim.calculatedIncentive, isAutoCalculated: true };
-    }, [stageIndex, claim]);
+
+        if (breakdown && (breakdown as any).isAward) {
+            return { defaultAmount: (breakdown as any).finalAmount, isAutoCalculated: true };
+        }
+
+        return { defaultAmount: claim.calculatedIncentive || 0, isAutoCalculated: true };
+    }, [stageIndex, claim, breakdown]);
     
     const getDefaultAction = useCallback(() => {
         if (isChecklistEnabled) return 'verify';

@@ -109,8 +109,9 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     finalAmount = isMainAuthor ? deductedAmount : 0;
                     authorShare = 'Sole main author (100%)';
                 } else if (coAuthors.length === 1) {
-                    finalAmount = !isMainAuthor ? deductedAmount * 0.8 : 0;
-                    authorShare = 'Sole co-author (80%)';
+                    const multiplier = publicationType === 'Scopus Indexed Conference Proceedings' ? 1.0 : 0.8;
+                    finalAmount = !isMainAuthor ? deductedAmount * multiplier : 0;
+                    authorShare = `Sole co-author (${multiplier * 100}%)`;
                 }
             }
             // Mixed roles
@@ -124,8 +125,9 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
             }
             // Multiple Co-Authors only
             else if (mainAuthors.length === 0 && coAuthors.length > 0) {
-                finalAmount = !isMainAuthor ? (deductedAmount * 0.8) / coAuthors.length : 0;
-                authorShare = `Multiple co-authors (80% ÷ ${coAuthors.length})`;
+                const multiplier = publicationType === 'Scopus Indexed Conference Proceedings' ? 1.0 : 0.8;
+                finalAmount = !isMainAuthor ? (deductedAmount * multiplier) / coAuthors.length : 0;
+                authorShare = `Multiple co-authors (${multiplier * 100}% ÷ ${coAuthors.length})`;
             }
             // Multiple main authors only
             else if (mainAuthors.length > 0) {
@@ -159,7 +161,25 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
         }
     };
 
+    const calculateAwardBreakdown = () => {
+        if (!claim || claim.claimType !== 'Award') return null;
+        
+        let honorsAmount = 0;
+        if (claim.awardCategory === 'International Award') honorsAmount = 15000;
+        else if (claim.awardCategory === 'National Award') honorsAmount = 5000;
+        else if (claim.awardCategory === 'Best Research Paper Award') honorsAmount = 2000;
+
+        if (claim.isPaidAward) honorsAmount = 0;
+
+        return {
+            category: claim.awardCategory,
+            isPaid: claim.isPaidAward,
+            honorsAmount
+        };
+    };
+
     const breakdown = calculateIncentiveBreakdown();
+    const awardBreakdown = calculateAwardBreakdown();
     
     const handleDownloadNoting = async () => {
         if (!claim || !isEligibleForFinancialDisbursement(claim)) {
@@ -595,9 +615,33 @@ a.href = url;
                             {renderDetail("Body Type", claim.awardBodyType)}
                             {renderDetail("Locale", claim.awardLocale)}
                             {renderDetail("Membership No.", claim.membershipNumber)}
+                            {renderDetail("Award Category", claim.awardCategory)}
+                            {renderDetail("Paid Award?", claim.isPaidAward)}
                             {renderDetail("Award Date", claim.awardDate ? new Date(claim.awardDate).toLocaleDateString() : 'N/A')}
-                            {renderDetail("Amount (if cash component)", claim.amountPaid?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                            {renderDetail("Cash Prize Received", claim.amountPaid?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
                             {renderDetail("Self Declaration", claim.awardSelfDeclaration)}
+
+                            {awardBreakdown && (
+                                <div className="mt-4 p-4 bg-primary/5 rounded-lg border border-primary/10">
+                                    <h4 className="font-bold text-sm text-primary mb-2">Award Incentive Calculation</h4>
+                                    <div className="space-y-1 text-sm">
+                                        <div className="flex justify-between">
+                                            <span>Policy Base ({awardBreakdown.category || 'N/A'}):</span>
+                                            <span className="font-semibold">₹{(awardBreakdown.honorsAmount > 0 || awardBreakdown.isPaid ? (awardBreakdown.category === 'International Award' ? 15000 : awardBreakdown.category === 'National Award' ? 5000 : 2000) : 0).toLocaleString('en-IN')}</span> 
+                                        </div>
+                                        {awardBreakdown.isPaid && (
+                                            <div className="flex justify-between text-destructive">
+                                                <span>Paid Award Deduction:</span>
+                                                <span className="font-semibold">-100% (Disqualified)</span>
+                                            </div>
+                                        )}
+                                        <div className="pt-2 border-t mt-2 flex justify-between font-bold text-primary">
+                                            <span>Final Honorarium:</span>
+                                            <span>₹{awardBreakdown.honorsAmount.toLocaleString('en-IN')}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Documents</h4>

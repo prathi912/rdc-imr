@@ -32,9 +32,10 @@ const awardSchema = z.object({
   awardingBody: z.string().min(2, "Awarding body is required."),
   awardStature: z.enum(["National", "International"], { required_error: "Stature of awarding body is required." }),
   awardBodyType: z.enum(["Government", "NGO (Non-Governmental Organization)", "Any Other"], { required_error: "Type of awarding body is required." }),
-  awardLocale: z.string().min(2, "Locale of the awarding body is required."),
+  awardCategory: z.enum(["International Award", "National Award", "Best Research Paper Award"], { required_error: "Award category is required." }),
+  isPaidAward: z.boolean({ required_error: "Please specify if this was a paid award." }),
   membershipNumber: z.string().optional(),
-  amountPaid: z.coerce.number().min(0, "Amount paid must be 0 or greater.").optional(),
+  amountPaid: z.coerce.number().min(0, "Amount must be 0 or greater.").optional(),
   paymentDate: z.string().optional(),
   awardDate: z.string().min(1, "Date of award is required."),
   awardProof: z.array(z.string()).min(1, "At least one proof document is required.").max(10, "Maximum 10 files allowed."),
@@ -132,7 +133,14 @@ function ReviewDetails({
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-2">Estimated Incentive</p>
                   <p className="text-[11px] opacity-70 mb-4 leading-tight font-medium">Based on the provided details, your tentative incentive claim will be:</p>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-black tracking-tighter">₹{(data.amountPaid || 0).toLocaleString("en-IN")}</span>
+                    <span className="text-4xl font-black tracking-tighter">
+                      ₹{(() => {
+                        const base = data.awardCategory === 'International Award' ? 15000 : 
+                                     data.awardCategory === 'National Award' ? 5000 : 
+                                     data.awardCategory === 'Best Research Paper Award' ? 2000 : 0;
+                        return (data.isPaidAward ? 0 : base).toLocaleString("en-IN");
+                      })()}
+                    </span>
                     <span className="text-xs font-medium opacity-60">INR*</span>
                   </div>
                   <p className="text-[10px] mt-4 font-medium opacity-70 italic">*Subject to final verification by the technical committee.</p>
@@ -159,7 +167,7 @@ function ReviewDetails({
                         ))}
 
                         <div className="text-[9px] italic mt-2 !pt-2 text-center border-t border-primary-foreground/10 opacity-70">
-                          *Awards with a cash component generally receive a direct 100% equivalent claim match pending verification.
+                          *Paid awards are not honored. Honorarium is fixed based on University policy.
                         </div>
                       </div>
                     )}
@@ -209,28 +217,43 @@ export function AwardForm({ user }: { user: User }) {
 
   const getAwardLogicBreakdown = (data: Partial<AwardFormValues>) => {
     const steps: { label: string, value: string }[] = [];
-    steps.push({ label: '1. National/International Stature', value: data.awardStature || 'Pending' });
-    steps.push({ label: '2. Award Cash Component', value: `₹${data.amountPaid?.toLocaleString('en-IN') || 0}` });
-    steps.push({ label: '3. Final Matched Incentive', value: `₹${data.amountPaid?.toLocaleString('en-IN') || 0}` });
+    
+    let baseAmount = 0;
+    if (data.awardCategory === 'International Award') baseAmount = 15000;
+    else if (data.awardCategory === 'National Award') baseAmount = 5000;
+    else if (data.awardCategory === 'Best Research Paper Award') baseAmount = 2000;
+
+    steps.push({ label: '1. Award Category', value: data.awardCategory || 'Pending' });
+    steps.push({ label: '2. Policy Honorarium', value: `₹${baseAmount.toLocaleString('en-IN')}` });
+    
+    if (data.isPaidAward) {
+      steps.push({ label: '3. Paid Award Check', value: 'Disqualified (Paid)' });
+      steps.push({ label: '4. Final Incentive', value: '₹0' });
+    } else {
+      steps.push({ label: '3. Paid Award Check', value: 'Verified (Not Paid)' });
+      steps.push({ label: '4. Final Incentive', value: `₹${baseAmount.toLocaleString('en-IN')}` });
+    }
     return steps;
   };
 
   const form = useForm<AwardFormValues>({
     resolver: zodResolver(awardSchema),
-    defaultValues: {
-      awardTitle: "",
-      awardingBody: "",
-      awardStature: undefined,
-      awardBodyType: undefined,
-      awardLocale: "",
-      membershipNumber: "",
-      amountPaid: 0,
-      paymentDate: "",
-      awardDate: "",
-      awardProof: [],
-      awardSelfDeclaration: false,
-    },
-  })
+      defaultValues: {
+        awardTitle: "",
+        awardingBody: "",
+        awardStature: undefined,
+        awardBodyType: undefined,
+        awardCategory: undefined,
+        isPaidAward: false,
+        awardLocale: "",
+        membershipNumber: "",
+        amountPaid: 0,
+        paymentDate: "",
+        awardDate: "",
+        awardProof: [],
+        awardSelfDeclaration: false,
+      },
+    })
 
   useEffect(() => {
     if (user) {
@@ -249,19 +272,21 @@ export function AwardForm({ user }: { user: User }) {
           const claimSnap = await getDoc(claimRef)
           if (claimSnap.exists()) {
             const draftData = claimSnap.data() as IncentiveClaim
-            form.reset({
-              awardTitle: draftData.awardTitle || "",
-              awardingBody: draftData.awardingBody || "",
-              awardStature: draftData.awardStature as "National" | "International" | undefined,
-              awardBodyType: draftData.awardBodyType as "Government" | "NGO (Non-Governmental Organization)" | "Any Other" | undefined,
-              awardLocale: draftData.awardLocale || "",
-              membershipNumber: draftData.membershipNumber || "",
-              amountPaid: draftData.amountPaid || 0,
-              paymentDate: draftData.paymentDate || "",
-              awardDate: draftData.awardDate || "",
-              awardProof: draftData.awardProofUrls || [],
-              awardSelfDeclaration: draftData.awardSelfDeclaration || false,
-            })
+              form.reset({
+                awardTitle: draftData.awardTitle || "",
+                awardingBody: draftData.awardingBody || "",
+                awardStature: draftData.awardStature as "National" | "International" | undefined,
+                awardBodyType: draftData.awardBodyType as "Government" | "NGO (Non-Governmental Organization)" | "Any Other" | undefined,
+                awardCategory: draftData.awardCategory as any,
+                isPaidAward: draftData.isPaidAward || false,
+                awardLocale: draftData.awardLocale || "",
+                membershipNumber: draftData.membershipNumber || "",
+                amountPaid: draftData.amountPaid || 0,
+                paymentDate: draftData.paymentDate || "",
+                awardDate: draftData.awardDate || "",
+                awardProof: draftData.awardProofUrls || [],
+                awardSelfDeclaration: draftData.awardSelfDeclaration || false,
+              })
           }
         } catch (error) {
           console.error("Error fetching draft:", error)
@@ -350,6 +375,8 @@ export function AwardForm({ user }: { user: User }) {
         awardStature: values.awardStature,
         awardBodyType: values.awardBodyType,
         awardLocale: values.awardLocale,
+        awardCategory: values.awardCategory,
+        isPaidAward: values.isPaidAward,
         membershipNumber: values.membershipNumber,
         amountPaid: values.amountPaid,
         paymentDate: values.paymentDate,
@@ -396,6 +423,8 @@ export function AwardForm({ user }: { user: User }) {
         awardStature: values.awardStature,
         awardBodyType: values.awardBodyType,
         awardLocale: values.awardLocale,
+        awardCategory: values.awardCategory,
+        isPaidAward: values.isPaidAward,
         membershipNumber: values.membershipNumber,
         amountPaid: values.amountPaid,
         paymentDate: values.paymentDate,
@@ -579,6 +608,59 @@ export function AwardForm({ user }: { user: User }) {
                     )}
                   />
                 </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <FormField
+                    control={form.control}
+                    name="awardCategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-semibold">Award Category</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-12 shadow-sm">
+                              <SelectValue placeholder="Select award category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="International Award">International Award (Reputed Body/Fellowship)</SelectItem>
+                            <SelectItem value="National Award">National Award (Govt/Well Recognized Body)</SelectItem>
+                            <SelectItem value="Best Research Paper Award">Best Research Paper Award (In Conferences)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="isPaidAward"
+                    render={({ field }) => (
+                      <FormItem className="space-y-3">
+                        <FormLabel className="text-base font-semibold">Was this a Paid Award?</FormLabel>
+                        <FormControl>
+                          <RadioGroup 
+                            onValueChange={(val) => field.onChange(val === "true")} 
+                            value={field.value?.toString()} 
+                            className="flex gap-6 mt-2"
+                          >
+                            <Label htmlFor="paid-no" className="flex items-center space-x-3 bg-muted/40 px-5 py-2.5 rounded-xl border border-muted-foreground/10 hover:bg-muted transition-all cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5">
+                              <RadioGroupItem value="false" id="paid-no" />
+                              <span className="font-bold text-sm">No</span>
+                            </Label>
+                            <Label htmlFor="paid-yes" className="flex items-center space-x-3 bg-muted/40 px-5 py-2.5 rounded-xl border border-muted-foreground/10 hover:bg-muted transition-all cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5">
+                              <RadioGroupItem value="true" id="paid-yes" />
+                              <span className="font-bold text-sm">Yes (Paid)</span>
+                            </Label>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
 
                 <FormField
                   control={form.control}
@@ -625,7 +707,7 @@ export function AwardForm({ user }: { user: User }) {
                     name="amountPaid"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold">Amount Paid (INR)</FormLabel>
+                        <FormLabel className="text-base font-semibold">Cash Prize Received (INR)</FormLabel>
                         <FormControl>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
@@ -644,13 +726,21 @@ export function AwardForm({ user }: { user: User }) {
 
               <Separator className="bg-muted-foreground/5" />
 
-              {Number(form.watch("amountPaid") || 0) > 0 && (
+              {(form.watch("awardCategory") || form.watch("isPaidAward")) && (
                 <Alert className="mt-8 bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md mb-8">
                   <div className="flex flex-col gap-1.5">
                     <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> Estimated Incentive Amount
                     </p>
-                    <h4 className="text-4xl font-black text-foreground tracking-tight py-1">₹{(form.watch("amountPaid") || 0).toLocaleString('en-IN')}</h4>
+                    <h4 className="text-4xl font-black text-foreground tracking-tight py-1">
+                      ₹{(() => {
+                        const vals = form.getValues();
+                        const base = vals.awardCategory === 'International Award' ? 15000 : 
+                                     vals.awardCategory === 'National Award' ? 5000 : 
+                                     vals.awardCategory === 'Best Research Paper Award' ? 2000 : 0;
+                        return (vals.isPaidAward ? 0 : base).toLocaleString("en-IN");
+                      })()}
+                    </h4>
                     <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
 
                     <div className="mt-4 border-t border-primary/10 pt-4">
