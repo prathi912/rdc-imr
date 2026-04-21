@@ -80,7 +80,7 @@ const bankDetailsSchema = z.object({
   bankName: z.string().min(1, "Please select a bank."),
   branchName: z.string().min(2, "Branch name is required."),
   city: z.string().min(2, "City is required."),
-  ifscCode: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, "Invalid IFSC code format."),
+  ifscCode: z.string().toUpperCase().regex(/^(AUBL|HDFC|CBIN)0[A-Z0-9]{6}$/, "Only AU, HDFC, or Central Bank IFSC codes are permitted."),
 })
 type BankDetailsFormValues = z.infer<typeof bankDetailsSchema>
 
@@ -263,6 +263,7 @@ export default function SettingsPage() {
 
   const bankForm = useForm<BankDetailsFormValues>({
     resolver: zodResolver(bankDetailsSchema),
+    mode: "onChange",
     defaultValues: {
       beneficiaryName: "",
       accountNumber: "",
@@ -351,6 +352,26 @@ export default function SettingsPage() {
       profileForm.setValue('institute', '');
     }
   }, [selectedCampus, profileForm]);
+
+  const ifscCodeWatcher = bankForm.watch('ifscCode');
+
+  useEffect(() => {
+    async function fetchIfscDetails() {
+      if (ifscCodeWatcher && ifscCodeWatcher.length === 11) {
+        try {
+          const res = await fetch(`https://ifsc.razorpay.com/${ifscCodeWatcher.toUpperCase()}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.BRANCH) bankForm.setValue('branchName', data.BRANCH, { shouldValidate: true });
+            if (data.CITY) bankForm.setValue('city', data.CITY, { shouldValidate: true });
+          }
+        } catch (error) {
+          console.error("Failed to fetch IFSC details: ", error);
+        }
+      }
+    }
+    fetchIfscDetails();
+  }, [ifscCodeWatcher, bankForm]);
 
   async function onProfileSubmit(data: ProfileFormValues) {
     if (!user) return
@@ -1051,6 +1072,19 @@ export default function SettingsPage() {
                   )}
                 />
                 <FormField
+                  name="ifscCode"
+                  control={bankForm.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>IFSC Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., HDFC0000001" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
                   name="bankName"
                   control={bankForm.control}
                   render={({ field }) => (
@@ -1102,19 +1136,7 @@ export default function SettingsPage() {
                     )}
                   />
                 </div>
-                <FormField
-                  name="ifscCode"
-                  control={bankForm.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>IFSC Code</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., HDFC0000001" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+
               </CardContent>
               <CardFooter className="border-t px-6 py-4">
                 <Button type="submit" disabled={isSubmittingBank}>

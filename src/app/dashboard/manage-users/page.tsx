@@ -670,15 +670,7 @@ export default function ManageUsersPage() {
                                           </DropdownMenuSubContent>
                                       </DropdownMenuPortal>
                                   </DropdownMenuSub>
-                                  {user.designation === 'Head of Goa Campus' ? (
-                                      <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'faculty', { designation: 'faculty', campus: 'Goa' })}>
-                                          Dismiss as Head of Goa Campus
-                                      </DropdownMenuItem>
-                                  ) : (
-                                      <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'admin', { designation: 'Head of Goa Campus', campus: 'Goa'})}>
-                                          Assign as Head of Goa Campus
-                                      </DropdownMenuItem>
-                                  )}
+
                                 </>
                               )}
                               {isCurrentUserSuperAdmin && user.role === 'CRO' && (
@@ -776,7 +768,7 @@ export default function ManageUsersPage() {
                                         </DropdownMenuSubContent>
                                     </DropdownMenuPortal>
                                 </DropdownMenuSub>
-                                {user.designation === 'Head of Goa Campus' ? ( <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'faculty', { designation: 'faculty', campus: 'Goa' })}>Dismiss as Head of Goa Campus</DropdownMenuItem>) : (<DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'admin', { designation: 'Head of Goa Campus', campus: 'Goa'})}>Assign as Head of Goa Campus</DropdownMenuItem>)}
+
                               </>
                             )}
                             {isCurrentUserSuperAdmin && user.role === 'CRO' && (
