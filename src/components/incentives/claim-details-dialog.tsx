@@ -230,7 +230,7 @@ a.href = url;
                                     <TableRow key={idx} className="hover:bg-transparent">
                                         <TableCell className="py-1.5 font-medium text-xs">{author.name}</TableCell>
                                         <TableCell className="py-1.5 text-xs">{author.role}</TableCell>
-                                        <TableCell className="py-1.5 text-xs text-muted-foreground">{author.email}</TableCell>
+                                        <TableCell className="py-1.5 text-xs text-muted-foreground break-all">{author.email}</TableCell>
                                         <TableCell className="py-1.5 text-xs text-muted-foreground">{author.isExternal ? (author.organization || '-') : '-'}</TableCell>
                                         <TableCell className="py-1.5">
                                             {author.isExternal ? (
@@ -261,7 +261,7 @@ a.href = url;
         return (
             <div className={`grid grid-cols-3 gap-2 py-1 ${isTable ? 'items-start' : ''}`}>
                 <dt className={`font-semibold text-muted-foreground ${isTable ? 'col-span-3 mb-1' : 'col-span-1'}`}>{label}</dt>
-                <dd className={`${isTable ? 'col-span-3' : 'col-span-2 flex items-center gap-2'}`}>
+                <dd className={`${isTable ? 'col-span-3' : 'col-span-2 flex items-center gap-2 break-all'}`}>
                     {displayValue}
                     {isAutoFetched && (
                         <TooltipProvider>
@@ -572,7 +572,7 @@ a.href = url;
                                     <dd className="col-span-2">
                                         <ul className="list-disc pl-5">
                                             {claim.externalCoPis.map((pi: any, idx: number) => (
-                                                <li key={idx}><strong>{pi.name}</strong> - {pi.organization} {pi.email ? `(${pi.email})` : ''}</li>
+                                                <li key={idx}><strong className="break-words">{pi.name}</strong> - {pi.organization} {pi.email ? <span className="break-all">({pi.email})</span> : ''}</li>
                                             ))}
                                         </ul>
                                     </dd>

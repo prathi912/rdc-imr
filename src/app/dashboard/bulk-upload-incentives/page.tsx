@@ -15,7 +15,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { bulkUploadIncentiveClaims } from '@/app/incentive-bulk-actions';
 import type { User } from '@/types';
 
-const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
+const CLAIM_TYPES = [
+  'Research Papers',
+  'Patents',
+  'Conference Presentations',
+  'Books',
+  'Membership of Professional Bodies',
+  'Seed Money for APC',
+  'Award',
+  'EMR Sanction Project',
+  'Workshop/FDP/Training'
+];
 
 type IncentiveUploadData = {
   'Title of Paper': string;

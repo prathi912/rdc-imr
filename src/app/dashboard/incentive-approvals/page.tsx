@@ -22,7 +22,17 @@ import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
+const CLAIM_TYPES = [
+  'Research Papers',
+  'Patents',
+  'Conference Presentations',
+  'Books',
+  'Membership of Professional Bodies',
+  'Seed Money for APC',
+  'Award',
+  'EMR Sanction Project',
+  'Workshop/FDP/Training'
+];
 type SortableKeys = 'userName' | 'claimType' | 'submissionDate' | 'status' | 'paperTitle';
 
 export default function IncentiveApprovalsPage() {
@@ -106,7 +116,7 @@ export default function IncentiveApprovalsPage() {
     };
 
     const getClaimTitle = (claim: IncentiveClaim) => {
-        return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'N/A';
+        return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || claim.awardTitle || claim.emrProjectName || claim.workshopName || 'N/A';
     };
 
     const uniqueFaculties = useMemo(() => {

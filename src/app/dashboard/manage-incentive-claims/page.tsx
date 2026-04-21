@@ -48,7 +48,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
 
-const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
+const CLAIM_TYPES = [
+  'Research Papers',
+  'Patents',
+  'Conference Presentations',
+  'Books',
+  'Membership of Professional Bodies',
+  'Seed Money for APC',
+  'Award',
+  'EMR Sanction Project',
+  'Workshop/FDP/Training'
+];
 type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'submissionDate' | 'status' | 'claimType'>;
 
 
@@ -66,6 +76,7 @@ export default function ManageIncentiveClaimsPage() {
   const [claimTypeFilter, setClaimTypeFilter] = useState('all');
   const [facultyFilter, setFacultyFilter] = useState('all');
   const [instituteFilter, setInstituteFilter] = useState('all');
+  const [stageFilter, setStageFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'submissionDate', direction: 'descending' });
 
   const [selectedClaims, setSelectedClaims] = useState<string[]>([]);
@@ -119,7 +130,7 @@ export default function ManageIncentiveClaimsPage() {
   }, [currentUser, fetchClaimsAndUsers]);
 
   const getClaimTitle = (claim: IncentiveClaim): string => {
-    return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'N/A';
+    return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || claim.awardTitle || claim.emrProjectName || claim.workshopName || 'N/A';
   };
 
   const uniqueFaculties = useMemo(() => {
@@ -158,6 +169,10 @@ export default function ManageIncentiveClaimsPage() {
       });
     }
 
+    if (stageFilter !== 'all') {
+      filtered = filtered.filter(claim => claim.status === stageFilter);
+    }
+
     if (searchTerm.trim()) {
       const lowerCaseSearch = searchTerm.trim().toLowerCase();
       filtered = filtered.filter(claim => {
@@ -173,7 +188,7 @@ export default function ManageIncentiveClaimsPage() {
       });
     }
     return filtered;
-  }, [allClaims, searchTerm, claimTypeFilter, facultyFilter, instituteFilter, users]);
+  }, [allClaims, searchTerm, claimTypeFilter, facultyFilter, instituteFilter, stageFilter, users]);
 
   // count unique paper titles in the current filtered set
   const uniquePaperCount = useMemo(() => {
@@ -182,7 +197,7 @@ export default function ManageIncentiveClaimsPage() {
   }, [filteredClaims]);
 
   const tabClaims = useMemo(() => {
-    const pending = filteredClaims.filter(claim => ['Pending', 'Pending Stage 1 Approval', 'Pending Stage 2 Approval', 'Pending Stage 3 Approval'].includes(claim.status));
+    const pending = filteredClaims.filter(claim => ['Pending', 'Pending Stage 1 Approval', 'Pending Stage 2 Approval', 'Pending Stage 3 Approval', 'Pending Stage 4 Approval'].includes(claim.status));
     const pendingBank = filteredClaims.filter(claim => claim.status === 'Accepted');
     const submittedBank = filteredClaims.filter(claim => claim.status === 'Submitted to Accounts' && claim.paymentSheetRef);
     const approved = filteredClaims.filter(claim => claim.status === 'Payment Completed');
@@ -238,7 +253,7 @@ export default function ManageIncentiveClaimsPage() {
     setSelectedClaims([]);
     setCurrentPage(1);
     setSelectedPaymentSheetRef('');
-  }, [activeTab, searchTerm, claimTypeFilter, facultyFilter, instituteFilter, sortConfig]);
+  }, [activeTab, searchTerm, claimTypeFilter, facultyFilter, instituteFilter, stageFilter, sortConfig]);
 
   const requestSort = (key: SortableKeys) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -350,6 +365,23 @@ export default function ManageIncentiveClaimsPage() {
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to download payment sheet.' });
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleStageFilterChange = (value: string) => {
+    setStageFilter(value);
+    if (value === 'all') return;
+
+    if (['Pending', 'Pending Stage 1 Approval', 'Pending Stage 2 Approval', 'Pending Stage 3 Approval', 'Pending Stage 4 Approval'].includes(value)) {
+      setActiveTab('pending');
+    } else if (value === 'Accepted') {
+      setActiveTab('pending-bank');
+    } else if (value === 'Submitted to Accounts') {
+      setActiveTab('submitted-bank');
+    } else if (value === 'Payment Completed') {
+      setActiveTab('approved');
+    } else if (value === 'Rejected') {
+      setActiveTab('rejected');
     }
   };
 
@@ -781,6 +813,23 @@ export default function ManageIncentiveClaimsPage() {
                       {uniqueInstitutes.map(institute => (
                         <SelectItem key={institute} value={institute}>{institute}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={stageFilter} onValueChange={handleStageFilterChange}>
+                    <SelectTrigger className="w-[220px]">
+                      <SelectValue placeholder="Filter by stage/status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Stages</SelectItem>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Pending Stage 1 Approval">Stage 1</SelectItem>
+                      <SelectItem value="Pending Stage 2 Approval">Stage 2</SelectItem>
+                      <SelectItem value="Pending Stage 3 Approval">Stage 3</SelectItem>
+                      <SelectItem value="Pending Stage 4 Approval">Stage 4</SelectItem>
+                      <SelectItem value="Accepted">Accepted</SelectItem>
+                      <SelectItem value="Submitted to Accounts">Submitted to Accounts</SelectItem>
+                      <SelectItem value="Payment Completed">Payment Completed</SelectItem>
+                      <SelectItem value="Rejected">Rejected</SelectItem>
                     </SelectContent>
                   </Select>
                 </>
