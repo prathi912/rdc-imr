@@ -218,12 +218,18 @@ function ReviewDetails({
               <div className="space-y-1">
                 <p className="font-medium text-base">
                   {data.eventType} ({data.conferenceMode})
+                  {data.presentationType && <span className="ml-2 opacity-70">[{data.presentationType}]</span>}
                 </p>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Globe className="h-3.5 w-3.5" />
                   <span>
                     {data.conferenceType} - {data.conferenceVenue}
                   </span>
+                  {data.eventWebsite && (
+                    <Link href={data.eventWebsite} target="_blank" className="text-primary hover:underline flex items-center gap-1 ml-2">
+                      <Globe className="h-3 w-3" /> Website
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>
@@ -235,6 +241,16 @@ function ReviewDetails({
               <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Conference/Event</p>
               <p className="font-medium">{data.conferenceName}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Organized by: {data.organizerName}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Total Authors</p>
+                <p className="font-medium">{data.totalAuthors || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Your Category</p>
+                <p className="font-medium">{data.authorType || 'N/A'}</p>
+              </div>
             </div>
             <div className="flex gap-6">
               <div>
@@ -340,11 +356,17 @@ function ReviewDetails({
               </div>
             )}
 
-            {data.additionalDocuments && data.additionalDocuments.length > 0 && (
+            {(data.conferenceProof || (data.additionalDocuments && data.additionalDocuments.length > 0)) && (
               <div>
-                <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Additional Supportive Documents</p>
+                <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Supportive Documents</p>
                 <div className="flex flex-col gap-1.5">
-                  {Array.from(data.additionalDocuments as FileList).map((file: File, idx: number) => (
+                  {data.conferenceProof?.[0] && (
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg border bg-primary/5 shadow-sm transition-all text-xs font-medium border-primary/20">
+                      <FileText className="h-4 w-4 text-primary shrink-0" />
+                      <span className="truncate">Conference Proof: {data.conferenceProof[0].name}</span>
+                    </div>
+                  )}
+                  {data.additionalDocuments && Array.from(data.additionalDocuments as FileList).map((file: File, idx: number) => (
                     <div key={idx} className="flex items-center gap-2 p-2.5 rounded-lg border bg-muted/30 shadow-sm transition-all text-xs font-medium">
                       <FileText className="h-4 w-4 text-primary shrink-0" />
                       <span className="truncate">{file.name}</span>
@@ -640,7 +662,7 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
         return result.url
       }
 
-      const { govtFundingRequestProof, abstractUpload, registrationFeeProof, participationCertificate, prizeProof, travelReceipts, additionalDocuments, ...restOfData } =
+      const { govtFundingRequestProof, abstractUpload, registrationFeeProof, participationCertificate, prizeProof, travelReceipts, conferenceProof, additionalDocuments, ...restOfData } =
         data
 
       const [
@@ -650,6 +672,7 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
         participationCertificateUrl,
         prizeProofUrl,
         travelReceiptsUrl,
+        conferenceProofUrl,
       ] = await Promise.all([
         uploadFileHelper(govtFundingRequestProof?.[0], "conference-funding-proof"),
         uploadFileHelper(abstractUpload?.[0], "conference-abstract"),
@@ -657,6 +680,7 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
         uploadFileHelper(participationCertificate?.[0], "conference-cert"),
         uploadFileHelper(prizeProof?.[0], "conference-prize-proof"),
         uploadFileHelper(travelReceipts?.[0], "conference-travel-receipts"),
+        uploadFileHelper(conferenceProof?.[0], "conference-proof"),
       ])
 
       const additionalDocumentsUrlsRaw = additionalDocuments && additionalDocuments.length > 0
@@ -673,6 +697,7 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
         participationCertificateUrl: participationCertificateUrl ?? undefined,
         prizeProofUrl: prizeProofUrl ?? undefined,
         travelReceiptsUrl: travelReceiptsUrl ?? undefined,
+        conferenceProofUrl: conferenceProofUrl ?? undefined,
         additionalDocumentsUrls: additionalDocumentsUrls.length > 0 ? additionalDocumentsUrls : undefined,
         calculatedIncentive: calculatedIncentive ?? undefined,
         misId: user.misId ?? undefined,
@@ -825,10 +850,11 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Event Classification</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}>
-                      <FormControl><SelectTrigger className="h-12 shadow-sm"><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
-                      <SelectContent>{eventTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </FormItem>
+                    <FormControl><SelectTrigger className="h-12 shadow-sm"><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
+                    <SelectContent>{eventTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
                 )} />
 
                 <FormField name="conferenceMode" control={form.control} render={({ field }) => (
@@ -878,9 +904,29 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
                 <FormField name="conferenceName" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel className="text-base font-semibold">Conference Full Name</FormLabel><FormControl><Input placeholder="e.g. IEEE World Congress..." {...field} disabled={isFormDisabled} className="h-12 shadow-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
+                <FormField name="eventWebsite" control={form.control} render={({ field }) => (
+                  <FormItem><FormLabel className="text-base font-semibold">Event Website URL</FormLabel><FormControl><Input placeholder="https://..." {...field} disabled={isFormDisabled} className="h-12 shadow-sm" /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <FormField name="organizerName" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel className="text-base font-semibold">Organizing Body</FormLabel><FormControl><Input placeholder="e.g. Parul Institute of Engineering..." {...field} disabled={isFormDisabled} className="h-12 shadow-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
+                {conferenceMode === "Offline" && (
+                  <FormField name="presentationType" control={form.control} render={({ field }) => (
+                    <FormItem className="animate-in slide-in-from-top-2 duration-300">
+                      <FormLabel className="text-base font-semibold">Presentation Category</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}>
+                        <FormControl><SelectTrigger className="h-12 shadow-sm"><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {["Oral", "Poster", "Other"].map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
               </div>
             </section>
 
@@ -937,7 +983,10 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
                   <FormItem className="space-y-3"><FormLabel className="font-bold flex items-center gap-2 underline decoration-primary decoration-2"><Award className="h-4 w-4" /> Participation Certificate</FormLabel><FormControl><Input type="file" accept=".pdf" className="h-12 border-dashed border-2 bg-muted/20" onChange={e => onChange(e.target.files)} disabled={isFormDisabled} {...rest} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
-              <div className="pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                <FormField name="conferenceProof" control={form.control} render={({ field: { value, onChange, ...rest } }) => (
+                  <FormItem className="space-y-3"><FormLabel className="font-bold flex items-center gap-2 text-muted-foreground underline decoration-muted-foreground/30"><Globe className="h-4 w-4" /> Conference Proof (Brochure/Invitation)</FormLabel><FormControl><Input type="file" accept=".pdf" className="h-12 border-dashed border-2 bg-muted/5" onChange={e => onChange(e.target.files)} disabled={isFormDisabled} {...rest} /></FormControl><FormMessage /></FormItem>
+                )} />
                 <FormField name="additionalDocuments" control={form.control} render={({ field: { value, onChange, ...rest } }) => (
                   <FormItem className="space-y-3"><FormLabel className="font-bold flex items-center gap-2 text-muted-foreground"><FileText className="h-4 w-4" /> Additional Supportive Documents (Optional)</FormLabel><FormControl><Input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.zip" className="h-12 border-dashed border-2 bg-muted/5 hover:bg-muted/10 transition-colors" onChange={e => onChange(e.target.files)} disabled={isFormDisabled} {...rest} /></FormControl><FormDescription className="text-xs">Upload any other relevant files, letters, or bills here.</FormDescription><FormMessage /></FormItem>
                 )} />
@@ -982,6 +1031,57 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
                   ))}
                 </div>
                 <AuthorSearch authors={fields} onAdd={append} availableRoles={coAuthorRoles} currentUserEmail={user.email} />
+                {form.formState.errors.authors && (
+                  <p className="text-xs font-medium text-destructive mt-2">{form.formState.errors.authors.message}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                <FormField
+                  control={form.control}
+                  name="authorType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold">Your Author Category</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-10 shadow-sm rounded-lg">
+                            <SelectValue placeholder="Select Category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="rounded-xl">
+                          {authorTypeOptions.map((type) => (
+                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="totalAuthors"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold">Total Author Count</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-10 shadow-sm rounded-lg">
+                            <SelectValue placeholder="Count" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="rounded-xl">
+                          {authorCountOptions.map((count) => (
+                            <SelectItem key={count} value={count}>{count}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
@@ -1020,6 +1120,7 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
                       <FormControl>
                         <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -1036,6 +1137,7 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
                       <FormControl>
                         <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -1157,17 +1259,6 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
               </div>
 
               <div className="bg-muted/30 p-8 rounded-[2rem] border space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
-                  <FormField name="wasPresentingAuthor" control={form.control} render={({ field }) => (
-                    <FormItem className="flex items-center justify-between p-2"><FormLabel className="font-bold text-sm">Presenting Author Role</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} className="scale-125" /></FormControl></FormItem>
-                  )} />
-                  <FormField name="isPuNamePresent" control={form.control} render={({ field }) => (
-                    <FormItem className="flex items-center justify-between p-2"><FormLabel className="font-bold text-sm">PU Institutional Name Presence</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} className="scale-125" /></FormControl></FormItem>
-                  )} />
-                </div>
-
-                <Separator className="bg-muted-foreground/10" />
-
                 <FormField name="wonPrize" control={form.control} render={({ field }) => (
                   <div className="space-y-4">
                     <FormItem className="flex items-center justify-between p-2"><FormLabel className="font-black text-amber-600 dark:text-amber-500 uppercase tracking-tight flex items-center gap-2">Won a prize / Best paper award? <Award className="h-5 w-5" /></FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} className="scale-125 border-amber-500 data-[state=checked]:bg-amber-500" /></FormControl></FormItem>
@@ -1207,7 +1298,7 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
         <Button variant="ghost" size="lg" onClick={() => handleSave("Draft")} disabled={isSubmitting} className="rounded-2xl px-8 h-12 font-bold hover:bg-primary/5 text-primary">Save as Draft</Button>
         <div className="flex gap-4">
           <Button variant="outline" size="lg" onClick={() => router.back()} disabled={isSubmitting} className="rounded-2xl px-6 h-12">Cancel</Button>
-          <Button size="lg" onClick={form.handleSubmit(handleProceedToReview)} disabled={isFormDisabled} className="rounded-2xl px-12 h-12 font-black shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-[1.02]">
+          <Button size="lg" onClick={handleProceedToReview} disabled={isFormDisabled} className="rounded-2xl px-12 h-12 font-black shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-[1.02]">
             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
             Review Application
           </Button>
