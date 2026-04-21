@@ -72,7 +72,7 @@ function ReviewDetails({
   isSubmitting: boolean
   showLogic: boolean
   setShowLogic: (s: boolean) => void
-  getAwardLogicBreakdown: (data: AwardFormValues) => {label: string, value: string}[]
+  getAwardLogicBreakdown: (data: AwardFormValues) => { label: string, value: string }[]
 }) {
   return (
     <Card className="max-w-4xl mx-auto shadow-xl border-t-4 border-t-primary">
@@ -136,11 +136,11 @@ function ReviewDetails({
                     <span className="text-xs font-medium opacity-60">INR*</span>
                   </div>
                   <p className="text-[10px] mt-4 font-medium opacity-70 italic">*Subject to final verification by the technical committee.</p>
-                  
+
                   <div className="mt-4 border-t border-primary/10 pt-4">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="text-xs font-bold w-full flex justify-between items-center text-primary-foreground hover:bg-primary-foreground/10"
                       onClick={() => setShowLogic(!showLogic)}
                       type="button"
@@ -148,16 +148,16 @@ function ReviewDetails({
                       View Calculation Logic
                       <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
                     </Button>
-                    
+
                     {showLogic && (
                       <div className="mt-3 p-4 bg-background/10 rounded-xl border border-primary-foreground/10 space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1 text-primary-foreground">
-                          {getAwardLogicBreakdown(data).map((step, idx) => (
-                            <div key={idx} className="flex justify-between items-start py-1 border-b last:border-0 border-primary-foreground/10">
-                              <span className="opacity-80 pr-2">{step.label}</span>
-                              <span className={idx === (getAwardLogicBreakdown(data).length - 1) ? "font-bold text-green-200 shrink-0" : "font-semibold shrink-0"}>{step.value}</span>
-                            </div>
-                          ))}
-                        
+                        {getAwardLogicBreakdown(data).map((step, idx) => (
+                          <div key={idx} className="flex justify-between items-start py-1 border-b last:border-0 border-primary-foreground/10">
+                            <span className="opacity-80 pr-2">{step.label}</span>
+                            <span className={idx === (getAwardLogicBreakdown(data).length - 1) ? "font-bold text-green-200 shrink-0" : "font-semibold shrink-0"}>{step.value}</span>
+                          </div>
+                        ))}
+
                         <div className="text-[9px] italic mt-2 !pt-2 text-center border-t border-primary-foreground/10 opacity-70">
                           *Awards with a cash component generally receive a direct 100% equivalent claim match pending verification.
                         </div>
@@ -208,7 +208,7 @@ export function AwardForm({ user }: { user: User }) {
   const [showLogic, setShowLogic] = useState(false)
 
   const getAwardLogicBreakdown = (data: Partial<AwardFormValues>) => {
-    const steps: {label: string, value: string}[] = [];
+    const steps: { label: string, value: string }[] = [];
     steps.push({ label: '1. National/International Stature', value: data.awardStature || 'Pending' });
     steps.push({ label: '2. Award Cash Component', value: `₹${data.amountPaid?.toLocaleString('en-IN') || 0}` });
     steps.push({ label: '3. Final Matched Incentive', value: `₹${data.amountPaid?.toLocaleString('en-IN') || 0}` });
@@ -460,7 +460,7 @@ export function AwardForm({ user }: { user: User }) {
                   <AlertDescription>
                     <div className="flex items-center justify-between">
                       <span>
-                        Your financial IDs (Bank, ORCID, MIS) must be complete to apply.
+                        Your Profile details (Bank, ORCID, MIS) must be complete to apply.
                         <Button variant="link" onClick={() => router.push("/dashboard/settings")} className="text-destructive font-black underline p-0 h-auto ml-2">Settings</Button>
                       </span>
                     </div>
@@ -482,7 +482,7 @@ export function AwardForm({ user }: { user: User }) {
 
               <section className="space-y-6">
                 <div className="flex items-center justify-between py-2 border-b">
-                   <div className="flex items-center gap-2 text-primary font-bold text-lg">
+                  <div className="flex items-center gap-2 text-primary font-bold text-lg">
                     <div className="h-8 w-1.5 bg-primary rounded-full"></div>
                     Award Information
                   </div>
@@ -599,7 +599,7 @@ export function AwardForm({ user }: { user: User }) {
 
               <section className="space-y-6">
                 <div className="flex items-center justify-between py-2 border-b">
-                   <div className="flex items-center gap-2 text-primary font-bold text-lg">
+                  <div className="flex items-center gap-2 text-primary font-bold text-lg">
                     <div className="h-8 w-1.5 bg-primary rounded-full"></div>
                     Metadata & Financials
                   </div>
@@ -643,50 +643,50 @@ export function AwardForm({ user }: { user: User }) {
               </section>
 
               <Separator className="bg-muted-foreground/5" />
-              
+
               {Number(form.watch("amountPaid") || 0) > 0 && (
-                 <Alert className="mt-8 bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md mb-8">
-                   <div className="flex flex-col gap-1.5">
-                      <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> Estimated Incentive Amount
-                      </p>
-                      <h4 className="text-4xl font-black text-foreground tracking-tight py-1">₹{(form.watch("amountPaid") || 0).toLocaleString('en-IN')}</h4>
-                      <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
-                      
-                      <div className="mt-4 border-t border-primary/10 pt-4">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
-                          onClick={() => setShowLogic(!showLogic)}
-                          type="button"
-                        >
-                          View Calculation Logic
-                          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
-                        </Button>
-                        
-                        {showLogic && (
-                          <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1">
-                              {getAwardLogicBreakdown(form.getValues()).map((step, idx) => (
-                                <div key={idx} className="flex justify-between items-start py-1 border-b last:border-0 border-muted">
-                                  <span className="text-muted-foreground pr-2">{step.label}</span>
-                                  <span className={idx === (getAwardLogicBreakdown(form.getValues()).length - 1) ? "font-bold text-green-600 shrink-0" : "font-semibold shrink-0"}>{step.value}</span>
-                                </div>
-                              ))}
-                            
-                            <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
-                              *Awards with a cash component generally receive a direct 100% equivalent claim match pending verification.
+                <Alert className="mt-8 bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md mb-8">
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> Estimated Incentive Amount
+                    </p>
+                    <h4 className="text-4xl font-black text-foreground tracking-tight py-1">₹{(form.watch("amountPaid") || 0).toLocaleString('en-IN')}</h4>
+                    <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
+
+                    <div className="mt-4 border-t border-primary/10 pt-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
+                        onClick={() => setShowLogic(!showLogic)}
+                        type="button"
+                      >
+                        View Calculation Logic
+                        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                      </Button>
+
+                      {showLogic && (
+                        <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1">
+                          {getAwardLogicBreakdown(form.getValues()).map((step, idx) => (
+                            <div key={idx} className="flex justify-between items-start py-1 border-b last:border-0 border-muted">
+                              <span className="text-muted-foreground pr-2">{step.label}</span>
+                              <span className={idx === (getAwardLogicBreakdown(form.getValues()).length - 1) ? "font-bold text-green-600 shrink-0" : "font-semibold shrink-0"}>{step.value}</span>
                             </div>
+                          ))}
+
+                          <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
+                            *Awards with a cash component generally receive a direct 100% equivalent claim match pending verification.
                           </div>
-                        )}
-                      </div>
-                   </div>
-                 </Alert>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Alert>
               )}
 
               <section className="space-y-8">
                 <div className="flex items-center justify-between py-2 border-b">
-                   <div className="flex items-center gap-2 text-primary font-bold text-lg">
+                  <div className="flex items-center gap-2 text-primary font-bold text-lg">
                     <div className="h-8 w-1.5 bg-primary rounded-full"></div>
                     Official Verification
                   </div>
@@ -711,19 +711,19 @@ export function AwardForm({ user }: { user: User }) {
                         </div>
                       </FormControl>
                       <FormDescription className="text-[10px] italic">Upload up to 10 verified PDFs. Max 10MB each.</FormDescription>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                         {form.watch("awardProof").map((url, idx) => (
                           <div key={idx} className="flex items-center justify-between p-3.5 bg-background rounded-2xl border border-primary/5 shadow-sm transition-all hover:border-primary/30 group">
-                             <div className="flex items-center gap-3 overflow-hidden">
-                                <div className="bg-primary/5 p-2 rounded-xl group-hover:bg-primary/10 transition-colors">
-                                  <FileText className="h-4 w-4 text-primary shrink-0" />
-                                </div>
-                                <span className="text-xs font-semibold truncate lowercase italic">verified_proof_{idx + 1}.pdf</span>
-                             </div>
-                             <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(idx)} className="text-destructive/40 hover:text-destructive hover:bg-destructive/10 h-10 w-10 p-0 rounded-xl">
-                                <Trash2 className="h-3.5 w-3.5" />
-                             </Button>
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <div className="bg-primary/5 p-2 rounded-xl group-hover:bg-primary/10 transition-colors">
+                                <FileText className="h-4 w-4 text-primary shrink-0" />
+                              </div>
+                              <span className="text-xs font-semibold truncate lowercase italic">verified_proof_{idx + 1}.pdf</span>
+                            </div>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(idx)} className="text-destructive/40 hover:text-destructive hover:bg-destructive/10 h-10 w-10 p-0 rounded-xl">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         ))}
                       </div>

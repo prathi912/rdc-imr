@@ -430,13 +430,17 @@ function ResearchPaperClaimDetails({
 
             // Base incentive
             let baseAmount = 0;
-            switch (journalClassification) {
-                case 'Nature/Science/Lancet': baseAmount = 50000; break;
-                case 'Top 1% Journals': baseAmount = 25000; break;
-                case 'Q1': baseAmount = 15000; break;
-                case 'Q2': baseAmount = 10000; break;
-                case 'Q3': baseAmount = 6000; break;
-                case 'Q4': baseAmount = 4000; break;
+            if (publicationType === 'Scopus Indexed Conference Proceedings') {
+                baseAmount = 3000;
+            } else {
+                switch (journalClassification) {
+                    case 'Nature/Science/Lancet': baseAmount = 50000; break;
+                    case 'Top 1% Journals': baseAmount = 25000; break;
+                    case 'Q1': baseAmount = 15000; break;
+                    case 'Q2': baseAmount = 10000; break;
+                    case 'Q3': baseAmount = 6000; break;
+                    case 'Q4': baseAmount = 4000; break;
+                }
             }
 
             // Apply publication type adjustment

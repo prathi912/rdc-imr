@@ -467,7 +467,13 @@ export function EmrSanctionForm({ user }: { user: User }) {
                       <FormControl>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
-                          <Input type="number" placeholder="Enter total amount" {...field} className="h-12 pl-8 text-lg font-mono shadow-sm" />
+                          <Input 
+                            type="number" 
+                            placeholder="Enter total amount" 
+                            {...field} 
+                            className="h-12 pl-8 text-lg font-mono shadow-sm" 
+                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                          />
                         </div>
                       </FormControl>
                       {field.value > 0 && (

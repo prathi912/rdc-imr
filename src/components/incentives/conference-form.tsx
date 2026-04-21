@@ -272,39 +272,39 @@ function ReviewDetails({
                     <span className="text-4xl font-black tracking-tighter">₹{calculatedIncentive?.toLocaleString('en-IN') || '0'}</span>
                     <span className="text-xs font-medium opacity-60">INR*</span>
                   </div>
-                  
-                  
+
+
                   <div className="mt-4 border-t border-primary/10 pt-4">
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
-                        onClick={() => setShowLogic(!showLogic)}
-                        type="button"
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
+                      onClick={() => setShowLogic(!showLogic)}
+                      type="button"
                     >
-                        View Calculation Logic
-                        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                      View Calculation Logic
+                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
                     </Button>
-                    
+
                     {showLogic && breakdown && (
-                        <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1">
-                            <div className="flex justify-between items-start py-1 border-b border-muted">
-                            <span className="text-muted-foreground pr-2">1. Incurred Expenses (Reg. Fee + Travel)</span>
-                            <span className="font-semibold shrink-0">₹{breakdown.eligibleExpenses?.toLocaleString('en-IN') || 0}</span>
-                            </div>
-                            <div className="flex justify-between items-start py-1 border-b border-muted">
-                            <span className="text-muted-foreground pr-2">2. Maximum Policy Limit</span>
-                            <span className="font-semibold shrink-0">₹{breakdown.maxReimbursement?.toLocaleString('en-IN') || 0}</span>
-                            </div>
-                            <div className="flex justify-between items-start py-1 border-b border-muted">
-                            <span className="text-muted-foreground pr-2">3. Final Admissible Amount</span>
-                            <span className="font-bold text-green-600 shrink-0">₹{calculatedIncentive?.toLocaleString('en-IN') || '0'}</span>
-                            </div>
-                        
+                      <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1">
+                        <div className="flex justify-between items-start py-1 border-b border-muted">
+                          <span className="text-muted-foreground pr-2">1. Incurred Expenses (Reg. Fee + Travel)</span>
+                          <span className="font-semibold shrink-0">₹{breakdown.eligibleExpenses?.toLocaleString('en-IN') || 0}</span>
+                        </div>
+                        <div className="flex justify-between items-start py-1 border-b border-muted">
+                          <span className="text-muted-foreground pr-2">2. Maximum Policy Limit</span>
+                          <span className="font-semibold shrink-0">₹{breakdown.maxReimbursement?.toLocaleString('en-IN') || 0}</span>
+                        </div>
+                        <div className="flex justify-between items-start py-1 border-b border-muted">
+                          <span className="text-muted-foreground pr-2">3. Final Admissible Amount</span>
+                          <span className="font-bold text-green-600 shrink-0">₹{calculatedIncentive?.toLocaleString('en-IN') || '0'}</span>
+                        </div>
+
                         <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
-                            *Logic matches official policy matrix evaluated by approvers during technical audit. Reimbursement is min(expenses, limit).
+                          *Logic matches official policy matrix evaluated by approvers during technical audit. Reimbursement is min(expenses, limit).
                         </div>
-                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -659,10 +659,10 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
         uploadFileHelper(travelReceipts?.[0], "conference-travel-receipts"),
       ])
 
-      const additionalDocumentsUrlsRaw = additionalDocuments && additionalDocuments.length > 0 
-        ? await Promise.all(Array.from(additionalDocuments as FileList).map(file => uploadFileHelper(file as File, "conference-additional-docs"))) 
+      const additionalDocumentsUrlsRaw = additionalDocuments && additionalDocuments.length > 0
+        ? await Promise.all(Array.from(additionalDocuments as FileList).map(file => uploadFileHelper(file as File, "conference-additional-docs")))
         : []
-      
+
       const additionalDocumentsUrls = additionalDocumentsUrlsRaw.filter(Boolean) as string[]
 
       const claimData: Omit<IncentiveClaim, "id" | "claimId"> = {
@@ -788,7 +788,7 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
                 <AlertCircle className="h-5 w-5" />
                 <AlertTitle className="font-bold">Profile Update Required</AlertTitle>
                 <AlertDescription className="flex items-center justify-between">
-                  <span>Your financial IDs (Bank, ORCID, MIS) must be complete to apply.</span>
+                  <span>Your Profile details (Bank, ORCID, MIS) must be complete to apply.</span>
                   <Button variant="link" onClick={() => router.push("/dashboard/settings")} className="text-destructive font-black underline p-0 h-auto">Settings</Button>
                 </AlertDescription>
               </Alert>
@@ -1103,49 +1103,49 @@ function ConferenceFormContent({ user, onEventTypeChange }: { user: User; onEven
               )}
 
               {calculatedIncentive !== null && (
-                 <Alert className="bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md">
-                   <div className="flex flex-col gap-1.5">
-                      <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> Estimated Incentive Amount
-                      </p>
-                      <h4 className="text-4xl font-black text-foreground tracking-tight py-1">₹{calculatedIncentive.toLocaleString('en-IN')}</h4>
-                      <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
-                      
-                      <div className="mt-4 border-t border-primary/10 pt-4">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
-                          onClick={() => setShowLogic(!showLogic)}
-                          type="button"
-                        >
-                          View Calculation Logic
-                          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
-                        </Button>
-                        
-                        {showLogic && calculationBreakdown && (
-                          <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1">
-                              <div className="flex justify-between items-start py-1 border-b border-muted">
-                                <span className="text-muted-foreground pr-2">1. Incurred Expenses (Reg. Fee + Travel)</span>
-                                <span className="font-semibold shrink-0">₹{calculationBreakdown.eligibleExpenses?.toLocaleString('en-IN') || 0}</span>
-                              </div>
-                              <div className="flex justify-between items-start py-1 border-b border-muted">
-                                <span className="text-muted-foreground pr-2">2. Maximum Policy Limit</span>
-                                <span className="font-semibold shrink-0">₹{calculationBreakdown.maxReimbursement?.toLocaleString('en-IN') || 0}</span>
-                              </div>
-                              <div className="flex justify-between items-start py-1 border-b border-muted">
-                                <span className="text-muted-foreground pr-2">3. Final Admissible Amount</span>
-                                <span className="font-bold text-green-600 shrink-0">₹{calculatedIncentive.toLocaleString('en-IN')}</span>
-                              </div>
-                            
-                            <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
-                              *Logic matches official policy matrix evaluated by approvers during technical audit. Reimbursement is min(expenses, limit).
-                            </div>
+                <Alert className="bg-primary/5 border-primary/20 py-6 rounded-3xl transition-all animate-in zoom-in-95 border-l-4 border-l-primary shadow-sm hover:shadow-md">
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> Estimated Incentive Amount
+                    </p>
+                    <h4 className="text-4xl font-black text-foreground tracking-tight py-1">₹{calculatedIncentive.toLocaleString('en-IN')}</h4>
+                    <p className="text-[10px] text-muted-foreground font-medium italic">Tentative individual share*</p>
+
+                    <div className="mt-4 border-t border-primary/10 pt-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs font-bold w-full flex justify-between items-center text-primary hover:bg-primary/10"
+                        onClick={() => setShowLogic(!showLogic)}
+                        type="button"
+                      >
+                        View Calculation Logic
+                        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showLogic ? 'rotate-180' : ''}`} />
+                      </Button>
+
+                      {showLogic && calculationBreakdown && (
+                        <div className="mt-3 p-4 bg-background rounded-xl border shadow-inner space-y-2 text-xs font-medium animate-in slide-in-from-top-2 flex flex-col gap-1">
+                          <div className="flex justify-between items-start py-1 border-b border-muted">
+                            <span className="text-muted-foreground pr-2">1. Incurred Expenses (Reg. Fee + Travel)</span>
+                            <span className="font-semibold shrink-0">₹{calculationBreakdown.eligibleExpenses?.toLocaleString('en-IN') || 0}</span>
                           </div>
-                        )}
-                      </div>
-                   </div>
-                 </Alert>
+                          <div className="flex justify-between items-start py-1 border-b border-muted">
+                            <span className="text-muted-foreground pr-2">2. Maximum Policy Limit</span>
+                            <span className="font-semibold shrink-0">₹{calculationBreakdown.maxReimbursement?.toLocaleString('en-IN') || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-start py-1 border-b border-muted">
+                            <span className="text-muted-foreground pr-2">3. Final Admissible Amount</span>
+                            <span className="font-bold text-green-600 shrink-0">₹{calculatedIncentive.toLocaleString('en-IN')}</span>
+                          </div>
+
+                          <div className="text-[9px] text-muted-foreground italic mt-2 !pt-2 text-center border-t border-muted opacity-70">
+                            *Logic matches official policy matrix evaluated by approvers during technical audit. Reimbursement is min(expenses, limit).
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Alert>
               )}
             </section>
 

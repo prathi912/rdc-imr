@@ -12,6 +12,8 @@ import Link from 'next/link';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { generateOfficeNotingForClaim } from '@/app/actions';
 import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 
 function getVerificationMark(approval: ApprovalStage | null | undefined, fieldId: string) {
@@ -45,13 +47,17 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
             
             // Base incentive
             let baseAmount = 0;
-            switch (journalClassification) {
-                case 'Nature/Science/Lancet': baseAmount = 50000; break;
-                case 'Top 1% Journals': baseAmount = 25000; break;
-                case 'Q1': baseAmount = 15000; break;
-                case 'Q2': baseAmount = 10000; break;
-                case 'Q3': baseAmount = 6000; break;
-                case 'Q4': baseAmount = 4000; break;
+            if (publicationType === 'Scopus Indexed Conference Proceedings') {
+                baseAmount = 3000;
+            } else {
+                switch (journalClassification) {
+                    case 'Nature/Science/Lancet': baseAmount = 50000; break;
+                    case 'Top 1% Journals': baseAmount = 25000; break;
+                    case 'Q1': baseAmount = 15000; break;
+                    case 'Q2': baseAmount = 10000; break;
+                    case 'Q3': baseAmount = 6000; break;
+                    case 'Q4': baseAmount = 4000; break;
+                }
             }
 
             // Apply publication type adjustment
@@ -208,11 +214,36 @@ a.href = url;
         } else if (Array.isArray(value)) {
              if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null && 'name' in value[0]) {
                 displayValue = (
-                    <ul className="list-disc pl-5">
-                        {(value as Author[]).map((author, idx) => (
-                            <li key={idx}><strong>{author.name}</strong> ({author.role}) - {author.email}</li>
-                        ))}
-                    </ul>
+                    <div className="border rounded-md overflow-hidden mt-1 w-full">
+                        <Table>
+                            <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                    <TableHead className="py-1 h-8 text-xs">Name</TableHead>
+                                    <TableHead className="py-1 h-8 text-xs">Role</TableHead>
+                                    <TableHead className="py-1 h-8 text-xs">Email</TableHead>
+                                    <TableHead className="py-1 h-8 text-xs">Organization</TableHead>
+                                    <TableHead className="py-1 h-8 text-xs">Type</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {(value as Author[]).map((author, idx) => (
+                                    <TableRow key={idx} className="hover:bg-transparent">
+                                        <TableCell className="py-1.5 font-medium text-xs">{author.name}</TableCell>
+                                        <TableCell className="py-1.5 text-xs">{author.role}</TableCell>
+                                        <TableCell className="py-1.5 text-xs text-muted-foreground">{author.email}</TableCell>
+                                        <TableCell className="py-1.5 text-xs text-muted-foreground">{author.isExternal ? (author.organization || '-') : '-'}</TableCell>
+                                        <TableCell className="py-1.5">
+                                            {author.isExternal ? (
+                                                <Badge variant="destructive" className="text-[9px] py-0 h-4 leading-none">External</Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="text-[9px] py-0 h-4 leading-none border-green-200 bg-green-50 text-green-700">Internal</Badge>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 );
             } else {
                  displayValue = (value as string[]).join(', ');
@@ -225,11 +256,12 @@ a.href = url;
         }
         
         const isAutoFetched = claim && fieldId && claim.autoFetchedFields?.includes(fieldId);
+        const isTable = Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && value[0] !== null && 'name' in value[0];
 
         return (
-            <div className="grid grid-cols-3 gap-2 py-1">
-                <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
-                <dd className="col-span-2 flex items-center gap-2">
+            <div className={`grid grid-cols-3 gap-2 py-1 ${isTable ? 'items-start' : ''}`}>
+                <dt className={`font-semibold text-muted-foreground ${isTable ? 'col-span-3 mb-1' : 'col-span-1'}`}>{label}</dt>
+                <dd className={`${isTable ? 'col-span-3' : 'col-span-2 flex items-center gap-2'}`}>
                     {displayValue}
                     {isAutoFetched && (
                         <TooltipProvider>

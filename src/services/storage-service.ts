@@ -152,8 +152,9 @@ export async function getStorageUsage(): Promise<{ success: boolean; totalSizeMB
 /**
  * Verifies if a user has access to a specific document based on organizational rules.
  */
-export async function verifyDocumentAccess(path: string, userId: string, userRole: string): Promise<{ allowed: boolean; reason?: string }> {
+export async function verifyDocumentAccess(path: string, userId: string, user: any): Promise<{ allowed: boolean; reason?: string }> {
   try {
+    const userRole = user.role;
     // 1. Super Admin and IQAC have global access
     if (userRole === 'Super-admin' || userRole === 'IQAC') {
       return { allowed: true };
@@ -258,6 +259,11 @@ export async function verifyDocumentAccess(path: string, userId: string, userRol
     // 4. Incentive Claims
     if (collectionName.startsWith('incentive-')) {
         const idOrUid = entityId;
+
+        // Global access for all incentive approvers
+        if (user.allowedModules && user.allowedModules.some((m: string) => m.startsWith('incentive-approver-'))) {
+            return { allowed: true };
+        }
         
         // 4a. Simple case: User accessing their own incentive proof folder
         if (idOrUid === userId) return { allowed: true };
@@ -326,7 +332,7 @@ export async function getSecureDocumentUrl(path: string, userIdArg: string): Pro
     if (!userSnap.exists) return { success: false, error: 'User session invalid' };
     const user = userSnap.data() as any;
 
-    const auth = await verifyDocumentAccess(path, userId, user.role);
+    const auth = await verifyDocumentAccess(path, userId, user);
     if (!auth.allowed) {
       await logActivity('WARNING', 'Blocked unauthorized document access attempt', { path, userId, reason: auth.reason });
       return { success: false, error: auth.reason || 'Unauthorized' };

@@ -749,7 +749,7 @@ export function ApcForm({ user }: { user: User }) {
                 <FormField name="apcTotalAmount" control={form.control} render={({ field }) => (
                   <FormItem className="space-y-3">
                     <FormLabel className="text-base font-semibold">Total Paid to Journal (INR)</FormLabel>
-                    <FormControl><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold italic">₹</span><Input type="number" {...field} className="h-12 pl-8 text-lg font-black shadow-sm" /></div></FormControl>
+                    <FormControl><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold italic">₹</span><Input type="number" onWheel={(e) => (e.target as HTMLInputElement).blur()} {...field} className="h-12 pl-8 text-lg font-black shadow-sm" /></div></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -757,7 +757,7 @@ export function ApcForm({ user }: { user: User }) {
                 <FormField name="apcAmountClaimed" control={form.control} render={({ field }) => (
                   <FormItem className="space-y-3">
                     <FormLabel className="text-base font-semibold">Amount to Reimburse (INR)</FormLabel>
-                    <FormControl><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold italic">₹</span><Input type="number" {...field} className="h-12 pl-8 text-lg font-black shadow-sm" /></div></FormControl>
+                    <FormControl><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold italic">₹</span><Input type="number" onWheel={(e) => (e.target as HTMLInputElement).blur()} {...field} className="h-12 pl-8 text-lg font-black shadow-sm" /></div></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
