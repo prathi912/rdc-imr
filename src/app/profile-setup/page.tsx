@@ -54,7 +54,7 @@ const faculties = [
   "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
   "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurved",
   "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health",
-  "Parul Sevashram Hospital", "RDC", "University Office", "Parul Aarogya Seva Mandal"
+  "Parul Sevashram Hospital", "RDC", "University Office", "Faculty of Liberal Arts", "Parul Aarogya Seva Mandal"
 ];
 
 const campuses = ["Rajkot", "Ahmedabad", "Vadodara", "Goa"];
@@ -84,7 +84,7 @@ const institutes = [
   "Ahmedabad Homoeopathic Medical College", "Ahmedabad Physiotherapy College",
   "College of Agriculture", "Parul Institute of Allied & Healthcare Sciences", "Faculty of Library & Information Science",
   "Institute of Pharmaceutical Sciences", "Jawaharlal Nehru Homoeopathic Medical College", "Parul College of Pharmacy & Research",
-  "Parul Institute of Applied Sciences (Ahmedabad Campus)", "Parul Institute of Applied Sciences (Vadodara Campus)", "Parul Institute of Architecture & Research",
+  "Parul Institute of Applied Sciences (Ahmedabad Campus)", "Parul Institute of Liberal Arts", "Parul Institute of Applied Sciences (Vadodara Campus)", "Parul Institute of Architecture & Research",
   "Parul Institute of Arts", "Parul Institute of Ayurveda", "Parul Institute of Ayurveda & Research", "Parul Ayurved Hospital", "Parul Institute of Business Administration",
   "Parul Institute of Commerce", "Parul Institute of Computer Application", "Parul Institute of Design", "Parul Institute of Engineering & Technology",
   "Parul Institute of Engineering & Technology (Diploma Studies)", "Parul Institute of Fine Arts", "Parul Institute of Homeopathy & Research",

@@ -440,7 +440,7 @@ export async function submitIncentiveClaim(
             const isEmr = finalClaimData.claimType === 'EMR Sanction Project';
             const isEligible = !isEmr && (!isConf || (coAuthor.role === 'Presenting Author' || coAuthor.role === 'First & Presenting Author'));
 
-            const ctaUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://rdc.paruluniversity.ac.in'}/dashboard/incentive-claim?tab=co-author`;
+            const ctaUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://rndprojects.paruluniversity.ac.in'}/dashboard/incentive-claim?tab=co-author`;
 
             let subMessage = "";
             if (isEligible) {
@@ -503,7 +503,7 @@ export async function deleteIncentiveClaim(claimId: string, _userId?: string): P
   try {
     const session = await checkAuth();
     if (!session.authenticated || !session.uid) return { success: false, error: "Authentication missing. Please log in again." };
-    
+
     const isAdmin = session.role === 'admin' || session.role === 'Super-admin' || session.role === 'CRO';
 
     const claim = await getIncentiveClaimByIdCombined(claimId);

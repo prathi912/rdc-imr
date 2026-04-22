@@ -142,6 +142,7 @@ const institutes = [
   "Parul Institute of Applied Sciences (Vadodara Campus)",
   "Parul Institute of Architecture & Research",
   "Parul Institute of Arts",
+  "Parul Institute of Liberal Arts",
   "Parul Institute of Ayurveda",
   "Parul Institute of Ayurveda & Research",
   "Parul Ayurved Hospital",
@@ -720,7 +721,7 @@ export default function SettingsPage() {
   return (
     <div className="container mx-auto py-10">
       <PageHeader title="Settings" description="Manage your account settings and preferences." />
-      
+
       <div className="mt-8">
         <Tabs defaultValue="account" className="space-y-6">
           <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
@@ -1245,8 +1246,8 @@ export default function SettingsPage() {
                                     </TableRow>
                                   </TableHeader>
                                   <TableBody>
-                                    {incentiveClaimTypes.map(type => { 
-                                      const workflow = systemSettings.incentiveApprovalWorkflows?.[type] || [1, 2, 3, 4]; 
+                                    {incentiveClaimTypes.map(type => {
+                                      const workflow = systemSettings.incentiveApprovalWorkflows?.[type] || [1, 2, 3, 4];
                                       return (
                                         <TableRow key={type}>
                                           <TableCell className="py-2 text-[11px] font-medium leading-none">{type}</TableCell>
@@ -1254,7 +1255,7 @@ export default function SettingsPage() {
                                             <TableCell key={stage} className="text-center py-2"><Checkbox checked={workflow.includes(stage)} onCheckedChange={(checked) => handleWorkflowChange(type, stage, !!checked)} disabled={isSavingSettings} /></TableCell>
                                           ))}
                                         </TableRow>
-                                      ); 
+                                      );
                                     })}
                                   </TableBody>
                                 </Table>
@@ -1289,7 +1290,7 @@ export default function SettingsPage() {
                               <span className="text-sm font-medium">Months</span>
                             </div>
                           </div>
-                          
+
                           <div className="space-y-4 rounded-lg border p-4">
                             <div className="flex items-center gap-2 text-primary"><CalendarIcon className="h-5 w-5" /><Label className="text-base">Evaluation Period</Label></div>
                             <p className="text-xs text-muted-foreground">Days allowed for evaluator feedback post-meeting.</p>

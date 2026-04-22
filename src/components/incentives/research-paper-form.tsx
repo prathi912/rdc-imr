@@ -223,7 +223,7 @@ const sdgGoalsList = [
 ]
 
 const coAuthorRoles: Author['role'][] = ["First Author", "Corresponding Author", "Co-Author", "First & Corresponding Author"];
-const conferenceAuthorRoles: Author['role'][] = ['Presenting Author', 'First & Presenting Author', 'Co-Author'];
+
 
 const authorPositions = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
 
@@ -694,24 +694,6 @@ export function ResearchPaperForm() {
   );
 
   const getAvailableRoles = (currentAuthor?: Author) => {
-    if (publicationType === 'Scopus Indexed Conference Proceedings') {
-      const isCurrentAuthorPresenting = currentAuthor && (currentAuthor.role === 'Presenting Author' || currentAuthor.role === 'First & Presenting Author');
-      const isClaimant = currentAuthor && user && currentAuthor.email.toLowerCase() === user.email.toLowerCase();
-      
-      let availableRoles = [...conferenceAuthorRoles];
-      
-      // Applicant cannot be a Co-Author for conference proceedings
-      if (isClaimant) {
-        availableRoles = availableRoles.filter(role => role !== 'Co-Author');
-      }
-
-      // Only one presenting author allowed
-      if (presentingAuthorExists && !isCurrentAuthorPresenting) {
-        availableRoles = availableRoles.filter(role => role !== 'Presenting Author' && role !== 'First & Presenting Author');
-      }
-      
-      return availableRoles;
-    }
     const isCurrentAuthorFirst = currentAuthor && (currentAuthor.role === 'First Author' || currentAuthor.role === 'First & Corresponding Author');
     if (firstAuthorExists && !isCurrentAuthorFirst) {
       return coAuthorRoles.filter(role => role !== 'First Author' && role !== 'First & Corresponding Author');
@@ -736,17 +718,8 @@ export function ResearchPaperForm() {
   useEffect(() => {
     if (publicationType === 'Scopus Indexed Conference Proceedings') {
       form.setValue('journalClassification', undefined);
-      
-      // If claimant is currently Co-Author, switch them to Presenting Author as they can't be Co-Author
-      const currentAuthors = form.getValues('authors');
-      const claimantIndex = currentAuthors.findIndex(a => a.email.toLowerCase() === user?.email.toLowerCase());
-      if (claimantIndex !== -1 && currentAuthors[claimantIndex].role === 'Co-Author') {
-        const updatedAuthors = [...currentAuthors];
-        updatedAuthors[claimantIndex] = { ...updatedAuthors[claimantIndex], role: 'Presenting Author' as any };
-        form.setValue('authors', updatedAuthors);
-      }
     }
-  }, [publicationType, form, user?.email]);
+  }, [publicationType, form]);
 
   const handleFetchData = async (source: 'scopus' | 'wos' | 'sciencedirect') => {
     const doi = form.getValues('doi');
