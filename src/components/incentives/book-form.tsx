@@ -23,6 +23,7 @@ import { Loader2, AlertCircle, Info, ChevronDown, Upload, FileText, CheckCircle2
 import { uploadFileToApi } from "@/lib/upload-client"
 import { submitIncentiveClaimViaApi } from "@/lib/incentive-claim-client"
 import { calculateBookIncentive } from "@/app/incentive-calculation"
+import { getIncentiveClaimByIdAction } from "@/app/actions"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
@@ -84,27 +85,20 @@ const bookSchema = z
     isbnPrint: z.string().optional(),
     isbnElectronic: z.string().optional(),
     publisherWebsite: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
-    bookProof: z
-      .any()
-      .refine((files) => files?.length > 0, "Proof of publication is required.")
-      .refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, "File must be less than 10 MB."),
-    scopusProof: z
-      .any()
-      .optional()
-      .refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, "File must be less than 10 MB."),
+    bookProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, "File must be less than 10 MB."),
+    scopusProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, "File must be less than 10 MB."),
     publicationOrderInYear: z.enum(["First", "Second", "Third"]).optional(),
     bookType: z.enum(["Textbook", "Reference Book"], { required_error: "Please select the book type." }),
     bookSelfDeclaration: z.boolean().refine((val) => val === true, { message: "You must agree to the self-declaration." }),
     authorPosition: z.enum(["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th"]).optional(),
+    bookProofUrl: z.string().optional(),
+    scopusProofUrl: z.string().optional(),
   })
   .refine((data) => !(data.bookApplicationType === "Book Chapter") || (!!data.bookTitleForChapter && data.bookTitleForChapter.length > 2), {
     message: "Book title is required for a book chapter.",
     path: ["bookTitleForChapter"],
   })
-  .refine((data) => !data.isScopusIndexed || (!!data.scopusProof && data.scopusProof.length > 0), {
-    message: "Proof of Scopus indexing is required if selected.",
-    path: ["scopusProof"],
-  })
+
   .refine((data) => !(data.bookApplicationType === "Book") || (!!data.publisherCity && data.publisherCity.length > 0), {
     message: "Publisher city is required for book publications.",
     path: ["publisherCity"],
@@ -133,6 +127,14 @@ const bookSchema = z
     message: "Total chapters are required for book publications.",
     path: ["bookTotalChapters"],
   })
+  .refine(data => data.bookProofUrl || (data.bookProof && data.bookProof.length > 0), {
+    message: "Proof of publication is required.",
+    path: ["bookProof"],
+  })
+  .refine(data => !data.isScopusIndexed || data.scopusProofUrl || (data.scopusProof && data.scopusProof.length > 0), {
+    message: "Proof of Scopus indexing is required if selected.",
+    path: ["scopusProof"],
+  });
 
 type BookFormValues = z.infer<typeof bookSchema>
 
@@ -154,6 +156,9 @@ function ReviewDetails({
   isSubmitting: boolean
   calculatedIncentive: number | null
 }) {
+  const bookProofFile = data.bookProof?.[0] as File | undefined;
+  const scopusProofFile = data.scopusProof?.[0] as File | undefined;
+
   return (
     <Card className="max-w-4xl mx-auto shadow-xl border-t-4 border-t-primary">
       <CardHeader className="bg-muted/30">
@@ -212,6 +217,27 @@ function ReviewDetails({
                 </div>
               )}
             </div>
+
+            {((data.bookApplicationType === "Book Chapter" && data.bookChapterPages) || (data.bookApplicationType === "Book" && data.bookTotalPages)) && (
+              <div>
+                 <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Volume Details</p>
+                 <div className="flex gap-4">
+                   {data.bookChapterPages && <span className="text-xs font-medium bg-muted p-1.5 rounded-md">Chapter Pages: {data.bookChapterPages}</span>}
+                   {data.bookTotalPages && <span className="text-xs font-medium bg-muted p-1.5 rounded-md">Total Pages: {data.bookTotalPages}</span>}
+                   {data.bookTotalChapters && <span className="text-xs font-medium bg-muted p-1.5 rounded-md">Total Chapters: {data.bookTotalChapters}</span>}
+                 </div>
+              </div>
+            )}
+            
+            {(data.publisherCity || data.publisherCountry || data.publisherWebsite) && (
+              <div>
+                 <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Publisher Extras</p>
+                 <p className="font-medium text-xs">
+                   {[data.publisherCity, data.publisherCountry].filter(Boolean).join(', ')}
+                 </p>
+                 {data.publisherWebsite && <p className="text-xs text-muted-foreground truncate">{data.publisherWebsite}</p>}
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -257,6 +283,31 @@ function ReviewDetails({
                 <p className="text-[10px] text-muted-foreground font-medium italic">Verified database presence confirmed.</p>
               </div>
             )}
+
+            <div>
+              <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Applicant Metadata</p>
+              <div className="flex flex-col gap-1 mt-1 text-xs font-medium">
+                {data.authorPosition && <p>Your Position: <Badge variant="secondary" className="text-[10px] scale-90 origin-left">{data.authorPosition}</Badge></p>}
+                {data.authorRole && <p>Designated Role: <Badge variant="secondary" className="text-[10px] scale-90 origin-left">{data.authorRole}</Badge></p>}
+                {data.totalPuStudents ? <p>PU Students Involved: {data.totalPuStudents}</p> : null}
+              </div>
+            </div>
+
+            <div>
+              <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Uploaded Proofs</p>
+              <div className="flex flex-col gap-1.5 mt-1">
+                <div className="flex items-center gap-2 bg-background p-2 rounded-lg border text-xs shadow-sm">
+                  <FileText className="h-3.5 w-3.5 text-primary" />
+                  <span className="truncate flex-1">Book Proof: {bookProofFile?.name || "Attached (Draft URL)"}</span>
+                </div>
+                {(scopusProofFile || data.scopusProofUrl) && (
+                  <div className="flex items-center gap-2 bg-background p-2 rounded-lg border text-xs shadow-sm">
+                    <FileText className="h-3.5 w-3.5 text-primary" />
+                    <span className="truncate flex-1">Scopus: {scopusProofFile?.name || "Attached (Draft URL)"}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </CardContent>
@@ -444,6 +495,7 @@ export function BookForm() {
             const draftData = result.data as any
             form.reset({
               ...draftData,
+              publicationYear: draftData.bookPublicationYear || new Date().getFullYear(),
               authors: draftData.authors || [],
               bookProof: undefined,
               scopusProof: undefined,
@@ -452,6 +504,7 @@ export function BookForm() {
             toast({ variant: "destructive", title: result.error || "Draft Not Found" })
           }
         } catch (error) {
+          console.error("DRAFT LOADING ERROR:", error)
           toast({ variant: "destructive", title: "Error Loading Draft" })
         } finally {
           setIsLoadingDraft(false)
@@ -470,10 +523,11 @@ export function BookForm() {
     if (isValid) {
       setStep("review")
     } else {
+      console.error("FORM VALIDATION ERRORS:", form.formState.errors)
       toast({
         variant: "destructive",
         title: "Validation Error",
-        description: "Please correct the errors before proceeding.",
+        description: "Please correct the errors before proceeding. Check the console for details.",
       })
     }
   }
@@ -509,8 +563,8 @@ export function BookForm() {
       const bookProofFile = data.bookProof?.[0]
       const scopusProofFile = data.scopusProof?.[0]
 
-      const bookProofUrl = await uploadFileHelper(bookProofFile, "book-proof")
-      const scopusProofUrl = await uploadFileHelper(scopusProofFile, "book-scopus-proof")
+      const bookProofUrl = await uploadFileHelper(bookProofFile, "book-proof") || data.bookProofUrl
+      const scopusProofUrl = await uploadFileHelper(scopusProofFile, "book-scopus-proof") || data.scopusProofUrl
 
       const { bookProof, scopusProof, ...restOfData } = data
 
@@ -537,6 +591,7 @@ export function BookForm() {
         chaptersInSameBook: data.chaptersInSameBook,
         bookPublicationYear: data.publicationYear,
         authorRole: data.authorRole,
+        isScopusIndexed: data.isScopusIndexed,
         publicationMode: data.publicationMode,
         isbnPrint: data.isbnPrint,
         isbnElectronic: data.isbnElectronic,
@@ -685,7 +740,7 @@ export function BookForm() {
                     <FormItem className="space-y-4">
                       <FormLabel className="text-base font-semibold">Application Type</FormLabel>
                       <FormControl>
-                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                        <RadioGroup onValueChange={field.onChange} value={field.value || ""} className="flex gap-6">
                           <Label htmlFor="type-chap" className="flex items-center space-x-3 bg-muted/40 px-5 py-3 rounded-xl border border-muted-foreground/10 hover:bg-muted transition-all cursor-pointer [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5">
                             <RadioGroupItem value="Book Chapter" id="type-chap" />
                             <span className="font-bold text-sm">Book Chapter</span>
@@ -734,7 +789,7 @@ export function BookForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-semibold">Book Category</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl><SelectTrigger className="h-12"><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
                           <SelectContent><SelectItem value="Textbook">Textbook</SelectItem><SelectItem value="Reference Book">Reference Book</SelectItem></SelectContent>
                         </Select>
@@ -748,7 +803,7 @@ export function BookForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-semibold">Year of Publication</FormLabel>
-                        <FormControl><Input type="number" {...field} className="h-12 shadow-sm" /></FormControl>
+                        <FormControl><Input type="number" {...field} value={field.value ?? ""} className="h-12 shadow-sm" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -809,7 +864,7 @@ export function BookForm() {
                   <FormField name="authorPosition" control={form.control} render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-base font-semibold">Your Position</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl><SelectTrigger className="h-12"><SelectValue placeholder="Select position" /></SelectTrigger></FormControl>
                         <SelectContent className="rounded-xl">
                           {["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th"].map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
@@ -820,7 +875,7 @@ export function BookForm() {
                   <FormField name="isScopusIndexed" control={form.control} render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-4 shadow-sm hover:bg-primary/10 transition-all">
                       <div className="space-y-0.5"><FormLabel className="text-sm font-bold">Scopus Indexed?</FormLabel></div>
-                      <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} className="h-6 w-6 rounded-lg" /></FormControl>
+                      <FormControl><Checkbox checked={field.value || false} onCheckedChange={field.onChange} className="h-6 w-6 rounded-lg" /></FormControl>
                     </FormItem>
                   )} />
                 </div>
@@ -862,7 +917,7 @@ export function BookForm() {
                     <FormField name="publicationMode" control={form.control} render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-semibold">Publication Mode</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl><SelectTrigger className="h-12"><SelectValue placeholder="Select mode" /></SelectTrigger></FormControl>
                           <SelectContent><SelectItem value="Print Only">Print Only</SelectItem><SelectItem value="Electronic Only">Electronic Only</SelectItem><SelectItem value="Print & Electronic">Print & Electronic</SelectItem></SelectContent>
                         </Select>
@@ -936,9 +991,28 @@ export function BookForm() {
                   </FormItem>
                 )} />
 
+                {isScopusIndexed && (
+                  <FormField name="scopusProof" control={form.control} render={({ field: { value, onChange, ...field } }) => (
+                    <FormItem className="pt-6 animate-in slide-in-from-top-2">
+                      <FormLabel className="text-base font-semibold">Scopus Indexing Proof</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="file"
+                          accept=".pdf"
+                          className="h-20 border-dashed border-2 cursor-pointer bg-muted/10 hover:bg-muted/20 file:bg-primary/10 file:text-primary file:border-none file:h-12 file:px-6 file:mr-6 file:rounded-xl group transition-all"
+                          onChange={(e) => onChange(e.target.files)}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-[10px] italic">Upload verification of Scopus indexing (Max 10MB).</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
+
                 <FormField name="bookSelfDeclaration" control={form.control} render={({ field }) => (
                   <FormItem className="flex flex-row items-center space-x-5 space-y-0 rounded-3xl border border-primary/10 bg-primary/5 p-8 transition-all hover:bg-primary/10 ring-1 ring-primary/5">
-                    <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} className="h-6 w-6 rounded-lg shadow-inner data-[state=checked]:bg-primary" /></FormControl>
+                    <FormControl><Checkbox checked={field.value || false} onCheckedChange={field.onChange} className="h-6 w-6 rounded-lg shadow-inner data-[state=checked]:bg-primary" /></FormControl>
                     <div className="space-y-1.5 leading-tight">
                       <FormLabel className="text-sm font-bold text-primary italic uppercase tracking-wider">Applicant Declaration</FormLabel>
                       <p className="text-xs font-medium text-muted-foreground/80 leading-relaxed italic">
