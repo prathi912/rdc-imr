@@ -9,7 +9,6 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription }
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
@@ -66,19 +65,20 @@ const apcSchema = z.object({
   apcApcWaiverRequested: z.boolean().refine(val => val === true, {
     message: 'You must request an APC waiver and provide proof to be eligible.',
   }),
-  apcApcWaiverProof: z.any().refine(files => files?.length > 0, {
-    message: 'Proof of APC waiver request is required.',
-  }).refine(files => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
-  apcJournalWebsite: z.string().url('Please enter a valid URL.'),
+  apcApcWaiverProof: z.any().optional().refine(files => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+  apcJournalWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
   apcIssnNo: z.string().min(5, 'ISSN is required.'),
   apcSciImpactFactor: z.coerce.number().optional(),
-  apcPublicationProof: z.any().refine((files) => files?.length > 0, 'Proof of publication is required.').refine(files => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
-  apcInvoiceProof: z.any().refine((files) => files?.length > 0, 'Proof of payment/invoice is required.').refine(files => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+  apcPublicationProof: z.any().optional().refine(files => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+  apcInvoiceProof: z.any().optional().refine(files => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
   apcPuNameInPublication: z.boolean().optional(),
   apcAmountClaimed: z.coerce.number().positive('Claimed amount must be positive.'),
   apcTotalAmount: z.coerce.number().positive('Total amount must be a positive number greater than 0.'),
   apcSelfDeclaration: z.boolean().refine(val => val === true, { message: 'You must agree to the self-declaration.' }),
   authorPosition: z.enum(['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th']).optional(),
+  apcApcWaiverProofUrl: z.string().optional(),
+  apcPublicationProofUrl: z.string().optional(),
+  apcInvoiceProofUrl: z.string().optional(),
 }).refine(data => data.apcTypeOfArticle !== 'Other' || (!!data.apcOtherArticleType && data.apcOtherArticleType.length > 0), {
   message: 'Please specify the article type.',
   path: ['apcOtherArticleType'],
@@ -90,6 +90,15 @@ const apcSchema = z.object({
 }, {
   message: 'Web of Science Accession Number is required when Web of Science is selected.',
   path: ['apcWosAccessionNumber'],
+}).refine(data => data.apcApcWaiverProofUrl || (data.apcApcWaiverProof && data.apcApcWaiverProof.length > 0), {
+  message: 'Proof of APC waiver request is required.',
+  path: ['apcApcWaiverProof'],
+}).refine(data => data.apcPublicationProofUrl || (data.apcPublicationProof && data.apcPublicationProof.length > 0), {
+  message: 'Proof of publication is required.',
+  path: ['apcPublicationProof'],
+}).refine(data => data.apcInvoiceProofUrl || (data.apcInvoiceProof && data.apcInvoiceProof.length > 0), {
+  message: 'Proof of payment/invoice is required.',
+  path: ['apcInvoiceProof'],
 });
 
 type ApcFormValues = z.infer<typeof apcSchema>;
@@ -491,9 +500,9 @@ export function ApcForm({ user }: { user: User }) {
         status,
         submissionDate: new Date().toISOString(),
         bankDetails: user.bankDetails || undefined,
-        apcApcWaiverProofUrl: waiver,
-        apcPublicationProofUrl: pub,
-        apcInvoiceProofUrl: inv,
+        apcApcWaiverProofUrl: waiver || data.apcApcWaiverProofUrl,
+        apcPublicationProofUrl: pub || data.apcPublicationProofUrl,
+        apcInvoiceProofUrl: inv || data.apcInvoiceProofUrl,
       };
 
       const result = await submitIncentiveClaimViaApi(claimData, searchParams.get('claimId') || undefined);
@@ -576,7 +585,7 @@ export function ApcForm({ user }: { user: User }) {
                 <FormField control={form.control} name="apcTypeOfArticle" render={({ field }) => (
                   <FormItem className="space-y-3">
                     <FormLabel className="text-base font-semibold">Article Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
                       <FormControl><SelectTrigger className="h-12 shadow-sm"><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
                       <SelectContent>{articleTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                     </Select>
@@ -587,7 +596,7 @@ export function ApcForm({ user }: { user: User }) {
                 <FormField control={form.control} name="apcQRating" render={({ field }) => (
                   <FormItem className="space-y-3">
                     <FormLabel className="text-base font-semibold">Journal Q-Rating (Derive from Scopus/WoS)</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
                       <FormControl><SelectTrigger className="h-12 shadow-sm"><SelectValue placeholder="Select Quartile" /></SelectTrigger></FormControl>
                       <SelectContent>{['Q1', 'Q2', 'Q3', 'Q4'].map(q => <SelectItem key={q} value={q}>{q}</SelectItem>)}</SelectContent>
                     </Select>
@@ -852,7 +861,7 @@ export function ApcForm({ user }: { user: User }) {
         <Button variant="ghost" size="lg" onClick={() => handleSave('Draft')} disabled={isSubmitting} className="rounded-2xl px-8 h-12 font-bold hover:bg-primary/5 text-primary">Save to Draft</Button>
         <div className="flex gap-4">
           <Button variant="outline" size="lg" onClick={() => router.back()} disabled={isSubmitting} className="rounded-2xl px-6 h-12">Cancel</Button>
-          <Button size="lg" onClick={form.handleSubmit(() => setStep('review'))} disabled={isSubmitting} className="rounded-2xl px-12 h-12 font-black shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-[1.02]">
+          <Button size="lg" onClick={form.handleSubmit(() => setStep('review'), (errors) => console.error("FORM ERRORS:", errors))} disabled={isSubmitting} className="rounded-2xl px-12 h-12 font-black shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-[1.02]">
             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
             Review Application
           </Button>

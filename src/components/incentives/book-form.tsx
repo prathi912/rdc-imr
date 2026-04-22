@@ -819,7 +819,7 @@ export function BookForm() {
                   )} />
                   <FormField name="isScopusIndexed" control={form.control} render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-4 shadow-sm hover:bg-primary/10 transition-all">
-                      <div className="space-y-0.5"><FormLabel className="text-sm font-bold">Scopus Indexed?</FormLabel><p className="text-[10px] text-muted-foreground font-medium">Global database presence</p></div>
+                      <div className="space-y-0.5"><FormLabel className="text-sm font-bold">Scopus Indexed?</FormLabel></div>
                       <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} className="h-6 w-6 rounded-lg" /></FormControl>
                     </FormItem>
                   )} />

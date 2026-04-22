@@ -259,7 +259,7 @@ export function AuthorSearch({
                             className="h-9 shadow-sm"
                         />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-end">
                         {type === 'author' && (
                             <div className="flex-1 space-y-1">
                                 <Label className="text-[10px] uppercase font-bold text-muted-foreground">Role</Label>
