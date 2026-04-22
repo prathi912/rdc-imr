@@ -86,7 +86,7 @@ const bookSchema = z
     isbnElectronic: z.string().optional(),
     publisherWebsite: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
     bookProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, "File must be less than 10 MB."),
-    scopusProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, "File must be less than 10 MB."),
+    scopusProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= 2 * 1024 * 1024, "File must be less than 2 MB."),
     publicationOrderInYear: z.enum(["First", "Second", "Third"]).optional(),
     bookType: z.enum(["Textbook", "Reference Book"], { required_error: "Please select the book type." }),
     bookSelfDeclaration: z.boolean().refine((val) => val === true, { message: "You must agree to the self-declaration." }),
@@ -220,22 +220,22 @@ function ReviewDetails({
 
             {((data.bookApplicationType === "Book Chapter" && data.bookChapterPages) || (data.bookApplicationType === "Book" && data.bookTotalPages)) && (
               <div>
-                 <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Volume Details</p>
-                 <div className="flex gap-4">
-                   {data.bookChapterPages && <span className="text-xs font-medium bg-muted p-1.5 rounded-md">Chapter Pages: {data.bookChapterPages}</span>}
-                   {data.bookTotalPages && <span className="text-xs font-medium bg-muted p-1.5 rounded-md">Total Pages: {data.bookTotalPages}</span>}
-                   {data.bookTotalChapters && <span className="text-xs font-medium bg-muted p-1.5 rounded-md">Total Chapters: {data.bookTotalChapters}</span>}
-                 </div>
+                <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Volume Details</p>
+                <div className="flex gap-4">
+                  {data.bookChapterPages && <span className="text-xs font-medium bg-muted p-1.5 rounded-md">Chapter Pages: {data.bookChapterPages}</span>}
+                  {data.bookTotalPages && <span className="text-xs font-medium bg-muted p-1.5 rounded-md">Total Pages: {data.bookTotalPages}</span>}
+                  {data.bookTotalChapters && <span className="text-xs font-medium bg-muted p-1.5 rounded-md">Total Chapters: {data.bookTotalChapters}</span>}
+                </div>
               </div>
             )}
-            
+
             {(data.publisherCity || data.publisherCountry || data.publisherWebsite) && (
               <div>
-                 <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Publisher Extras</p>
-                 <p className="font-medium text-xs">
-                   {[data.publisherCity, data.publisherCountry].filter(Boolean).join(', ')}
-                 </p>
-                 {data.publisherWebsite && <p className="text-xs text-muted-foreground truncate">{data.publisherWebsite}</p>}
+                <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">Publisher Extras</p>
+                <p className="font-medium text-xs">
+                  {[data.publisherCity, data.publisherCountry].filter(Boolean).join(', ')}
+                </p>
+                {data.publisherWebsite && <p className="text-xs text-muted-foreground truncate">{data.publisherWebsite}</p>}
               </div>
             )}
           </div>
@@ -280,7 +280,6 @@ function ReviewDetails({
                 <p className="text-primary font-bold flex items-center gap-1.5 text-xs mb-0.5">
                   <Award className="h-3.5 w-3.5" /> Scopus Indexed
                 </p>
-                <p className="text-[10px] text-muted-foreground font-medium italic">Verified database presence confirmed.</p>
               </div>
             )}
 
@@ -597,6 +596,11 @@ export function BookForm() {
         isbnElectronic: data.isbnElectronic,
         publisherWebsite: data.publisherWebsite,
         publicationOrderInYear: data.publicationOrderInYear,
+        publisherName: data.publisherName,
+        publisherCity: data.publisherCity,
+        publisherCountry: data.publisherCountry,
+        publisherType: data.publisherType,
+        authorPosition: data.authorPosition,
         bookType: data.bookType,
         bookSelfDeclaration: data.bookSelfDeclaration,
         calculatedIncentive: calculationResult.success ? calculationResult.amount : 0,
@@ -998,13 +1002,13 @@ export function BookForm() {
                       <FormControl>
                         <Input
                           type="file"
-                          accept=".pdf"
+                          accept=".pdf,.jpg,.jpeg,.png"
                           className="h-20 border-dashed border-2 cursor-pointer bg-muted/10 hover:bg-muted/20 file:bg-primary/10 file:text-primary file:border-none file:h-12 file:px-6 file:mr-6 file:rounded-xl group transition-all"
                           onChange={(e) => onChange(e.target.files)}
                           {...field}
                         />
                       </FormControl>
-                      <FormDescription className="text-[10px] italic">Upload verification of Scopus indexing (Max 10MB).</FormDescription>
+                      <FormDescription className="text-[10px] italic">Upload verification of Scopus indexing. Allows jpg, png, max 2 mb.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )} />
