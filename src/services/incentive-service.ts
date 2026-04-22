@@ -387,7 +387,7 @@ export async function submitIncentiveClaim(
 
     if (!!claimData.originalClaimId === false && finalClaimData.status !== 'Draft' && finalClaimData.authors) {
       // 1. Identify all internal co-authors who are not the primary claimant
-      const internalCoAuthors = finalClaimData.authors.filter(a => 
+      const internalCoAuthors = finalClaimData.authors.filter(a =>
         !a.isExternal && a.email?.toLowerCase() !== claimData.userEmail?.toLowerCase()
       );
 
@@ -395,7 +395,7 @@ export async function submitIncentiveClaim(
         // 2. Map of registered users to their UIDs for permission checking
         const coAuthorUids = internalCoAuthors.map(a => a.uid).filter((uid): uid is string => !!uid);
         const uidToUserMap = new Map<string, User>();
-        
+
         if (coAuthorUids.length > 0) {
           const usersRef = adminDb.collection('users');
           for (let i = 0; i < coAuthorUids.length; i += 30) {
@@ -467,7 +467,7 @@ export async function submitIncentiveClaim(
                                   <div style="background: rgba(255,255,255,0.05); padding: 25px; border-radius: 12px; border-left: 5px solid #00e676; margin: 25px 0;">
                                       <p style="color:#ffffff; margin: 0 0 12px 0; font-weight: bold; font-size: 1.2em; line-height: 1.4;">"${claimTitle}"</p>
                                       <p style="color:#e0e0e0; margin: 0; font-size: 0.95em;">
-                                          <strong>Listed Role:</strong> ${coAuthor.role} ${finalClaimData.authorPosition ? `| <strong>Position:</strong> ${finalClaimData.authorPosition}` : ''}
+                                          <strong>Listed Role:</strong> ${coAuthor.role} ${finalClaimData.authorPosition}
                                       </p>
                                   </div>
 
@@ -499,29 +499,24 @@ export async function submitIncentiveClaim(
   }
 }
 
-export async function deleteIncentiveClaim(claimId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteIncentiveClaim(claimId: string, _userId?: string): Promise<{ success: boolean; error?: string }> {
   try {
     const session = await checkAuth();
-    if (!session.authenticated) return { success: false, error: "Unauthorized." };
+    if (!session.authenticated || !session.uid) return { success: false, error: "Authentication missing. Please log in again." };
+    
     const isAdmin = session.role === 'admin' || session.role === 'Super-admin' || session.role === 'CRO';
 
-    if (!isAdmin && session.uid !== userId) {
-      return { success: false, error: "Unauthorized." };
-    }
-
-    const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
-    const claimSnap = await claimRef.get();
-    if (!claimSnap.exists) return { success: false, error: "Claim not found." };
-    const claim = claimSnap.data() as IncentiveClaim;
-    if (claim.uid !== userId) return { success: false, error: "Unauthorized." };
+    const claim = await getIncentiveClaimByIdCombined(claimId);
+    if (!claim) return { success: false, error: "Claim not found." };
+    if (!isAdmin && claim.uid !== session.uid) return { success: false, error: "Unauthorized access to this claim." };
     if (claim.status !== 'Draft') return { success: false, error: "Only drafts can be deleted." };
 
     // Legacy Firestore write has been completely purged to strictly enforce the RTDB-only pipeline.
     try { await adminRtdb.ref(`incentiveClaims/${claimId}`).remove(); } catch (e) {
       console.error("RTDB Remove Error (deleteIncentiveClaim):", e);
-      return { success: false, error: "Failed to delete from Realtime Database." };
+      return { success: false, error: "Failed to delete." };
     }
-    await logActivity('INFO', 'Incentive claim draft deleted', { claimId, userId });
+    await logActivity('INFO', 'Incentive claim draft deleted', { claimId, userId: session.uid });
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
