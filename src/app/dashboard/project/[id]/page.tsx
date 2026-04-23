@@ -173,7 +173,7 @@ export default function ProjectDetailsPage() {
       <PageHeader
         title={project.title}
         description={project.type}
-        onBackClick={() => router.back()}
+        backButtonHref="/dashboard"
         backButtonText="Back"
       />
       <div className="mt-8">
