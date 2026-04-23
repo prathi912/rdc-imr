@@ -17,8 +17,9 @@ export async function deleteImrProject(
   deletedBy: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await checkAuth({ role: ['admin', 'Super-admin', 'CRO'] });
-    if (!session.authenticated || !session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
+    const session = await checkAuth({ role: ['admin', 'super-admin', 'cro'] });
+    if (!session.authenticated) return { success: false, error: "Session expired. Please refresh the page and try again." };
+    if (!session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
 
     const projectRef = adminDb.collection("projects").doc(projectId)
     const projectSnap = await projectRef.get()
@@ -120,8 +121,9 @@ export async function saveProjectSubmission(
 
 export async function updateProjectStatus(projectId: string, newStatus: Project["status"], comments?: string) {
   try {
-    const session = await checkAuth({ role: ['admin', 'Super-admin', 'CRO'] });
-    if (!session.authenticated || !session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
+    const session = await checkAuth({ role: ['admin', 'super-admin', 'cro'] });
+    if (!session.authenticated) return { success: false, error: "Session expired. Please refresh the page and try again." };
+    if (!session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
 
     const projectRef = adminDb.collection("projects").doc(projectId)
     const projectSnap = await projectRef.get()
@@ -260,8 +262,9 @@ export async function updateProjectDuration(
   endDate: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await checkAuth({ role: ['admin', 'Super-admin', 'CRO'] });
-    if (!session.authenticated || !session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
+    const session = await checkAuth({ role: ['admin', 'super-admin', 'cro'] });
+    if (!session.authenticated) return { success: false, error: "Session expired. Please refresh the page and try again." };
+    if (!session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
 
     if (!projectId || !startDate || !endDate) {
       return { success: false, error: "Project ID, start date, and end date are required." }
@@ -288,8 +291,9 @@ export async function updateProjectEvaluators(
   evaluatorUids: string[],
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await checkAuth({ role: ['admin', 'Super-admin', 'CRO'] });
-    if (!session.authenticated || !session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
+    const session = await checkAuth({ role: ['admin', 'super-admin', 'cro'] });
+    if (!session.authenticated) return { success: false, error: "Session expired. Please refresh the page and try again." };
+    if (!session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
 
     if (!projectId || !evaluatorUids) {
       return { success: false, error: "Project ID and evaluator UIDs are required." }
@@ -321,8 +325,9 @@ export async function markImrAttendance(
   meetingIdentifier?: { date: string; time: string; venue: string }
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await checkAuth({ role: ['admin', 'Super-admin', 'CRO'] });
-    if (!session.authenticated || !session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
+    const session = await checkAuth({ role: ['admin', 'super-admin', 'cro'] });
+    if (!session.authenticated) return { success: false, error: "Session expired. Please log out and log back in, then try again." };
+    if (!session.authorized) return { success: false, error: `Unauthorized: Your role '${session.role || 'unknown'}' does not have permission to mark attendance. Required: admin, Super-admin, or CRO.` };
 
     const batch = adminDb.batch();
     const projectsRef = adminDb.collection("projects");
@@ -376,7 +381,8 @@ export async function markImrAttendance(
     await logActivity('ERROR', 'Failed to mark IMR attendance', {
       error: error.message,
     });
-    return { success: false, error: "Failed to update attendance." };
+    // Return the actual error message so the admin can see what went wrong
+    return { success: false, error: error.message || "Failed to update attendance. Please try again." };
   }
 }
 
@@ -524,8 +530,9 @@ export async function adminUploadProposal(
   fileName: string,
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
-    const session = await checkAuth({ role: ['admin', 'Super-admin', 'CRO'] });
-    if (!session.authenticated || !session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
+    const session = await checkAuth({ role: ['admin', 'super-admin', 'cro'] });
+    if (!session.authenticated) return { success: false, error: "Session expired. Please refresh the page and try again." };
+    if (!session.authorized) return { success: false, error: "Unauthorized. Admin access required." };
 
     const { uploadFileToServer } = await import("./storage-service")
     const path = `projects/${projectId}/${fileName}`

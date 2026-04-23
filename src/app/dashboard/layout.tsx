@@ -64,7 +64,8 @@ import { signOut, onAuthStateChanged, type User as FirebaseUser } from "firebase
 import { useToast } from "@/hooks/use-toast"
 import { collection, onSnapshot, query, where, doc, getDoc } from "firebase/firestore"
 import { getDefaultModulesForRole } from "@/lib/modules"
-import { saveSidebarOrder, getSystemSettings } from "@/app/actions"
+import { saveSidebarOrder, getSystemSettings, setSession } from "@/app/actions"
+
 import { HelpDialog } from "@/components/help-dialog"
 import {
   AlertDialog,
@@ -401,12 +402,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
     }
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (unsubscribeProfile) unsubscribeProfile()
       clearTimeout(retryTimeout)
 
       if (firebaseUser) {
+        // Refresh the Firebase ID token to keep the server-side session cookie current.
+        // ID tokens expire after 1 hour; without this refresh, server actions would fail
+        // with "Session expired" after an hour of use.
+        try {
+          const freshToken = await firebaseUser.getIdToken(true); // force refresh
+          await setSession(freshToken);
+        } catch (tokenError) {
+          console.warn('Could not refresh session token:', tokenError);
+        }
         fetchUserProfile(firebaseUser)
+
       } else {
         // This is the key change: ensure all state is reset on logout
         setUser(null)

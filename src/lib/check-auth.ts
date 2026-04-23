@@ -28,8 +28,8 @@ export async function checkAuth(options: {
 
     if (role) {
       const allowedRoles = Array.isArray(role) ? role : [role];
-      const normalizedAllowedRoles = allowedRoles.map(r => r.toLowerCase().replace(/\s+/g, '-'));
-      let normalizedUserRole = userRole?.toLowerCase().replace(/\s+/g, '-');
+      const normalizedAllowedRoles = allowedRoles.map(r => r.toLowerCase().trim().replace(/[\s-]+/g, '-'));
+      let normalizedUserRole = userRole?.toLowerCase().trim().replace(/[\s-]+/g, '-');
 
       // If role is missing or doesn't match, try fetching a fresh one from the database
       if (!normalizedUserRole || !normalizedAllowedRoles.includes(normalizedUserRole)) {
@@ -39,7 +39,7 @@ export async function checkAuth(options: {
           const dbRole = userDoc.data()?.role;
           if (dbRole) {
             userRole = dbRole;
-            normalizedUserRole = dbRole.toLowerCase().replace(/\s+/g, '-');
+            normalizedUserRole = dbRole.toLowerCase().trim().replace(/[\s-]+/g, '-');
           }
         }
       }
